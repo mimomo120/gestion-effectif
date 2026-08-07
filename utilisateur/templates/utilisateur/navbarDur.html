@@ -1,0 +1,157 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'utilisateur/css/RU/navbar.css' %}">
+    {% block css %}{% endblock %}
+    <title>{% block title %}{% endblock %}</title>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top mb-4 py-2"
+        style="background: linear-gradient(135deg, #1E2A38 0%, #34465C 100%) !important;">
+        <div class="container-fluid px-4">
+
+            <!-- Brand/Logo (Position Fixée & Encapuchonnée) -->
+            <a class="navbar-brand d-flex align-items-center gap-3 pe-5  me-4" href="{% url 'DUR' %}">
+                <!-- SVG de l'icône "M" Stellantis -->
+                <svg width="34" height="34" viewBox="0 0 70 55" fill="none" class="flex-shrink-0">
+                    <rect x="0" y="40" width="8" height="8" fill="#fbf8f2" rx="1" />
+                    <rect x="0" y="28" width="8" height="8" fill="#fbf8f2" rx="1" />
+                    <rect x="0" y="16" width="8" height="8" fill="#0072ff" rx="1" />
+                    <rect x="0" y="4" width="8" height="8" fill="#0072ff" rx="1" />
+
+                    <rect x="11" y="13" width="7" height="7" fill="#0072ff" opacity="0.85" rx="1" />
+                    <rect x="21" y="22" width="6" height="6" fill="#0072ff" opacity="0.7" rx="1" />
+                    <rect x="30" y="30" width="7" height="7" fill="#fbf8f2" rx="1" />
+                    <rect x="39" y="22" width="6" height="6" fill="#0072ff" opacity="0.7" rx="1" />
+                    <rect x="48" y="13" width="7" height="7" fill="#0072ff" opacity="0.85" rx="1" />
+
+                    <rect x="58" y="4" width="8" height="8" fill="#0072ff" rx="1" />
+                    <rect x="58" y="16" width="8" height="8" fill="#0072ff" rx="1" />
+                    <rect x="58" y="28" width="8" height="8" fill="#fbf8f2" rx="1" />
+                    <rect x="58" y="40" width="8" height="8" fill="#fbf8f2" rx="1" />
+                </svg>
+
+                <!-- Texte avec conteneur flex vertical -->
+                <div class="d-flex flex-column justify-content-center lh-1">
+                    <span class="fw-light fs-4" style="color: #cfd2d6; letter-spacing: 4px;">MODULA</span>
+                    <span class="fw-semibold mt-1"
+                        style="color: #0072ff; font-size: 0.60rem; letter-spacing: 1.5px; white-space: nowrap;">
+                        EFFECTIF MANAGEMENT
+                    </span>
+                </div>
+            </a>
+
+            <!-- Bouton Hamburger Mobile -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Navbar Items -->
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto align-items-lg-center">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'DUR' %}active fw-bold{% endif %}"
+                            href="{% url 'DUR' %}">
+                            <i class="fas fa-home me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_Rg_par_dur' %}active fw-bold{% endif %}"
+                            href="{% url 'liste_Rg_par_dur' %}">
+                            <i class="fas fa-users me-2"></i>Opérateurs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_ru_non_valides_dur' %}active fw-bold{% endif %}"
+                            href="{% url 'liste_ru_non_valides_dur' %}">
+                            <i class="fas fa-check-circle me-2"></i>Validation du jour
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N3' %}active fw-bold{% endif %}"
+                            href="{% url 'affectation_N3' %}">
+                            <i class="fas fa-history me-2"></i>Historique
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Alerts + User Info & Disconnect -->
+                <div class="user-info text-end">
+                    <p class="mb-0 text-white fw-medium small">
+                        <i class="fas fa-user-circle me-1"></i>{{ request.session.nom }}
+                    </p>
+                    <div class="d-flex gap-1 justify-content-end align-items-center" style="font-size: 0.7rem;">
+                        {% if request.session.roles_disponibles|length > 1 %}
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-link text-secondary text-uppercase p-0 dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.7rem;">
+                                {{ request.session.role }}
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                {% for role in request.session.roles_disponibles %}
+                                <li>
+                                    <a class="dropdown-item {% if role == request.session.role %}active{% endif %}"
+                                        href="{% url 'changer_role' role %}">
+                                        {{ role }}
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% else %}
+                        <span class="text-secondary text-uppercase">{{ request.session.role }}</span>
+                        {% endif %}
+                
+                        {% if request.session.unite %}
+                        <span class="text-secondary">• {{ request.session.unite }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                    <a href="{% url 'deconnecter' %}" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-sign-out-alt me-1"></i>Déconnecter
+                    </a>
+                </div>
+            </div>
+            
+        </div>
+    </nav>
+
+
+    <!-- Main Content -->
+    <div class="container-fluid px-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block script %}
+    <script>
+        (function () {
+            const toggle = document.getElementById("navbar-toggle");
+            const menu = document.getElementById("navbar-menu");
+            if (!toggle || !menu) return;
+
+            toggle.addEventListener("click", function () {
+                const ouvert = menu.classList.toggle("open");
+                toggle.setAttribute("aria-expanded", ouvert ? "true" : "false");
+            });
+        })();
+    </script>
+    {% endblock %}
+
+</body>
+
+</html>

@@ -1,0 +1,32 @@
+{%extends "utilisateur/navbarRg.html"%}
+{% load static %}
+{% block title %}Liste{% endblock %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/RG/liste.css' %}">
+{% endblock %}
+{%block content%}
+<table class="table-operateurs">
+    <thead>
+        <tr>
+            <th>Matricule</th>
+            <th>Utilisateur</th>
+            <th>Nom Prenom</th>
+            <th>Lot</th>
+        </tr>
+    </thead>
+    <tbody id="result-operateurs">
+        {%for operateur in operateurs %}
+        <tr>
+            <td>{{operateur.matricule}}</td>
+            <td>{{operateur.it}}</td>
+            <td>{{operateur.nom_complete}}</td>
+            <td>{{operateur.lot}}</td>
+        </tr>
+        {%empty %}
+        <tr>
+            <td colspan="4" class="empty-row">Aucun opérateur trouvé.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{%endblock%}

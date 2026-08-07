@@ -1,0 +1,48 @@
+{% extends "utilisateur/navbarDur.html" %}
+{% load static %}
+
+{% block title %}<title>Liste des Effectifs</title>{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/RG/liste.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="table-container">
+
+    <div class="tables-grid">
+        <!-- TABLEAU 1 : RESPONSABLES -->
+        <div class="table-wrapper">
+            <div class="page-header">
+                <h1>Liste des responsables ({{ nbr }}) :</h1>
+            </div>
+            <table class="table-operateurs">
+                <thead>
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Utilisateur</th>
+                        <th>Nom & Prénom</th>
+                        <th>Lot</th>
+                    </tr>
+                </thead>
+                <tbody id="result-responsables">
+                    {% for operateur in operateurs %}
+                    <tr>
+                        <td class="cell-mono">{{ operateur.matricule }}</td>
+                        <td class="cell-mono">{{ operateur.it }}</td>
+                        <td>{{ operateur.nom_complete }}</td>
+                        <td><span class="chip chip-lot-{{ operateur.lot }}">{{ operateur.lot }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="empty-row">Aucun responsable trouvé.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+    </div>
+
+</div>
+{% endblock %}

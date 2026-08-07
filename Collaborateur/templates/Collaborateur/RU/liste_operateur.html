@@ -1,0 +1,223 @@
+{%extends 'utilisateur/navbar.html'%}
+{% load static %}
+{% block title %}<title>Liste Opérateurs</title>{% endblock %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/RU/liste.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="operateurs-container">
+    <h1 class="page-title">Opérateurs</h1>
+
+    <!-- Filters Section -->
+    <div class="filters-section">
+        <div class="filter-group">
+            <input type="text" placeholder="Rechercher par matricule ou nom" class="filter-input search-input"
+                id="search">
+
+            <select class="filter-select" id="choix">
+                <option value="">Tous les lots</option>
+                <option value="A">Lot A</option>
+                <option value="O">Lot O</option>
+                <option value="P">Lot P</option>
+            </select>
+
+            <input type="date" class="filter-input date-input" id="date">
+
+            <button class="btn btn-reset" id="resetBtn">
+                <i class="fas fa-redo me-2"></i>Réinitialiser
+            </button>
+        </div>
+    </div>
+
+    <!-- Table Section -->
+    <div class="table-container">
+        <table class="table-operateurs">
+            <thead>
+                <tr>
+                    <th>Matricule</th>
+                    <th>Utilisateur</th>
+                    <th>Nom & Prénom</th>
+                    <th>Lot</th>
+                </tr>
+            </thead>
+            <tbody id="result">
+                {% for operateur in operateurs_finaux %}
+                <tr class="table-row">
+                    <td class="cell-matricule">{{ operateur.matricule }}</td>
+                    <td class="cell-utilisateur">{{ operateur.it }}</td>
+                    <td class="cell-nom">{{ operateur.nom_complete }}</td>
+                    <td class="cell-lot">
+                        <span class="">{{operateur.lot}}</span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="empty-row">
+                        <i class="fas fa-inbox"></i> Aucun opérateur trouvé
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const resultat = document.getElementById("result");
+        const searchInput = document.getElementById("search");
+        const lotSelect = document.getElementById("choix");
+        const dateInput = document.getElementById("date");
+        const resetBtn = document.getElementById("resetBtn");
+
+        // Set today's date on load
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        const day = String(today.getDate()).padStart(2, "0");
+        dateInput.value = `${year}-${month}-${day}`;
+
+        // Search function
+        async function performSearch() {
+            const query = searchInput.value.trim();
+            const lot = lotSelect.value;
+            const post = postSelect.value;
+
+            try {
+                const response = await fetch(
+                    `/rechercher?q=${encodeURIComponent(query)}&choix=${encodeURIComponent(lot)}`
+                );
+
+                if (!response.ok) throw new Error("Erreur réseau");
+
+                const data = await response.json();
+
+                if (data.length > 0) {
+                    resultat.innerHTML = data.map(op => `
+                        <tr class="table-row">
+                            <td class="cell-matricule">${escapeHtml(op.matricule)}</td>
+                            <td class="cell-utilisateur">${escapeHtml(op.it)}</td>
+                            <td class="cell-nom">${escapeHtml(op.nom_complete)}</td>
+                            <td class="cell-lot">
+                                <span class="badge badge-${op.lot?.toLowerCase() || ''}">
+                                    ${escapeHtml(op.lot || '-')}
+                                </span>
+                            </td>
+
+                        </tr>
+                    `).join("");
+                } else {
+                    resultat.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="empty-row">
+                                <i class="fas fa-search"></i> Aucun opérateur trouvé
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (error) {
+                console.error("Erreur lors de la recherche:", error);
+                resultat.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="empty-row error">
+                            <i class="fas fa-exclamation-circle"></i> Erreur lors de la recherche
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Date filter function
+        async function filterByDate() {
+            const date = dateInput.value;
+
+            if (!date) {
+                resultat.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="empty-row">Sélectionnez une date</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            try {
+                const response = await fetch(`/filter?time=${encodeURIComponent(date)}`);
+
+                if (!response.ok) throw new Error("Erreur réseau");
+
+                const data = await response.json();
+
+                if (data.length > 0) {
+                    resultat.innerHTML = data.map(op => `
+                        <tr class="table-row">
+                            <td class="cell-matricule">${escapeHtml(op.matricule)}</td>
+                            <td class="cell-utilisateur">${escapeHtml(op.it)}</td>
+                            <td class="cell-nom">${escapeHtml(op.nom_complete)}</td>
+                            <td class="cell-lot">
+                                <span class="badge badge-${op.lot?.toLowerCase() || ''}">
+                                    ${escapeHtml(op.lot || '-')}
+                                </span>
+                            </td>
+                        </tr>
+                    `).join("");
+                } else {
+                    resultat.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="empty-row">
+                                <i class="fas fa-calendar-times"></i> Aucune déclaration pour cette date
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (error) {
+                console.error("Erreur lors du filtrage:", error);
+                resultat.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="empty-row error">
+                            <i class="fas fa-exclamation-circle"></i> Erreur lors du filtrage
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Reset function
+        function resetFilters() {
+            searchInput.value = "";
+            lotSelect.value = "";
+            postSelect.value = "";
+            dateInput.value = `${year}-${month}-${day}`;
+            performSearch();
+        }
+
+        // XSS Protection
+        function escapeHtml(text) {
+            const map = {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;"
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Event listeners
+        searchInput.addEventListener("input", performSearch);
+        lotSelect.addEventListener("change", performSearch);
+        postSelect.addEventListener("change", performSearch);
+        dateInput.addEventListener("change", filterByDate);
+        resetBtn.addEventListener("click", resetFilters);
+
+        // Debounce for better performance
+        let searchTimeout;
+        searchInput.addEventListener("input", (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(performSearch, 300);
+        });
+    });
+</script>
+{% endblock %}

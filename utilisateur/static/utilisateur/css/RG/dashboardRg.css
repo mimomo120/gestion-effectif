@@ -1,0 +1,308 @@
+/* ==========================================================================
+   VARIABLES & DESIGN SYSTEM
+   ========================================================================== */
+:root {
+    --primary: #1E2A38;
+    --surface: #FFFFFF;
+    --paper: #F8FAFC;
+    --line: #E2E8F0;
+    --line-subtle: #F1F5F9;
+
+    --ink-heading: #0F172A;
+    --ink-body: #334155;
+    --ink-muted: #64748B;
+
+    --emerald-bg: #E6F4EA;
+    --emerald-text: #137333;
+
+    --crimson-bg: #FCE8E6;
+    --crimson-text: #C5221F;
+
+    --radius-md: 10px;
+    --radius-lg: 14px;
+
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.08);
+}
+
+.dash-header {
+    margin-bottom: 24px;
+}
+
+.dash-header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--ink-heading);
+    margin: 0 0 4px 0;
+}
+
+.dash-header p {
+    color: var(--ink-muted);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* ==========================================================================
+   CARTES DE STATISTIQUES (KPIs)
+   ========================================================================== */
+.statistique-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.stat-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.stat-card h3 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0 0 10px 0;
+}
+
+.stat-valeur-group {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.stat-valeur-group .valeur {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--ink-heading);
+    line-height: 1;
+}
+
+.stat-valeur-group .unite {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--ink-body);
+}
+
+/* ==========================================================================
+   BADGE PILL "vs maquette"
+   ========================================================================== */
+.badge-vs {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.badge-vs.positive {
+    background-color: var(--emerald-bg);
+    color: var(--emerald-text);
+}
+
+.badge-vs.negative {
+    background-color: var(--crimson-bg);
+    color: var(--crimson-text);
+}
+
+/* ==========================================================================
+   SECTION TABLEAU & RECHERCHE
+   ========================================================================== */
+.section {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 20px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.section-header h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ink-heading);
+    margin: 0;
+}
+
+.recherche-ru {
+    position: relative;
+    min-width: 280px;
+}
+
+.recherche-ru .icon-search {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: var(--ink-muted);
+}
+
+.recherche-ru input {
+    width: 100%;
+    padding: 8px 12px 8px 38px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.recherche-ru input:focus {
+    border-color: var(--primary);
+}
+
+/* ==========================================================================
+   TABLEAU STRUCTURÉ
+   ========================================================================== */
+.table-ru {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.88rem;
+}
+
+.table-ru thead th {
+    background: var(--paper);
+    color: var(--ink-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.table-ru tbody tr {
+    border-bottom: 1px solid var(--line-subtle);
+    transition: background-color 0.15s ease;
+}
+
+.table-ru tbody tr:hover {
+    background-color: var(--paper);
+}
+
+.table-ru td {
+    padding: 12px 16px;
+    vertical-align: middle;
+    color: var(--ink-body);
+}
+
+.table-ru td.matricule {
+    font-weight: 600;
+    color: var(--ink-heading);
+}
+
+/* Alignement flex dans les cellules du tableau */
+.cell-stat-container {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.cell-stat-container .valeur-chiffre {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ink-heading);
+}
+
+.empty-row {
+    text-align: center;
+    padding: 32px !important;
+    color: var(--ink-muted);
+}
+/* ===== GRAPHIQUE ===== */
+.chart-wrapper {
+    background: var(--surface, #FFFFFF);
+    border: 1px solid var(--line, #E2E5EA);
+    border-radius: var(--radius, 10px);
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(16, 21, 28, 0.06));
+    padding: 20px;
+    height: 360px;
+    margin-bottom: 24px;
+}
+
+/* ===== PAGINATION ===== */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 4px 4px;
+}
+
+.pagination-info {
+    font-size: 0.82rem;
+    color: var(--ink-400, #8792A2);
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pagination-pages {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink-600, #4A5568);
+    white-space: nowrap;
+}
+
+.pagination-btn {
+    padding: 7px 14px;
+    border: 1px solid var(--line, #E2E5EA);
+    background: var(--surface, #FFFFFF);
+    color: var(--ink-900, #10151C);
+    border-radius: 7px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: var(--paper, #F6F7F9);
+    border-color: var(--steel-500, #4e657997);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+@media (max-width: 576px) {
+    .pagination-bar {
+        justify-content: center;
+        text-align: center;
+    }
+
+    .chart-wrapper {
+        height: 280px;
+        padding: 14px;
+    }
+}

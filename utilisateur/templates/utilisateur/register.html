@@ -1,0 +1,39 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+    <link rel="stylesheet" href="{% static 'utilisateur/css/register.css' %}">
+</head>
+<body>
+    <div class="formule">
+        
+        <img src="{% static 'images/logo.png' %}" class="logo">
+        {% if message %}
+        <div class="alert alert-danger">{{ message }}</div>
+        {% endif %}
+
+        <form method="post" action="{% url 'register' %}">
+            {% csrf_token %}
+        
+            <div class="mb-3">
+                <label class="form-label">it</label>
+                <input type="text" name="it" class="form-control" required>
+            </div>
+        
+            <div class="mb-3">
+                <label class="form-label">Mot de passe</label>
+                <input type="password" name="password" class="form-control" required>
+            </div>
+        
+            <button type="submit" class="btn btn-primary w-100">
+                cree
+            </button>
+            
+        </form>
+        <a href="{% url 'login' %}" class="login">log-in</a>
+    </div>
+</body>
+</html>

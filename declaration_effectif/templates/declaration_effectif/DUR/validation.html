@@ -1,0 +1,241 @@
+{% extends "utilisateur/navbarDur.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'declaration_effectif/css/validation.css' %}">
+{% endblock %}
+
+{% block title %}<title>Validation</title>{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-4">
+    <div class="row g-4 justify-content-center">
+        <div class="col-12">
+            <input type="date" class="filter-input date-input mb-3" id="date">
+        </div>
+
+        <!-- Table 1 : Liste RU sans validation (avec bouton Alerter) -->
+        <div class="col-12">
+            <h5 class="section-title">
+                Liste Ru sans validation (<span id="count-ru">{{ non_valides|length|default:"0" }}</span>) :
+            </h5>
+
+            <div class="table-card">
+                <table class="custom-table">
+                    <thead id="titre">
+                        <tr>
+                            <th>MATRICULE</th>
+                            <th>UTILISATEUR</th>
+                            <th>NOM & PRÉNOM</th>
+                            <th class="text-center">LOT</th>
+                            <th class="text-center">DATE</th>
+                            <th class="text-end">ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody id="result">
+                        {% for operateur in non_valides %}
+                        <tr>
+                            <td class="cell-mono">{{ operateur.matricule }}</td>
+                            <td class="cell-mono">{{ operateur.it }}</td>
+                            <td class="cell-name">{{ operateur.nom_complete }}</td>
+                            <td class="text-center">
+                                <span class="badge-circle badge-circle-{{ operateur.lot }}">{{ operateur.lot }}</span>
+                            </td>
+                            <td class="text-center">{{ date }}</td>
+                            <td class="text-end">
+                                <button class="alert_btn" data-ru_it="{{ operateur.it }}">Alerter</button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="empty-row text-center">Aucun opérateur trouvé.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Récupération du Cookie CSRF
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+    const csrftoken = getCookie('csrftoken');
+    const dateInput = document.getElementById("date");
+    const resultContainer = document.getElementById("result");
+    const head = document.getElementById("titre");
+    const countRu = document.getElementById("count-ru");
+
+    // Helper de sécurité contre XSS
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // 2. Initialisation au chargement de la page
+    document.addEventListener("DOMContentLoaded", function () {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        const day = String(today.getDate()).padStart(2, "0");
+        dateInput.value = `${year}-${month}-${day}`;
+
+        attachAlertListeners();
+    });
+
+    dateInput.addEventListener("change", filterByDate);
+
+    // 3. Filtrage dynamique par date
+    async function filterByDate() {
+        const date = dateInput.value;
+
+        if (!date) {
+            resultContainer.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty-row text-center">Sélectionnez une date</td>
+                </tr>
+            `;
+            if (countRu) countRu.textContent = "0";
+            return;
+        }
+
+        try {
+            const response = await fetch(`/filter_date?time=${encodeURIComponent(date)}`);
+            if (!response.ok) throw new Error("Erreur réseau");
+
+            const data = await response.json();
+
+            if (data.resultats && data.resultats.length > 0) {
+                // Mise à jour du compteur
+                if (countRu) countRu.textContent = data.resultats.length;
+
+                if (data.status) {
+                    // Masquer la colonne ACTION
+                    head.innerHTML = `
+                        <tr>
+                            <th>MATRICULE</th>
+                            <th>UTILISATEUR</th>
+                            <th>NOM & PRÉNOM</th>
+                            <th class="text-center">LOT</th>
+                            <th class="text-center">DATE</th>
+                        </tr>
+                    `;
+
+                    resultContainer.innerHTML = data.resultats.map(op => `
+                        <tr>
+                            <td class="cell-mono">${escapeHtml(op.matricule)}</td>
+                            <td class="cell-mono">${escapeHtml(op.it)}</td>
+                            <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                            <td class="text-center">
+                                <span class="badge-circle badge-circle-${escapeHtml(op.lot?.toLowerCase() || '')}">
+                                    ${escapeHtml(op.lot || '-')}
+                                </span>
+                            </td>
+                            <td class="text-center">${escapeHtml(date)}</td>
+                        </tr>
+                    `).join("");
+
+                } else {
+                    // Afficher la colonne ACTION avec le bouton Alerter
+                    head.innerHTML = `
+                        <tr>
+                            <th>MATRICULE</th>
+                            <th>UTILISATEUR</th>
+                            <th>NOM & PRÉNOM</th>
+                            <th class="text-center">LOT</th>
+                            <th class="text-center">DATE</th>
+                            <th class="text-end">ACTION</th>
+                        </tr>
+                    `;
+
+                    resultContainer.innerHTML = data.resultats.map(op => `
+                        <tr>
+                            <td class="cell-mono">${escapeHtml(op.matricule)}</td>
+                            <td class="cell-mono">${escapeHtml(op.it)}</td>
+                            <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                            <td class="text-center">
+                                <span class="badge-circle badge-circle-${escapeHtml(op.lot?.toLowerCase() || '')}">
+                                    ${escapeHtml(op.lot || '-')}
+                                </span>
+                            </td>
+                            <td class="text-center">${escapeHtml(date)}</td>
+                            <td class="text-end">
+                                <button class="alert_btn" data-ru_it="${escapeHtml(op.it)}">Alerter</button>
+                            </td>
+                        </tr>
+                    `).join("");
+
+                    attachAlertListeners();
+                }
+
+            } else {
+                if (countRu) countRu.textContent = "0";
+                resultContainer.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-row text-center">
+                            <i class="fas fa-calendar-times"></i> Aucune déclaration pour cette date.
+                        </td>
+                    </tr>
+                `;
+            }
+        } catch (error) {
+            console.error("Erreur lors du filtrage:", error);
+            if (countRu) countRu.textContent = "0";
+            resultContainer.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty-row error text-center">
+                        <i class="fas fa-exclamation-circle"></i> Erreur lors du filtrage des données.
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    // 4. Attachement des clics sur le bouton Alerter
+    function attachAlertListeners() {
+        const alertButtons = resultContainer.querySelectorAll(".alert_btn");
+        alertButtons.forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                const ru_it = btn.dataset.ru_it;
+                envoyerAlerte(ru_it, btn);
+            });
+        });
+    }
+
+    // 5. Requête POST d'envoi d'alerte
+    function envoyerAlerte(ru_it, btn) {
+        fetch("/alerter_ru/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrftoken
+            },
+            body: JSON.stringify({ ru_it: ru_it })
+        })
+            .then(response => {
+                if (!response.ok) throw new Error("Erreur serveur : " + response.status);
+                return response.json();
+            })
+            .then(data => {
+                btn.textContent = "Envoyé";
+                btn.classList.add("sent");
+                btn.disabled = true;
+            })
+            .catch(error => {
+                console.error("Erreur lors de l'envoi de l'alerte :", error);
+                alert("Échec de l'envoi de l'alerte.");
+            });
+    }
+</script>
+{% endblock %}

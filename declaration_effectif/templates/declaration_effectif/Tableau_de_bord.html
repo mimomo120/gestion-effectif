@@ -1,0 +1,226 @@
+{% extends 'utilisateur/navbar.html' %}
+{% load static %}
+
+{% block title %}
+<title>Tableau de bord</title>
+{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/RU/tableau.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page">
+
+    <!-- En-tête -->
+    <header class="header">
+        <h1>Tableau de bord</h1>
+        <div class="time">
+            <h5 id="time" aria-live="polite">{{ date }}</h5>
+        </div>
+    </header>
+
+    <!-- Cartes d'effectifs (KPIs) -->
+    <section class="statistique">
+        <div class="reel">
+            <h3>Effectif réel</h3>
+            <p><span>{{ reel }}</span> opérateurs</p>
+            {% if diff_r_m > 0 %}
+            <p class="diff diff-positive">▲ +{{ diff_r_m }} vs maquette</p>
+            {% else %}
+            <p class="diff diff-negative">▼ {{ diff_r_m }} vs maquette</p>
+            {% endif %}
+        </div>
+
+        <div class="systeme">
+            <h3>Effectif système</h3>
+            <p><span>{{ syste }}</span> opérateurs</p>
+            {% if diff_s_m > 0 %}
+            <p class="diff diff-positive">▲ +{{ diff_s_m }} vs maquette</p>
+            {% else %}
+            <p class="diff diff-negative">▼ {{ diff_s_m }} vs maquette</p>
+            {% endif %}
+        </div>
+
+        <div class="maquette">
+            <h3>Effectif maquette</h3>
+            <h5>{{ maquette }} <small class="text-muted">opérateurs</small></h5>
+        </div>
+    </section>
+
+    <!-- Section Graphique : Évolution de l'Effectif Réel -->
+    <section class="chart-section">
+        <div class="chart-card">
+            <div class="chart-header">
+                <h2>Évolution de l'Effectif Réel</h2>
+                {% if selected_ru_nom %}
+                <span class="ru-badge">RU : {{ selected_ru_nom }}</span>
+                {% endif %}
+            </div>
+            <div class="chart-container">
+                <canvas id="evolutionRUChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Synthèse des Lots -->
+    <section class="Lot">
+        <table class="table-operateurs-systeme">
+            <thead>
+                <tr>
+                    <th>Anapec - Ouvrier contrat CDI</th>
+                    <th>Pro</th>
+                    <th>Cadre</th>
+                    <th>Technicien agent de maitrise</th>
+                </tr>
+            </thead>
+            <tbody id="result-systeme-lots">
+                <tr>
+                    <td>{{ OLr }} / {{ O }}</td>
+                    <td>{{ Pr }} / {{ P }}</td>
+                    <td>{{ Cr }} / {{ C }}</td>
+                    <td>{{ Er }} / {{ E }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Détails des opérateurs -->
+    <section class="diff">
+        <h2>Présents uniquement au système</h2>
+        <table class="table-operateurs-systeme">
+            <thead>
+                <tr>
+                    <th>Matricule</th>
+                    <th>CIN</th>
+                    <th>Nom & Prénom</th>
+                    <th>DPT</th>
+                    <th>Lot</th>
+                </tr>
+            </thead>
+            <tbody id="result-systeme">
+                {% for operateur in systeme1 %}
+                <tr>
+                    <td>{{ operateur.matricule }}</td>
+                    <td>{{ operateur.cin }}</td>
+                    <td>{{ operateur.nom_complete }}</td>
+                    <td>{{ operateur.departement_id }}</td>
+                    <td>{{ operateur.lot }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="empty-row">Aucun opérateur trouvé.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h2>Présents uniquement au réel</h2>
+        <table class="table-operateurs-reel">
+            <thead>
+                <tr>
+                    <th>Matricule</th>
+                    <th>CIN</th>
+                    <th>Nom & Prénom</th>
+                    <th>Lot</th>
+                </tr>
+            </thead>
+            <tbody id="result-reel">
+                {% for operateur in reel1 %}
+                <tr>
+                    <td>{{ operateur.matricule }}</td>
+                    <td>{{ operateur.cin }}</td>
+                    <td>{{ operateur.nom_complete }}</td>
+                    <td>{{ operateur.lot }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="empty-row">Aucun opérateur trouvé.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+</div>
+{% endblock %}
+
+{% block script %}
+<!-- CDN Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Lecture directe des variables nettoyées transmises par views.py
+        const dynamicLabels = JSON.parse('{{ chart_labels|safe }}');
+        const dynamicData = JSON.parse('{{ chart_data|safe }}');
+
+        const ctx = document.getElementById('evolutionRUChart').getContext('2d');
+
+        // Création du dégradé de couleur sous la ligne du graphe
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, 'rgba(43, 88, 149, 0.35)');
+        gradient.addColorStop(1, 'rgba(43, 88, 149, 0.0)');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dynamicLabels,
+                datasets: [{
+                    label: 'Effectif Réel',
+                    data: dynamicData,
+                    borderColor: '#2b5895',
+                    backgroundColor: gradient,
+                    borderWidth: 2.5,
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: '#2b5895',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        padding: 10,
+                        displayColors: false,
+                        callbacks: {
+                            label: function (context) {
+                                return ` Effectif Réel: ${context.parsed.y} op.`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#64748b'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#e2e8f0'
+                        },
+                        ticks: {
+                            precision: 0,
+                            color: '#64748b'
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

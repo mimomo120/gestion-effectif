@@ -1,0 +1,48 @@
+effectifs-projet/
+├── config/
+│   ├── settings.py
+│   └── urls.py
+│
+├── apps/
+│   ├── collaborateur/          # Gestion des opérateurs
+│   │   ├── models.py
+│   │   ├── views.py
+│   │   ├── forms.py
+│   │   └── templates/
+│   │
+│   ├── declaration_effectif/   # Déclarations quotidiennes
+│   │   ├── models.py
+│   │   ├── views.py
+│   │   ├── forms.py            # Import manuel
+│   │   ├── parser.py           # Parsing CSV/Excel
+│   │   └── templates/
+│   │
+│   ├── maquette/               # Effectifs cibles
+│   │   ├── models.py
+│   │   ├── views.py
+│   │   └── forms.py
+│   │
+│   ├── affectation/            # Changements d'affectation
+│   │   ├── models.py
+│   │   ├── views.py
+│   │   └── forms.py
+│   │
+│   ├── dashboard/              # Tableaux de bord par rôle
+│   │   ├── views.py
+│   │   └── templates/
+│   │
+│   └── users/                  # Authentification + permissions
+│       ├── models.py           # Access model
+│       ├── views.py
+│       └── permissions.py
+│
+├── static/
+│   └── js/
+│       └── import_handler.js
+│
+├── templates/
+│   ├── base.html
+│   ├── import.html
+│   └── dashboard.html
+│
+└── manage.py

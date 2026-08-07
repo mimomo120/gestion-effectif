@@ -1,0 +1,130 @@
+{% extends 'utilisateur/navbarDur.html' %}
+{% load static %}
+{% block title %}Tableau de bord{% endblock %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/Rg/dashboardRg.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="dash-header">
+    <h1>Tableau de bord</h1>
+    <div class="time">
+        <h5 id="time" aria-live="polite">{{maint}}</h5>
+    </div>
+</div>
+
+<!-- ===== STATISTIQUES GÉNÉRALES (toutes unités confondues) ===== -->
+<div class="statistique-cards">
+    <div class="stat-card stat-reel">
+        <h3>Effectif réel/OP</h3>
+        <p><span>{{ total_r }}</span> opérateurs</p>
+    </div>
+    <div class="stat-card stat-systeme">
+        <h3>Effectif système/OP</h3>
+        <p><span>{{ total_syst }}</span> opérateurs</p>
+    </div>
+    <div class="stat-card stat-maquette">
+        <h3>Effectif maquette</h3>
+        <p><span>{{ maquette_totale }}</span> opérateurs</p>
+    </div>
+</div>
+
+<!-- ===== STATISTIQUES PAR RU (accès individuel) ===== -->
+<div class="section">
+    <div class="section-header">
+        <h2>Statistiques par N1</h2>
+        <div class="recherche-ru">
+            <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="recherche-ru" placeholder="Rechercher par matricule ou nom...">
+        </div>
+    </div>
+
+    <table class="table-ru">
+        <thead>
+            <tr>
+                <th>Matricule</th>
+                <th>Responsable Unité</th>
+                <th>Lot</th>
+                <th>Unite</th>
+                <th>DPT</th>
+                <th>Effectif réel</th>
+                <th>Effectif système</th>
+                <th>Effectif maquette</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for ru in liste_ru_stats %}
+        <tr data-matricule="{{ ru.n1.matricule }}" data-nom="{{ ru.n1.nom_complete }}">
+            <td class="matricule">{{ ru.n1.matricule }}</td>
+            <td>{{ ru.n1.nom_complete }}</td>
+            <td>{{ ru.n1.lot }}</td>
+            <td>{{ ru.n1.unite_id }}</td>
+            <td>{{ ru.n1.departement_id }}</td>
+            <td>{{ ru.reel }}</td>
+            <td>{{ ru.systeme }}</td>
+            <td>{{ ru.maquette }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" class="text-center">Aucune donnée disponible</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const rechercheInput = document.getElementById("recherche-ru");
+        const tbody = document.querySelector(".table-ru tbody");
+        if (!rechercheInput || !tbody) return;
+
+        // Lignes réellement issues du serveur (on exclut la ligne "vide"
+        // ajoutée dynamiquement par la recherche elle-même).
+        const lignes = Array.from(tbody.querySelectorAll("tr[data-matricule]"));
+
+        // Enlève les accents pour que "responsable" trouve aussi "Responsablé"
+        // et que la recherche soit insensible aux accents/majuscules.
+        function normaliser(texte) {
+            return String(texte)
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+        }
+
+        function filtrer() {
+            const requete = normaliser(rechercheInput.value.trim());
+            let resultatsVisibles = 0;
+
+            lignes.forEach(function (ligne) {
+                const matricule = normaliser(ligne.dataset.matricule || "");
+                const nom = normaliser(ligne.dataset.nom || "");
+                const correspond = requete === "" || matricule.includes(requete) || nom.includes(requete);
+                ligne.style.display = correspond ? "" : "none";
+                if (correspond) resultatsVisibles++;
+            });
+
+            let ligneVide = tbody.querySelector(".empty-row-recherche");
+            if (resultatsVisibles === 0 && lignes.length > 0) {
+                if (!ligneVide) {
+                    ligneVide = document.createElement("tr");
+                    ligneVide.className = "empty-row-recherche";
+                    ligneVide.innerHTML = '<td colspan="6" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
+                    tbody.appendChild(ligneVide);
+                }
+                ligneVide.style.display = "";
+            } else if (ligneVide) {
+                ligneVide.style.display = "none";
+            }
+        }
+
+        rechercheInput.addEventListener("input", filtrer);
+    });
+</script>
+{% endblock %}

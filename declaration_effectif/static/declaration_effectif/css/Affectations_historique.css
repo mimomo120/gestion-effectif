@@ -1,0 +1,130 @@
+/* ==========================================================================
+   Affectations_historique.css — Pleine Largeur (100%)
+   ========================================================================== */
+
+/* Titres des sections */
+.section-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 12px;
+}
+
+/* Carte conteneur de tableau */
+.table-card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+    border: 1px solid #e2e8f0;
+    width: 100%;
+    overflow-x: auto;
+    /* Scroll propre sur mobile */
+}
+
+/* Structure du Tableau */
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* En-tête bleu nuit */
+.custom-table thead tr {
+    background-color: #253449;
+}
+
+.custom-table thead th {
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 14px 18px;
+    border: none;
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Alignement centré pour l'en-tête de la colonne Etat */
+.custom-table thead th.text-center {
+    text-align: center;
+}
+
+/* Lignes du tableau */
+.custom-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.15s ease;
+}
+
+.custom-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.custom-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.custom-table tbody td {
+    padding: 12px 18px;
+    font-size: 0.82rem;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* Styles du texte */
+.cell-name {
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.cell-mono {
+    color: #475569;
+    font-weight: 500;
+}
+
+/* Message si aucune donnée */
+.empty-row {
+    text-align: center !important;
+    font-style: italic;
+    color: #94a3b8;
+    padding: 28px 18px !important;
+}
+
+/* ------------------------------- Badges d'état ------------------------------ */
+.badge {
+    display: inline-block;
+    padding: 5px 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 20px;
+    white-space: nowrap;
+    text-transform: capitalize;
+}
+
+/* Vert : Validé */
+.badge-valide-par-cp,
+.badge-valide,
+.badge-validee {
+    background-color: #dcfce7;
+    color: #15803d;
+}
+
+/* Jaune : En attente */
+.badge-en-attente,
+.badge-en-cours {
+    background-color: #fef3c7;
+    color: #b45309;
+}
+
+/* Rouge : Refusé */
+.badge-refuse,
+.badge-rejete {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+/* Fallback si état inconnu */
+.badge:not([class*="badge-"]) {
+    background-color: #f1f5f9;
+    color: #475569;
+}

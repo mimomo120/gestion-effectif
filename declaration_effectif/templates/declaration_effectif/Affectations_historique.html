@@ -1,0 +1,38 @@
+{%extends "utilisateur/navbar.html"%}
+{% load static %}
+{% block title %}<title>Liste des affectations</title>{% endblock %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/Rg/affectation.css' %}">
+{% endblock %}
+{%block content%}
+<div class="page-header">
+    <h1>Liste des affectations : {{nbr}}</h1>
+</div>
+
+<div class="section">
+    <table class="table-affectations">
+        <thead>
+            <tr>
+                <th>Nom complet Collaborateur</th>
+                <th>Nom complet RU initial</th>
+                <th>Nom complet RU cible</th>
+                <th>Etat</th>
+            </tr>
+        </thead>
+        <tbody id="result">
+            {%for affectation in info %}
+            <tr>
+                <td>{{affectation.collaborateur}}</td>
+                <td>{{affectation.initial}}</td>
+                <td>{{affectation.acceuil}}</td>
+                <td>{{affectation.etat}}</td>
+            </tr>
+            {%empty %}
+            <tr>
+                <td colspan="4" class="empty-row">Aucune affectation trouvée.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{%endblock%}

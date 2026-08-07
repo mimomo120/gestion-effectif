@@ -1,0 +1,125 @@
+{% extends 'utilisateur/navbarRg.html' %}
+{% load static %}
+
+{% block title %}Gestion des affectations{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/RG/affectation.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="affectations-container">
+    <div class="page-header">
+        <h2 class="page-title">Gestion des affectations</h2>
+    </div>
+
+    <!-- Onglets de basculement -->
+    <div class="tabs-switch" role="tablist">
+        <button type="button" class="tab-btn active" data-target="tab-mes" role="tab" aria-selected="true"
+            aria-controls="tab-mes">
+            Vos changements d'affectation
+        </button>
+        <button type="button" class="tab-btn" data-target="tab-toutes" role="tab" aria-selected="false"
+            aria-controls="tab-toutes">
+            Liste des affectations <span class="count-badge">{{ nbr|default:"0" }}</span>
+        </button>
+    </div>
+
+    <div class="sections-wrapper">
+        <!-- Section 1 : Affectations N2 -->
+        <div class="section-card tab-panel" id="tab-mes" role="tabpanel">
+            <div class="table-scroll">
+                <table class="table-affectations">
+                    <thead>
+                        <tr>
+                            <th>Collaborateur</th>
+                            <th>RU initial</th>
+                            <th>RU cible</th>
+                            <th class="text-center">État</th>
+                        </tr>
+                    </thead>
+                    <tbody id="result">
+                        {% for affectation in n2 %}
+                        <tr>
+                            <td class="cell-primary">{{ affectation.collaborateur }}</td>
+                            <td>{{ affectation.initial }}</td>
+                            <td>{{ affectation.acceuil }}</td>
+                            <td class="text-center">
+                                <span class="badge badge-{{ affectation.etat|slugify }}">
+                                    {{ affectation.etat }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="empty-row">Aucune affectation à afficher.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section 2 : Toutes les affectations -->
+        <div class="section-card tab-panel" id="tab-toutes" role="tabpanel" hidden>
+            <div class="table-scroll">
+                <table class="table-affectations">
+                    <thead>
+                        <tr>
+                            <th>Collaborateur</th>
+                            <th>RU initial</th>
+                            <th>RU cible</th>
+                            <th class="text-center">État</th>
+                        </tr>
+                    </thead>
+                    <tbody id="result2">
+                        {% for affectation in info %}
+                        <tr>
+                            <td class="cell-primary">{{ affectation.collaborateur }}</td>
+                            <td>{{ affectation.initial }}</td>
+                            <td>{{ affectation.acceuil }}</td>
+                            <td class="text-center">
+                                <span class="badge badge-{{ affectation.etat|slugify }}">
+                                    {{ affectation.etat }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="empty-row">Aucune affectation trouvée.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const boutons = document.querySelectorAll(".tab-btn");
+        const panneaux = document.querySelectorAll(".tab-panel");
+
+        boutons.forEach(function (bouton) {
+            bouton.addEventListener("click", function () {
+                const cible = bouton.dataset.target;
+
+                boutons.forEach(function (b) {
+                    b.classList.remove("active");
+                    b.setAttribute("aria-selected", "false");
+                });
+
+                bouton.classList.add("active");
+                bouton.setAttribute("aria-selected", "true");
+
+                panneaux.forEach(function (p) {
+                    p.hidden = (p.id !== cible);
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

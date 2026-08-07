@@ -1,0 +1,306 @@
+{% extends 'utilisateur/navbarRg.html' %}
+{% load static %}
+
+{% block title %}Tableau de bord - RG{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/Rg/dashboardRg.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="dash-header">
+    <h1>Tableau de bord</h1>
+    <p>Vue d'ensemble de vos {{ nb_ru }} responsables d'unité</p>
+</div>
+
+<!-- ===== STATISTIQUES GÉNÉRALES ===== -->
+<div class="statistique-cards">
+    <!-- Carte 1: Effectif Réel -->
+    <div class="stat-card">
+        <h3>Effectif réel</h3>
+        <div class="stat-valeur-group">
+            <span class="valeur">{{ effectif_reel }}</span>
+            <span class="unite">opérateurs</span>
+        </div>
+        {% if diff_reel_maquette > 0 %}
+        <span class="badge-vs positive">&#9650; +{{ diff_reel_maquette }} vs maquette</span>
+        {% elif diff_reel_maquette < 0 %} <span class="badge-vs negative">&#9660; {{ diff_reel_maquette }} vs
+            maquette</span>
+            {% endif %}
+    </div>
+
+    <!-- Carte 2: Effectif Système -->
+    <div class="stat-card">
+        <h3>Effectif système</h3>
+        <div class="stat-valeur-group">
+            <span class="valeur">{{ effectif_syste }}</span>
+            <span class="unite">opérateurs</span>
+        </div>
+        {% if diff_systeme_maquette > 0 %}
+        <span class="badge-vs positive">&#9650; +{{ diff_systeme_maquette }} vs maquette</span>
+        {% elif diff_systeme_maquette < 0 %} <span class="badge-vs negative">&#9660; {{ diff_systeme_maquette }} vs
+            maquette</span>
+            {% endif %}
+    </div>
+
+    <!-- Carte 3: Effectif Maquette -->
+    <div class="stat-card">
+        <h3>Effectif maquette</h3>
+        <div class="stat-valeur-group">
+            <span class="valeur">{{ maquette_total }}</span>
+            <span class="unite">opérateurs</span>
+        </div>
+    </div>
+</div>
+
+<!-- ===== GRAPHIQUE PAR RU ===== -->
+<div class="section">
+    <div class="section-header">
+        <h2>Réel / Système / Maquette par responsable d'unité</h2>
+    </div>
+    <div class="chart-wrapper">
+        <canvas id="chartParRu"></canvas>
+    </div>
+</div>
+
+<!-- Données injectées de façon sûre (échappées) pour le graphique -->
+{{ liste_ru_stats|json_script:"donnees-ru" }}
+
+<!-- ===== STATISTIQUES PAR RU ===== -->
+<div class="section">
+    <div class="section-header">
+        <h2>Statistiques par responsable d'unité</h2>
+        <div class="recherche-ru">
+            <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="recherche-ru" placeholder="Rechercher par matricule ou nom...">
+        </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="table-ru">
+            <thead>
+                <tr>
+                    <th>Matricule</th>
+                    <th>Responsable Unité</th>
+                    <th>Lot</th>
+                    <th>Unité</th>
+                    <th>DPT</th>
+                    <th>Effectif réel</th>
+                    <th>Effectif système</th>
+                    <th>Effectif maquette</th>
+                </tr>
+            </thead>
+            <tbody id="corps-tableau-ru">
+                {% for ru in liste_ru_stats %}
+                <tr data-matricule="{{ ru.matricule }}" data-nom="{{ ru.nom_complete }}">
+                    <td class="matricule">{{ ru.matricule }}</td>
+                    <td>{{ ru.nom_complete }}</td>
+                    <td>{{ ru.lot }}</td>
+                    <td>{{ ru.unite }}</td>
+                    <td>{{ ru.dpt }}</td>
+
+                    <!-- Effectif Réel dans le tableau -->
+                    <td>
+                        <div class="cell-stat-container">
+                            <span class="valeur-chiffre">{{ ru.reel }}</span>
+                            {% if ru.MR > 0 %}
+                            <span class="badge-vs positive">&#9650; +{{ ru.MR }} vs maquette</span>
+                            {% elif ru.MR < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MR }} vs maquette</span>
+                                {% endif %}
+                        </div>
+                    </td>
+
+                    <!-- Effectif Système dans le tableau -->
+                    <td>
+                        <div class="cell-stat-container">
+                            <span class="valeur-chiffre">{{ ru.systeme }}</span>
+                            {% if ru.MS > 0 %}
+                            <span class="badge-vs positive">&#9650; +{{ ru.MS }} vs maquette</span>
+                            {% elif ru.MS < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MS }} vs maquette</span>
+                                {% endif %}
+                        </div>
+                    </td>
+
+                    <!-- Effectif Maquette -->
+                    <td>
+                        <div class="cell-stat-container">
+                            <span class="valeur-chiffre">{{ ru.maquette }}</span>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="empty-row">Aucune donnée disponible</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Contrôles de pagination -->
+    <div class="pagination-bar" id="pagination-bar">
+        <span class="pagination-info" id="pagination-info"></span>
+        <div class="pagination-controls">
+            <button type="button" id="page-prec" class="pagination-btn">&laquo; Précédent</button>
+            <span class="pagination-pages" id="pagination-pages"></span>
+            <button type="button" id="page-suiv" class="pagination-btn">Suivant &raquo;</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        /* =========================================================
+           1. GRAPHIQUE : Réel / Système / Maquette par RU
+        ========================================================= */
+        const donneesRuEl = document.getElementById("donnees-ru");
+        if (donneesRuEl) {
+            const donneesRu = JSON.parse(donneesRuEl.textContent);
+
+            const labels = donneesRu.map(r => r.nom_complete);
+            const reel = donneesRu.map(r => r.reel);
+            const systeme = donneesRu.map(r => r.systeme);
+            const maquette = donneesRu.map(r => r.maquette);
+
+            const ctx = document.getElementById("chartParRu");
+            if (ctx) {
+                new Chart(ctx, {
+                    type: "bar",
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: "Réel",
+                                data: reel,
+                                backgroundColor: "#1E8F63"
+                            },
+                            {
+                                label: "Système",
+                                data: systeme,
+                                backgroundColor: "#2E6F8E"
+                            },
+                            {
+                                label: "Maquette",
+                                data: maquette,
+                                backgroundColor: "#8792A2"
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: "top" },
+                            tooltip: { mode: "index", intersect: false }
+                        },
+                        scales: {
+                            x: { ticks: { autoSkip: false, maxRotation: 60, minRotation: 0 } },
+                            y: { beginAtZero: true, ticks: { precision: 0 } }
+                        }
+                    }
+                });
+            }
+        }
+
+        /* =========================================================
+           2. RECHERCHE + PAGINATION (combinées)
+        ========================================================= */
+        const rechercheInput = document.getElementById("recherche-ru");
+        const tbody = document.getElementById("corps-tableau-ru");
+        if (!rechercheInput || !tbody) return;
+
+        const LIGNES_PAR_PAGE = 15;
+        const toutesLesLignes = Array.from(tbody.querySelectorAll("tr[data-matricule]"));
+        let pageActuelle = 1;
+
+        const btnPrec = document.getElementById("page-prec");
+        const btnSuiv = document.getElementById("page-suiv");
+        const infoEl = document.getElementById("pagination-info");
+        const pagesEl = document.getElementById("pagination-pages");
+        const barreEl = document.getElementById("pagination-bar");
+
+        function normaliser(texte) {
+            return String(texte)
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+        }
+
+        function lignesCorrespondantes() {
+            const requete = normaliser(rechercheInput.value.trim());
+            if (requete === "") return toutesLesLignes;
+            return toutesLesLignes.filter(function (ligne) {
+                const matricule = normaliser(ligne.dataset.matricule || "");
+                const nom = normaliser(ligne.dataset.nom || "");
+                return matricule.includes(requete) || nom.includes(requete);
+            });
+        }
+
+        function afficher() {
+            // Retire l'éventuelle ligne "aucun résultat" d'un rendu précédent
+            const ligneVideExistante = tbody.querySelector(".empty-row-recherche");
+            if (ligneVideExistante) ligneVideExistante.remove();
+
+            const correspondances = lignesCorrespondantes();
+            const total = correspondances.length;
+            const totalPages = Math.max(1, Math.ceil(total / LIGNES_PAR_PAGE));
+
+            if (pageActuelle > totalPages) pageActuelle = totalPages;
+            if (pageActuelle < 1) pageActuelle = 1;
+
+            const debut = (pageActuelle - 1) * LIGNES_PAR_PAGE;
+            const fin = debut + LIGNES_PAR_PAGE;
+            const aAfficher = new Set(correspondances.slice(debut, fin));
+
+            toutesLesLignes.forEach(function (ligne) {
+                ligne.style.display = aAfficher.has(ligne) ? "" : "none";
+            });
+
+            if (total === 0) {
+                const ligneVide = document.createElement("tr");
+                ligneVide.className = "empty-row-recherche";
+                ligneVide.innerHTML = '<td colspan="8" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
+                tbody.appendChild(ligneVide);
+            }
+
+            // Mise à jour des infos et boutons
+            if (total > 0) {
+                infoEl.textContent = `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}`;
+            } else {
+                infoEl.textContent = "";
+            }
+            pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
+            btnPrec.disabled = pageActuelle <= 1;
+            btnSuiv.disabled = pageActuelle >= totalPages;
+            barreEl.style.display = (total <= LIGNES_PAR_PAGE) ? "none" : "flex";
+        }
+
+        rechercheInput.addEventListener("input", function () {
+            pageActuelle = 1;
+            afficher();
+        });
+
+        btnPrec.addEventListener("click", function () {
+            pageActuelle -= 1;
+            afficher();
+        });
+
+        btnSuiv.addEventListener("click", function () {
+            pageActuelle += 1;
+            afficher();
+        });
+
+        afficher();
+    });
+</script>
+{% endblock %}

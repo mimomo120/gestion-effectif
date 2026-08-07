@@ -1,0 +1,36 @@
+{%extends "utilisateur/navbarN4.html"%}
+{% load static %}
+{% block title %}<title>Liste</title>{% endblock %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/RG/liste.css' %}">
+{% endblock %}
+{%block content%}
+<div class="page-header">
+    <h1>Liste des responsables {{nbr}} :</h1>
+</div>
+
+<table class="table-operateurs">
+    <thead>
+        <tr>
+            <th>Matricule</th>
+            <th>Utilisateur</th>
+            <th>Nom Prenom</th>
+            <th>Lot</th>
+        </tr>
+    </thead>
+    <tbody id="result">
+        {%for operateur in N3 %}
+        <tr>
+            <td>{{operateur.matricule}}</td>
+            <td>{{operateur.it}}</td>
+            <td>{{operateur.nom_complete}}</td>
+            <td>{{operateur.lot}}</td>
+        </tr>
+        {%empty %}
+        <tr>
+            <td colspan="4" class="empty-row">Aucun opérateur trouvé.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{%endblock%}

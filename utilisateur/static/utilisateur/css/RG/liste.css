@@ -1,0 +1,105 @@
+/* ==========================================================================
+   liste.css — Style pour la page Liste des Opérateurs
+   ========================================================================== */
+
+/* Structure Générale */
+body {
+    background-color: #f8fafc;
+    color: #334155;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Titres */
+h1 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ------------------------------- Tableaux ------------------------------- */
+
+.table-operateurs {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background-color: #ffffff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+    border: 1px solid #e2e8f0;
+    margin-bottom: 2rem;
+}
+
+/* En-tête (Bleu Nuit Professionnel) */
+.table-operateurs thead tr {
+    background-color: #253449;
+}
+
+.table-operateurs thead th {
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 14px 18px;
+    text-align: left;
+    border: none;
+    white-space: nowrap;
+}
+
+/* Corps du tableau */
+.table-operateurs tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.15s ease;
+}
+
+.table-operateurs tbody tr:last-child {
+    border-bottom: none;
+}
+
+.table-operateurs tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.table-operateurs tbody td {
+    padding: 12px 18px;
+    font-size: 0.875rem;
+    color: #334155;
+    vertical-align: middle;
+}
+
+/* Stylisation spécifique des colonnes */
+.table-operateurs tbody td:nth-child(1),
+.table-operateurs tbody td:nth-child(2) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 500;
+    color: #475569;
+}
+
+.table-operateurs tbody td:nth-child(3) {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+/* Rangée vide (aucun résultat) */
+.empty-row {
+    text-align: center !important;
+    color: #64748b;
+    font-style: italic;
+    padding: 28px 18px !important;
+    background-color: #ffffff;
+}
+
+/* Responsive (défilement horizontal sur petits écrans) */
+@media (max-width: 768px) {
+    .table-operateurs {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+}

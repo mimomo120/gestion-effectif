@@ -1,0 +1,28 @@
+from django.db import models
+from Collaborateur.models import Collaborateur
+from django.core.validators import MinLengthValidator
+from django.contrib.auth.hashers import make_password, check_password
+# Create your models here.
+class utilisateur(models.Model):
+    password=models.CharField(max_length=277, blank=True)
+    role=models.CharField(max_length=5,null=False,choices=[("N+1","N+1"),("N+2"," N+2"),("N+3","N+3"),("N+4","N+4")])
+    it = models.OneToOneField(
+        Collaborateur,
+        to_field="it",
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name='utilisateur'
+    )
+    N1=models.IntegerField(choices=[("1",True),("0",False)])
+    N2=models.IntegerField(choices=[("1",True),("0",False)])
+    N3=models.IntegerField(choices=[("1",True),("0",False)])
+    N4=models.IntegerField(choices=[("1",True),("0",False)])
+    def set_password(self, raw_password):
+        """Hasher le password avant stockage"""
+        self.password = make_password(raw_password)
+        self.save()
+    
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password)
+    def __str__(self):
+        return self.role
