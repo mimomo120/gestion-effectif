@@ -3,5 +3,5 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path("import/", views.importer_fichier_Collaborateur, name="importer_fichier"),
+    path("import/", views.importer_fichiers_combines, name="importer_fichier"),
 ]

@@ -11,8 +11,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'utilisateur/css/RU/navbar.css' %}">
-    {% block css %}{% endblock %}
-    <title>{% block title %}{% endblock %}</title>
+    {% block css %} {% endblock %}
+    <title>{% block title %} {% endblock %}</title>
 </head>
 
 <body>
@@ -68,8 +68,8 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'operateurs' %}active fw-bold{% endif %}"
-                            href="{% url 'operateurs' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'Liste_des_operateurs' %}active fw-bold{% endif %}"
+                            href="{% url 'Liste_des_operateurs' %}">
                             <i class="fas fa-users me-2"></i>Opérateurs
                         </a>
                     </li>
@@ -93,10 +93,10 @@
                     <button type="button" id="notification-bell" class="btn btn-outline-light btn-sm position-relative"
                         data-bs-toggle="modal" data-bs-target="#alertsModal" title="Alertes">
                         <i class="fas fa-bell"></i>
-                        {% if alertes and nv > 0 %}
+                        {% if notifications and nb_notifications > 0 %}
                         <span
                             class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger badge-notification">
-                            {{ nv }}
+                            {{ nb_notifications }}
                             <span class="visually-hidden">alertes non lues</span>
                         </span>
                         {% endif %}
@@ -165,9 +165,9 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    {% if alertes %}
+                    {% if notifications %}
                     <ul class="list-group list-group-flush">
-                        {% for alerte in alertes %}
+                        {% for alerte in notifications %}
                         <li class="list-group-item d-flex justify-content-between align-items-start">
                             <div class="ms-2 me-auto">
                                 <div class="fw-bold">{{ alerte.contenu }}</div>

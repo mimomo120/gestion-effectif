@@ -1,15 +1,20 @@
 import pandas as pd
-from django.db import transaction, IntegrityError
 from django.shortcuts import render
 from django.contrib import messages
-from .forms import ImportFileForm
-from Collaborateur.models import Collaborateur, Departement, Unite 
+from django.db import transaction, IntegrityError
+
+from .forms import MultipleImportForm
+from Collaborateur.models import Collaborateur, Departement, Unite
 from declaration_effectif.models import historique
 
 
+# ==========================================
+# FONCTIONS UTILITAIRES DE NETTOYAGE
+# ==========================================
+
 def clean_id(value):
-    """Nettoie matricule/RU lus par pandas (évite '1467.0')."""
-    if value is None:
+    """Nettoie matricule/RU/Utilisateur lus par pandas (évite '1467.0')."""
+    if value is None or pd.isna(value):
         return None
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
@@ -17,9 +22,8 @@ def clean_id(value):
 
 
 def clean_int(value, default=None):
-    """Nettoie un compteur numérique lu par pandas (NaN/float -> int).
-    Si value est vide et default est None -> renvoie None (pour ne rien écraser)."""
-    if value is None:
+    """Nettoie un compteur numérique lu par pandas (NaN/float -> int)."""
+    if value is None or pd.isna(value):
         return default
     try:
         return int(value)
@@ -28,6 +32,7 @@ def clean_int(value, default=None):
 
 
 def get_or_create_departement(dpt_code):
+    """Récupère ou crée un département par son abréviation."""
     dpt_code = str(dpt_code).strip()
     departement_obj = Departement.objects.filter(abreviation=dpt_code).first()
     if departement_obj:
@@ -39,88 +44,131 @@ def get_or_create_departement(dpt_code):
 
 
 def get_unite(unite_code):
-    """Retrouve une Unite existante par son abreviation. Ne la cree jamais
-    (le fichier Unite est importe separement) - juste None si introuvable."""
-    if not unite_code:
+    """Retrouve une Unité existante par son abréviation."""
+    if not unite_code or pd.isna(unite_code):
         return None
     return Unite.objects.filter(abreviation=str(unite_code).strip()).first()
 
 
-def importer_fichier_Collaborateur(request):
+def read_uploaded_file(fichier):
+    """Lit un fichier Excel ou CSV via Pandas et nettoie les entêtes."""
+    if fichier.name.endswith(".csv"):
+        df = pd.read_csv(fichier)
+    else:
+        df = pd.read_excel(fichier)
+    df.columns = df.columns.str.strip()
+    return df.where(pd.notnull(df), None)
+
+
+# ==========================================
+# VUE COMBINÉE D'IMPORTATION
+# ==========================================
+
+def importer_fichiers_combines(request):
+    """Importe simultanément le fichier Unités et le fichier Collaborateurs."""
     if request.method == "POST":
-        form = ImportFileForm(request.POST, request.FILES)
+        form = MultipleImportForm(request.POST, request.FILES)
         if form.is_valid():
-            fichier = request.FILES["fichier"]
+            f_collab = request.FILES["fichier_collaborateur"]
+            f_unite = request.FILES["fichier_unite"]
 
+            # 1. Lecture des deux fichiers
             try:
-                if fichier.name.endswith(".csv"):
-                    df = pd.read_csv(fichier)
-                else:
-                    df = pd.read_excel(fichier)
+                df_unite = read_uploaded_file(f_unite)
+                df_collab = read_uploaded_file(f_collab)
             except Exception as e:
-                messages.error(request, f"Impossible de lire le fichier : {e}")
-                return render(request, "import_data/import.html", {"form": ImportFileForm()})
+                messages.error(request, f"Impossible de lire les fichiers : {e}")
+                return render(request, "import_data/import.html", {"form": form})
 
-            df.columns = df.columns.str.strip()
-            df = df.where(pd.notnull(df), None)
-
-            required_fields = ["Utilisateur", "Nom", "Prénom", "Lot"]
-            missing_fields = [f for f in required_fields if f not in df.columns]
-            if missing_fields:
-                messages.error(request, f"Colonnes manquantes: {', '.join(missing_fields)}")
-                return render(request, "import_data/import.html", {"form": ImportFileForm()})
+            # 2. Vérification des colonnes requises dans le fichier Collaborateurs
+            req_collab = ["Utilisateur", "Nom", "Prénom", "Lot"]
+            missing = [c for c in req_collab if c not in df_collab.columns]
+            if missing:
+                messages.error(request, f"Collaborateurs - Colonnes manquantes : {', '.join(missing)}")
+                return render(request, "import_data/import.html", {"form": form})
 
             erreurs = []
-            crees = 0
+            crees_unites = 0
+            crees_collabs = 0
 
-            # Une seule grande transaction pour tout
+            # 3. Transaction globale (les Unités sont traitées avant les Collaborateurs)
             with transaction.atomic():
-                for i, row in df.iterrows():
-                    # Chaque ligne a son propre savepoint
+
+                # --- A. TRAITEMENT DU FICHIER UNITES ---
+                for i, row in df_unite.iterrows():
+                    sid = transaction.savepoint()
+                    try:
+                        abbrev = row.get("abreviation")
+                        if not abbrev:
+                            erreurs.append(f"Unités Ligne {i+2}: abréviation manquante")
+                            transaction.savepoint_rollback(sid)
+                            continue
+
+                        existing = Unite.objects.filter(abreviation=abbrev).first()
+
+                        def val_or_exist(key, old_val):
+                            v = clean_int(row.get(key), default=None)
+                            if v is not None:
+                                return v
+                            return old_val if old_val is not None else 0
+
+                        Unite.objects.update_or_create(
+                            abreviation=abbrev,
+                            defaults={
+                                "nom": row.get("nom") or abbrev,
+                                "maquette": val_or_exist("maquette", existing.maquette if existing else None),
+                                "A": val_or_exist("A", existing.A if existing else None),
+                                "T": val_or_exist("T", existing.T if existing else None),
+                                "O": val_or_exist("O", existing.O if existing else None),
+                                "P": val_or_exist("P", existing.P if existing else None),
+                                "C": val_or_exist("C", existing.C if existing else None),
+                            }
+                        )
+                        transaction.savepoint_commit(sid)
+                        crees_unites += 1
+                    except Exception as e:
+                        transaction.savepoint_rollback(sid)
+                        erreurs.append(f"Unités Ligne {i+2}: {str(e)[:80]}")
+
+                # --- B. TRAITEMENT DU FICHIER COLLABORATEURS ---
+                for i, row in df_collab.iterrows():
                     sid = transaction.savepoint()
                     try:
                         utilisateur = clean_id(row.get("Utilisateur"))
                         if not utilisateur:
-                            erreurs.append(f"Ligne {i+2}: Utilisateur manquant")
+                            erreurs.append(f"Collabs Ligne {i+2}: Utilisateur manquant")
                             transaction.savepoint_rollback(sid)
                             continue
 
+                        # Département
                         dpt_code = row.get("DPT")
-                        departement_obj = None
-                        if dpt_code:
-                            departement_obj = get_or_create_departement(dpt_code)
+                        departement_obj = get_or_create_departement(dpt_code) if dpt_code else None
 
+                        # Unité
                         unite_code = row.get("Unite")
                         unite_obj = None
                         if unite_code is not None and not pd.isna(unite_code):
                             unite_obj = get_unite(unite_code)
                             if not unite_obj:
-                                erreurs.append(f"Ligne {i+2}: Unite {unite_code} introuvable")
+                                erreurs.append(f"Collabs Ligne {i+2}: Unité {unite_code} introuvable")
 
-                        matricule = clean_id(row.get("Matricule"))
+                        # Determination du poste & matricule
                         lot = row.get("Lot", "")
-                        post = None
-                        if lot == "P":
-                            post = "T"
-                        elif lot in ("O", "A"):
-                            post = "O"
+                        post = "T" if lot == "P" else ("O" if lot in ("O", "A") else None)
+                        matricule = clean_id(row.get("Matricule"))
 
-                        matricule_ru = clean_id(row.get("RU"))
-                        ru_obj = None
-                        if matricule_ru:
-                            ru_obj = Collaborateur.objects.filter(matricule=matricule_ru).first()
-                            if not ru_obj:
-                                erreurs.append(f"Ligne {i+2}: RU matricule {matricule_ru} introuvable")
+                        # RU
+                        ru_mat = clean_id(row.get("RU"))
+                        ru_obj = Collaborateur.objects.filter(matricule=ru_mat).first() if ru_mat else None
 
-                        nom = row.get('Nom') or ''
-                        prenom = row.get('Prénom') or ''
-                        nom_complete = f"{nom} {prenom}".strip()
+                        nom = row.get("Nom") or ""
+                        prenom = row.get("Prénom") or ""
 
-                        obj, created = Collaborateur.objects.update_or_create(
+                        Collaborateur.objects.update_or_create(
                             it=utilisateur,
                             defaults={
                                 "matricule": matricule,
-                                "nom_complete": nom_complete,
+                                "nom_complete": f"{nom} {prenom}".strip(),
                                 "lot": lot,
                                 "departement": departement_obj,
                                 "eq": row.get("Equipe", ""),
@@ -131,152 +179,22 @@ def importer_fichier_Collaborateur(request):
                                 "ru_it": ru_obj,
                             }
                         )
-
-                        # Valide le savepoint de cette ligne
                         transaction.savepoint_commit(sid)
-                        crees += 1
-
+                        crees_collabs += 1
                     except Exception as e:
                         transaction.savepoint_rollback(sid)
-                        erreurs.append(f"Ligne {i+2}: {str(e)[:100]}")
+                        erreurs.append(f"Collabs Ligne {i+2}: {str(e)[:80]}")
 
-            messages.success(request, f"{crees} lignes importées.")
+            # 4. Feedback utilisateur
+            messages.success(
+                request, 
+                f"Importation terminée avec succès : {crees_unites} unités et {crees_collabs} collaborateurs traités."
+            )
             if erreurs:
-                messages.error(request, f"{len(erreurs)} erreurs: " + " | ".join(erreurs[:5]))
+                messages.error(request, f"{len(erreurs)} avertissement(s) : " + " | ".join(erreurs[:5]))
 
-            return render(request, "import_data/import.html", {"form": ImportFileForm()})
+            return render(request, "import_data/import.html", {"form": MultipleImportForm()})
     else:
-        form = ImportFileForm()
-
-    return render(request, "import_data/import.html", {"form": form})
-
-def importer_fichier_Unite(request):
-    if request.method == "POST":
-        form = ImportFileForm(request.POST, request.FILES)
-        if form.is_valid():
-            fichier = request.FILES["fichier"]
-
-            try:
-                if fichier.name.endswith(".csv"):
-                    df = pd.read_csv(fichier)
-                else:
-                    df = pd.read_excel(fichier)
-            except Exception as e:
-                messages.error(request, f"Impossible de lire le fichier : {e}")
-                return render(request, "import_data/import.html", {"form": ImportFileForm()})
-
-            df.columns = df.columns.str.strip()
-            df = df.where(pd.notnull(df), None)
-
-            erreurs = []
-            crees = 0
-
-            with transaction.atomic():
-                for i, row in df.iterrows():
-                    sid = transaction.savepoint()
-                    try:
-                        abreviation = row.get("abreviation")
-                        if not abreviation:
-                            erreurs.append(f"Ligne {i+2}: abreviation manquante")
-                            transaction.savepoint_rollback(sid)
-                            continue
-
-                        existing = Unite.objects.filter(abreviation=abreviation).first()
-
-                        def valeur_ou_existant(champ_fichier, champ_existant_val):
-                            v = clean_int(row.get(champ_fichier), default=None)
-                            if v is not None:
-                                return v
-                            return champ_existant_val if champ_existant_val is not None else 0
-
-                        maquette_val = valeur_ou_existant("maquette", existing.maquette if existing else None)
-                        a_val = valeur_ou_existant("A", existing.A if existing else None)
-                        t_val = valeur_ou_existant("T", existing.T if existing else None)
-                        o_val = valeur_ou_existant("O", existing.O if existing else None)
-                        p_val = valeur_ou_existant("P", existing.P if existing else None)
-                        c_val = valeur_ou_existant("C", existing.C if existing else None)
-
-                        obj, created = Unite.objects.update_or_create(
-                            abreviation=abreviation,
-                            defaults={
-                                "nom": row.get("nom") or abreviation,
-                                "maquette": maquette_val,
-                                "A": a_val,
-                                "T": t_val,
-                                "O": o_val,
-                                "P": p_val,
-                                "C": c_val,
-                            }
-                        )
-
-                        transaction.savepoint_commit(sid)
-                        crees += 1
-
-                    except Exception as e:
-                        transaction.savepoint_rollback(sid)
-                        erreurs.append(f"Ligne {i+2}: {str(e)[:100]}")
-
-            messages.success(request, f"{crees} lignes importées.")
-            if erreurs:
-                messages.error(request, f"{len(erreurs)} erreurs: " + " | ".join(erreurs[:5]))
-
-            return render(request, "import_data/import.html", {"form": ImportFileForm()})
-    else:
-        form = ImportFileForm()
-
-    return render(request, "import_data/import.html", {"form":form})
-
-def importer_fichier_Affectation(request):
-    if request.method == "POST":
-        form = ImportFileForm(request.POST, request.FILES)
-        if form.is_valid():
-            fichier = request.FILES["fichier"]
-
-            try:
-                if fichier.name.endswith(".csv"):
-                    df = pd.read_csv(fichier)
-                else:
-                    df = pd.read_excel(fichier)
-            except Exception as e:
-                messages.error(request, f"Impossible de lire le fichier : {e}")
-                return render(request, "import_data/import.html", {"form": ImportFileForm()})
-
-            df.columns = df.columns.str.strip()
-            df = df.where(pd.notnull(df), None)
-
-            required_fields = ["Nom & prénom", "Ru (Initial)", "RU D'accueil", "Etat"]
-            missing_fields = [f for f in required_fields if f not in df.columns]
-            if missing_fields:
-                messages.error(request, f"Colonnes manquantes: {', '.join(missing_fields)}")
-                return render(request, "import_data/import.html", {"form": ImportFileForm()})
-
-            erreurs = []
-            crees = 0
-
-            with transaction.atomic():
-                for i, row in df.iterrows():
-                    sid = transaction.savepoint()
-                    try:
-                        historique.objects.create(
-                            collaborateur=row.get("Nom & prénom") or "",
-                            initial=row.get("Ru (Initial)") or "",
-                            acceuil=row.get("RU D'accueil") or "",
-                            etat=row.get("Etat") or "",
-                        )
-
-                        transaction.savepoint_commit(sid)
-                        crees += 1
-
-                    except Exception as e:
-                        transaction.savepoint_rollback(sid)
-                        erreurs.append(f"Ligne {i+2}: {str(e)[:100]}")
-
-            messages.success(request, f"{crees} lignes importées.")
-            if erreurs:
-                messages.error(request, f"{len(erreurs)} erreurs: " + " | ".join(erreurs[:5]))
-
-            return render(request, "import_data/import.html", {"form": ImportFileForm()})
-    else:
-        form = ImportFileForm()
+        form = MultipleImportForm()
 
     return render(request, "import_data/import.html", {"form": form})

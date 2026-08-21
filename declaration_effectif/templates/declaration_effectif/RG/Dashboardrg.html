@@ -4,51 +4,59 @@
 {% block title %}Tableau de bord - RG{% endblock %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'utilisateur/css/Rg/dashboardRg.css' %}">
+<link rel="stylesheet" href="{% static 'utilisateur/css/RG/dashboardRg.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="dash-header">
+<header class="header">
     <h1>Tableau de bord</h1>
-    <p>Vue d'ensemble de vos {{ nb_ru }} responsables d'unité</p>
-</div>
-
+    <div class="time">
+        <h5 id="time" aria-live="polite">{{ maint }}</h5>
+    </div>
+</header>
 <!-- ===== STATISTIQUES GÉNÉRALES ===== -->
 <div class="statistique-cards">
     <!-- Carte 1: Effectif Réel -->
-    <div class="stat-card">
-        <h3>Effectif réel</h3>
+    <div class="stat-card" style="background-color: rgba(219, 41, 41, 0.239);">
+        <h3 style="color: red;">Effectif réel</h3>
         <div class="stat-valeur-group">
-            <span class="valeur">{{ effectif_reel }}</span>
+            <span class="valeur">{{ effectif_reel|default:"0" }}</span>
             <span class="unite">opérateurs</span>
         </div>
-        {% if diff_reel_maquette > 0 %}
-        <span class="badge-vs positive">&#9650; +{{ diff_reel_maquette }} vs maquette</span>
-        {% elif diff_reel_maquette < 0 %} <span class="badge-vs negative">&#9660; {{ diff_reel_maquette }} vs
+        {% if MR < 0 %}
+        <span class="badge-vs positive">&#9650; +{{ MR }} vs maquette</span>
+        {% elif MR > 0 %} <span class="badge-vs negative">&#9660; -{{ MR }} vs
             maquette</span>
             {% endif %}
     </div>
 
     <!-- Carte 2: Effectif Système -->
-    <div class="stat-card">
-        <h3>Effectif système</h3>
+    <div class="stat-card" style="background-color: rgba(19, 79, 31, 0.239);">
+        <h3 style="color: rgb(24, 77, 38);">Effectif système</h3>
         <div class="stat-valeur-group">
-            <span class="valeur">{{ effectif_syste }}</span>
+            <span class="valeur">{{ effectif_syste|default:"0" }}</span>
             <span class="unite">opérateurs</span>
         </div>
-        {% if diff_systeme_maquette > 0 %}
-        <span class="badge-vs positive">&#9650; +{{ diff_systeme_maquette }} vs maquette</span>
-        {% elif diff_systeme_maquette < 0 %} <span class="badge-vs negative">&#9660; {{ diff_systeme_maquette }} vs
+        {% if MS < 0 %}
+        <span class="badge-vs positive">&#9650; +{{ MS }} vs maquette</span>
+        {% elif MS > 0 %} <span class="badge-vs negative">&#9660; -{{ MS }} vs
             maquette</span>
             {% endif %}
     </div>
 
     <!-- Carte 3: Effectif Maquette -->
-    <div class="stat-card">
-        <h3>Effectif maquette</h3>
+    <div class="stat-card" style="background-color: rgba(212, 82, 27, 0.408);">
+        <h3 style=" color: rgb(255, 106, 0);">Effectif maquette</h3>
         <div class="stat-valeur-group">
-            <span class="valeur">{{ maquette_total }}</span>
+            <span class="valeur">{{ maquette_total|default:"0" }}</span>
             <span class="unite">opérateurs</span>
+        </div>
+    </div>
+    <div class="stat-card warning" style="background-color: rgba(62, 104, 153, 0.239); ">
+        <h3 style="color: blue;">RU non validés</h3>
+        <div class="stat-valeur-group">
+            <span class="valeur" style="color:black"">{{ non_valides|default:"0" }}</span>
+            <span class="unite">responsables</span>
         </div>
     </div>
 </div>
@@ -63,7 +71,7 @@
     </div>
 </div>
 
-<!-- Données injectées de façon sûre (échappées) pour le graphique -->
+<!-- Données JSON sécurisées pour le JS -->
 {{ liste_ru_stats|json_script:"donnees-ru" }}
 
 <!-- ===== STATISTIQUES PAR RU ===== -->
@@ -80,11 +88,11 @@
         </div>
     </div>
 
-    <div style="overflow-x: auto;">
+    <div class="table-container">
         <table class="table-ru">
             <thead>
                 <tr>
-                    <th>Matricule</th>
+                    <th>Utilisateur</th>
                     <th>Responsable Unité</th>
                     <th>Lot</th>
                     <th>Unité</th>
@@ -97,38 +105,40 @@
             <tbody id="corps-tableau-ru">
                 {% for ru in liste_ru_stats %}
                 <tr data-matricule="{{ ru.matricule }}" data-nom="{{ ru.nom_complete }}">
-                    <td class="matricule">{{ ru.matricule }}</td>
-                    <td>{{ ru.nom_complete }}</td>
-                    <td>{{ ru.lot }}</td>
-                    <td>{{ ru.unite }}</td>
-                    <td>{{ ru.dpt }}</td>
-
-                    <!-- Effectif Réel dans le tableau -->
+                    <td class="matricule">{{ ru.matricule|default:"-" }}</td>
+                    <td>{{ ru.nom_complete|default:"-" }}</td>
+                    <td>{{ ru.lot|default:"-" }}</td>
+                    <td>{% if ru.unite and ru.unite != "None" %}{{ ru.unite }}{% else %}-{% endif %}</td>
+                    <td>{{ ru.dpt|default:"-" }}</td>
+            
+                    <!-- Effectif Réel -->
                     <td>
                         <div class="cell-stat-container">
-                            <span class="valeur-chiffre">{{ ru.reel }}</span>
-                            {% if ru.MR > 0 %}
-                            <span class="badge-vs positive">&#9650; +{{ ru.MR }} vs maquette</span>
-                            {% elif ru.MR < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MR }} vs maquette</span>
+                            <span class="valeur-chiffre">{{ ru.reel|default:"0" }}</span>
+                            {% if ru.MR < 0 %} <span class="badge-vs positive">&#9650; +{{ ru.MR|stringformat:"i"|slice:"1:" }} vs
+                                maquette</span>
+                                {% elif ru.MR > 0 %}
+                                <span class="badge-vs negative">&#9660; -{{ ru.MR }} vs maquette</span>
                                 {% endif %}
                         </div>
                     </td>
-
-                    <!-- Effectif Système dans le tableau -->
+            
+                    <!-- Effectif Système -->
                     <td>
                         <div class="cell-stat-container">
-                            <span class="valeur-chiffre">{{ ru.systeme }}</span>
-                            {% if ru.MS > 0 %}
-                            <span class="badge-vs positive">&#9650; +{{ ru.MS }} vs maquette</span>
-                            {% elif ru.MS < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MS }} vs maquette</span>
+                            <span class="valeur-chiffre">{{ ru.systeme|default:"0" }}</span>
+                            {% if ru.MS < 0 %} <span class="badge-vs positive">&#9650; +{{ ru.MS|stringformat:"i"|slice:"1:" }} vs
+                                maquette</span>
+                                {% elif ru.MS > 0 %}
+                                <span class="badge-vs negative">&#9660; -{{ ru.MS }} vs maquette</span>
                                 {% endif %}
                         </div>
                     </td>
-
+            
                     <!-- Effectif Maquette -->
                     <td>
                         <div class="cell-stat-container">
-                            <span class="valeur-chiffre">{{ ru.maquette }}</span>
+                            <span class="valeur-chiffre">{{ ru.maquette|default:"0" }}</span>
                         </div>
                     </td>
                 </tr>
@@ -141,7 +151,7 @@
         </table>
     </div>
 
-    <!-- Contrôles de pagination -->
+    <!-- Pagination -->
     <div class="pagination-bar" id="pagination-bar">
         <span class="pagination-info" id="pagination-info"></span>
         <div class="pagination-controls">
@@ -154,153 +164,151 @@
 {% endblock %}
 
 {% block script %}
-<!-- Chart.js -->
+<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-<script>
+<!-- Fichier JS externe -->
+<script >
     document.addEventListener("DOMContentLoaded", function () {
 
-        /* =========================================================
-           1. GRAPHIQUE : Réel / Système / Maquette par RU
-        ========================================================= */
-        const donneesRuEl = document.getElementById("donnees-ru");
-        if (donneesRuEl) {
-            const donneesRu = JSON.parse(donneesRuEl.textContent);
+            /* =========================================================
+               1. GRAPHIQUE CHART.JS
+            ========================================================= */
+            const donneesRuEl = document.getElementById("donnees-ru");
+            if (donneesRuEl) {
+                const donneesRu = JSON.parse(donneesRuEl.textContent || "[]");
 
-            const labels = donneesRu.map(r => r.nom_complete);
-            const reel = donneesRu.map(r => r.reel);
-            const systeme = donneesRu.map(r => r.systeme);
-            const maquette = donneesRu.map(r => r.maquette);
+                const labels = donneesRu.map(r => r.nom_complete || "Inconnu");
+                const reel = donneesRu.map(r => r.reel || 0);
+                const systeme = donneesRu.map(r => r.systeme || 0);
+                const maquette = donneesRu.map(r => r.maquette || 0);
 
-            const ctx = document.getElementById("chartParRu");
-            if (ctx) {
-                new Chart(ctx, {
-                    type: "bar",
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: "Réel",
-                                data: reel,
-                                backgroundColor: "#1E8F63"
-                            },
-                            {
-                                label: "Système",
-                                data: systeme,
-                                backgroundColor: "#2E6F8E"
-                            },
-                            {
-                                label: "Maquette",
-                                data: maquette,
-                                backgroundColor: "#8792A2"
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: "top" },
-                            tooltip: { mode: "index", intersect: false }
+                const ctx = document.getElementById("chartParRu");
+                if (ctx) {
+                    new Chart(ctx, {
+                        type: "bar",
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: "Réel",
+                                    data: reel,
+                                    backgroundColor: "rgba(219, 41, 41, 0.7)"
+                                },
+                                {
+                                    label: "Système",
+                                    data: systeme,
+                                    backgroundColor: "rgba(19, 79, 31, 0.7)"
+                                },
+                                {
+                                    label: "Maquette",
+                                    data: maquette,
+                                    backgroundColor: " rgba(212, 82, 27, 0.408)"
+                                }
+                            ]
                         },
-                        scales: {
-                            x: { ticks: { autoSkip: false, maxRotation: 60, minRotation: 0 } },
-                            y: { beginAtZero: true, ticks: { precision: 0 } }
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false, barThickness: 24,
+                            plugins: {
+                                legend: { position: "top" },
+                                tooltip: { mode: "index", intersect: false }
+                            },
+                            scales: {
+                                x: { ticks: { autoSkip: false, maxRotation: 45, minRotation: 0 } },
+                                y: { beginAtZero: true, ticks: { precision: 0 } }
+                            }
                         }
-                    }
+                    });
+                }
+            }
+
+            /* =========================================================
+               2. RECHERCHE ET PAGINATION DYNAMIQUES
+            ========================================================= */
+            const rechercheInput = document.getElementById("recherche-ru");
+            const tbody = document.getElementById("corps-tableau-ru");
+            if (!rechercheInput || !tbody) return;
+
+            const LIGNES_PAR_PAGE = 10;
+            const toutesLesLignes = Array.from(tbody.querySelectorAll("tr[data-matricule]"));
+            let pageActuelle = 1;
+
+            const btnPrec = document.getElementById("page-prec");
+            const btnSuiv = document.getElementById("page-suiv");
+            const infoEl = document.getElementById("pagination-info");
+            const pagesEl = document.getElementById("pagination-pages");
+            const barreEl = document.getElementById("pagination-bar");
+
+            function normaliser(texte) {
+                return String(texte)
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "");
+            }
+
+            function lignesCorrespondantes() {
+                const requete = normaliser(rechercheInput.value.trim());
+                if (requete === "") return toutesLesLignes;
+                return toutesLesLignes.filter(function (ligne) {
+                    const matricule = normaliser(ligne.dataset.matricule || "");
+                    const nom = normaliser(ligne.dataset.nom || "");
+                    return matricule.includes(requete) || nom.includes(requete);
                 });
             }
-        }
 
-        /* =========================================================
-           2. RECHERCHE + PAGINATION (combinées)
-        ========================================================= */
-        const rechercheInput = document.getElementById("recherche-ru");
-        const tbody = document.getElementById("corps-tableau-ru");
-        if (!rechercheInput || !tbody) return;
+            function afficher() {
+                const ligneVideExistante = tbody.querySelector(".empty-row-recherche");
+                if (ligneVideExistante) ligneVideExistante.remove();
 
-        const LIGNES_PAR_PAGE = 15;
-        const toutesLesLignes = Array.from(tbody.querySelectorAll("tr[data-matricule]"));
-        let pageActuelle = 1;
+                const correspondances = lignesCorrespondantes();
+                const total = correspondances.length;
+                const totalPages = Math.max(1, Math.ceil(total / LIGNES_PAR_PAGE));
 
-        const btnPrec = document.getElementById("page-prec");
-        const btnSuiv = document.getElementById("page-suiv");
-        const infoEl = document.getElementById("pagination-info");
-        const pagesEl = document.getElementById("pagination-pages");
-        const barreEl = document.getElementById("pagination-bar");
+                if (pageActuelle > totalPages) pageActuelle = totalPages;
+                if (pageActuelle < 1) pageActuelle = 1;
 
-        function normaliser(texte) {
-            return String(texte)
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "");
-        }
+                const debut = (pageActuelle - 1) * LIGNES_PAR_PAGE;
+                const fin = debut + LIGNES_PAR_PAGE;
+                const aAfficher = new Set(correspondances.slice(debut, fin));
 
-        function lignesCorrespondantes() {
-            const requete = normaliser(rechercheInput.value.trim());
-            if (requete === "") return toutesLesLignes;
-            return toutesLesLignes.filter(function (ligne) {
-                const matricule = normaliser(ligne.dataset.matricule || "");
-                const nom = normaliser(ligne.dataset.nom || "");
-                return matricule.includes(requete) || nom.includes(requete);
-            });
-        }
+                toutesLesLignes.forEach(function (ligne) {
+                    ligne.style.display = aAfficher.has(ligne) ? "" : "none";
+                });
 
-        function afficher() {
-            // Retire l'éventuelle ligne "aucun résultat" d'un rendu précédent
-            const ligneVideExistante = tbody.querySelector(".empty-row-recherche");
-            if (ligneVideExistante) ligneVideExistante.remove();
+                if (total === 0) {
+                    const ligneVide = document.createElement("tr");
+                    ligneVide.className = "empty-row-recherche";
+                    ligneVide.innerHTML = '<td colspan="8" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
+                    tbody.appendChild(ligneVide);
+                }
 
-            const correspondances = lignesCorrespondantes();
-            const total = correspondances.length;
-            const totalPages = Math.max(1, Math.ceil(total / LIGNES_PAR_PAGE));
-
-            if (pageActuelle > totalPages) pageActuelle = totalPages;
-            if (pageActuelle < 1) pageActuelle = 1;
-
-            const debut = (pageActuelle - 1) * LIGNES_PAR_PAGE;
-            const fin = debut + LIGNES_PAR_PAGE;
-            const aAfficher = new Set(correspondances.slice(debut, fin));
-
-            toutesLesLignes.forEach(function (ligne) {
-                ligne.style.display = aAfficher.has(ligne) ? "" : "none";
-            });
-
-            if (total === 0) {
-                const ligneVide = document.createElement("tr");
-                ligneVide.className = "empty-row-recherche";
-                ligneVide.innerHTML = '<td colspan="8" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
-                tbody.appendChild(ligneVide);
+                if (total > 0) {
+                    infoEl.textContent = `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}`;
+                } else {
+                    infoEl.textContent = "";
+                }
+                pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
+                btnPrec.disabled = pageActuelle <= 1;
+                btnSuiv.disabled = pageActuelle >= totalPages;
+                barreEl.style.display = (total <= LIGNES_PAR_PAGE) ? "none" : "flex";
             }
 
-            // Mise à jour des infos et boutons
-            if (total > 0) {
-                infoEl.textContent = `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}`;
-            } else {
-                infoEl.textContent = "";
-            }
-            pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
-            btnPrec.disabled = pageActuelle <= 1;
-            btnSuiv.disabled = pageActuelle >= totalPages;
-            barreEl.style.display = (total <= LIGNES_PAR_PAGE) ? "none" : "flex";
-        }
+            rechercheInput.addEventListener("input", function () {
+                pageActuelle = 1;
+                afficher();
+            });
 
-        rechercheInput.addEventListener("input", function () {
-            pageActuelle = 1;
+            btnPrec.addEventListener("click", function () {
+                pageActuelle -= 1;
+                afficher();
+            });
+
+            btnSuiv.addEventListener("click", function () {
+                pageActuelle += 1;
+                afficher();
+            });
+
             afficher();
         });
-
-        btnPrec.addEventListener("click", function () {
-            pageActuelle -= 1;
-            afficher();
-        });
-
-        btnSuiv.addEventListener("click", function () {
-            pageActuelle += 1;
-            afficher();
-        });
-
-        afficher();
-    });
 </script>
 {% endblock %}

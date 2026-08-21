@@ -1,3 +1,4 @@
+from django.conf.locale import it
 from django.shortcuts import render, redirect , get_object_or_404
 from utilisateur.models import utilisateur
 from Collaborateur.models import Departement , Collaborateur ,Unite
@@ -9,12 +10,14 @@ from declaration_effectif.models import declaration_effectif ,Alert ,historique
 from django.http import JsonResponse
 from datetime import date
 import json
+from datetime import date , datetime , timedelta
 from django.db import transaction, IntegrityError
 from django.views.decorators.csrf import ensure_csrf_cookie
-from Collaborateur.views import rec , Ru_Rg, liste_Ru_par_Rg, Rg_Dur,liste_N1_pr_N3
+from Collaborateur.views import rec , Ru_Rg, liste_Ru_par_Rg, Rg_Dur,liste_N1_pr_N3 ,liste_N3_N4
 from django.views.decorators.http import require_POST
 from utilisateur.decorators import role_required
 from django.utils.dateparse import parse_date
+from django.core.paginator import Paginator
 
 @ensure_csrf_cookie
 #valider la liste des operateurs d'un Ru
@@ -114,7 +117,7 @@ def difference(request):
         }
 
     return {
-        "systeme1":Collaborateur.objects.none() ,
+        "systeme1":Collaborateur.objects.none(),
         "reel1": Collaborateur.objects.none(),
     }
 
@@ -140,20 +143,44 @@ def histo(ut):
 def histo_aff(request):
     util = request.session.get("it")
     changements = histo(util)
+    declarations = changements["declarations"]  # QuerySet
 
+    status = request.GET.get("status", "all")
+
+    if status == "valide":
+        declarations = declarations.filter(etat__icontains="valid")
+    elif status == "refuse":
+        declarations = declarations.filter(etat__icontains="refus")
+
+    paginator = Paginator(declarations, 15)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "info": page_obj,
+        "page_obj": page_obj,
+        "nbr": paginator.count,
+        "status": status,
+    }
     return render(
         request,
         "declaration_effectif/Affectations_historique.html",
-        {"info": changements["declarations"], "nbr": changements["nbr"]},
+        context,
     )
 #supp une declaration
 def supprimer(request):
     it = request.session.get("it")
+
+    if not it:
+        return JsonResponse({"status": "erreur", "error": "Session invalide"}, status=401)
+
     der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
+
     if der:
         declaration_effectif.objects.filter(Ru_id=it, date=der.date).delete()
-        return JsonResponse({"valide": True})
-    return JsonResponse({"valide": False})
+        return JsonResponse({"status": "supprimer"})
+
+    return JsonResponse({"status": "erreur", "error": "Aucune déclaration à supprimer"}, status=404)
 
 #afficher btn mod ds page validation
 def afficher_modifier(request):
@@ -198,29 +225,68 @@ def liste_ru_non_valides_Rg(request):
 #liste des affectations des n+2
 @role_required('N+2')
 def affectation_Ru(request):
-    
     util = request.session.get("it")
+    
+    # Récupération du paramètre status depuis la requête GET
+    status = request.GET.get("status", "all")
 
+    # 1. Chargement des données brutes N+2
     changements = histo(util)
-    toutes_declarations=[]
-    n1 = Ru_Rg(util)
     toutes_declarations_N2 = list(changements["declarations"])
-    total_nbr2 = changements["nbr"]
-    total_nbr=0
+
+    # 2. Chargement des données brutes N+1
+    toutes_declarations = []
+    n1 = Ru_Rg(util)
 
     for n in n1:
         changements_n = histo(n.it)
         toutes_declarations.extend(changements_n["declarations"])
-        total_nbr += changements_n["nbr"]
 
-    return render(
-        request,
-        "declaration_effectif/RG/affectation.html",
-        {    "n2":toutes_declarations_N2,
-            "info": toutes_declarations,
-            "nbr": total_nbr,
-        },
-    )
+    # Appliquer le filtrage par statut sur les listes Python
+    if status == "valide":
+        toutes_declarations_N2 = [
+            d for d in toutes_declarations_N2 
+            if d.etat and "valid" in str((d.etat)).lower()
+        ]
+        toutes_declarations = [
+            d for d in toutes_declarations 
+            if d.etat and "valid" in str((d.etat)).lower()
+        ]
+    elif status == "refuse":
+        toutes_declarations_N2 = [
+            d for d in toutes_declarations_N2 
+            if d.etat and "refus" in str(d.etat).lower()
+        ]
+        toutes_declarations = [
+            d for d in toutes_declarations 
+            if d.etat and "refus" in str((d.etat)).lower()
+        ]
+
+    # Recalcul des totaux après filtrage
+    total_nbr2 = len(toutes_declarations_N2)
+    total_nbr = len(toutes_declarations)
+
+    # 3. Pagination pour l'onglet N+1 ("info")
+    paginator_n1 = Paginator(toutes_declarations, 10)
+    page_n1 = request.GET.get("page_n1", 1)
+    page_obj_n1 = paginator_n1.get_page(page_n1)
+
+    # 4. Pagination pour l'onglet N+2 ("n2")
+    paginator_n2 = Paginator(toutes_declarations_N2, 10)
+    page_n2 = request.GET.get("page_n2", 1)
+    page_obj_n2 = paginator_n2.get_page(page_n2)
+
+    context = {
+        "n2": page_obj_n2,
+        "page_obj_n2": page_obj_n2,
+        "info": page_obj_n1,
+        "page_obj_n1": page_obj_n1,
+        "nbr": total_nbr,
+        "nbr2": total_nbr2,
+        "status": status,  # Transmis au template pour maintenir l'option sélectionnée
+    }
+
+    return render(request, "declaration_effectif/RG/affectation.html", context)
 
 
 #rederiger vers la page validation_n+3 + liste de n+1 pas valider
@@ -256,6 +322,9 @@ def liste_N1_non_valides_N3(request):
 def affectation_N3(request):
     util = request.session.get("it")
 
+    # Récupération du paramètre status depuis la requête GET
+    status = request.GET.get("status", "all")
+
     def collecter(it, deja_vus=None):
         if deja_vus is None:
             deja_vus = set()
@@ -265,33 +334,76 @@ def affectation_N3(request):
 
         changements_it = histo(it)
         toutes_declarations.extend(changements_it["declarations"])
-        nonlocal total_nbr
-        total_nbr += changements_it["nbr"]
 
         n0 = Ru_Rg(it)
         for e in n0:
             collecter(e.it, deja_vus)
 
+    # 1. Chargement des données brutes N+2
     changements = histo(util)
     toutes_declarations_N2 = list(changements["declarations"])
-    total_nbr2 = changements["nbr"]
 
+    # 2. Chargement des données brutes N+1 (et en dessous, récursivement)
     toutes_declarations = []
-    total_nbr = 0
-
     n1 = Rg_Dur(util)
     for n in n1:
         collecter(n.it)
 
-    return render(
-        request,
-        "declaration_effectif/DUR/affectation.html",
-        {
-            "n2": toutes_declarations_N2,
-            "info": toutes_declarations,
-            "nbr": total_nbr,
-        },
-    )
+    # Appliquer le filtrage par statut sur les listes Python
+    if status == "valide":
+        toutes_declarations_N2 = [
+            d for d in toutes_declarations_N2
+            if d.etat and "valid" in str(d.etat).lower()
+        ]
+        toutes_declarations = [
+            d for d in toutes_declarations
+            if d.etat and "valid" in str(d.etat).lower()
+        ]
+    elif status == "refuse":
+        toutes_declarations_N2 = [
+            d for d in toutes_declarations_N2
+            if d.etat and "refus" in str(d.etat).lower()
+        ]
+        toutes_declarations = [
+            d for d in toutes_declarations
+            if d.etat and "refus" in str(d.etat).lower()
+        ]
+    elif status == "non_demarrer":
+        toutes_declarations_N2 = [
+        d for d in toutes_declarations_N2
+        if d.etat and "non démarr" in str(d.etat).lower()
+    ]
+        toutes_declarations = [
+        d for d in toutes_declarations
+        if d.etat and "non démarr" in str(d.etat).lower()
+    ]
+
+    # Recalcul des totaux après filtrage
+    total_nbr2 = len(toutes_declarations_N2)
+    total_nbr = len(toutes_declarations)
+
+    # 3. Pagination pour l'onglet N+1 ("info")
+    paginator_n1 = Paginator(toutes_declarations, 10)
+    page_n1 = request.GET.get("page_n1", 1)
+    page_obj_n1 = paginator_n1.get_page(page_n1)
+
+    # 4. Pagination pour l'onglet N+2 ("n2")
+    paginator_n2 = Paginator(toutes_declarations_N2, 10)
+    page_n2 = request.GET.get("page_n2", 1)
+    page_obj_n2 = paginator_n2.get_page(page_n2)
+
+    context = {
+        "n2": page_obj_n2,
+        "page_obj_n2": page_obj_n2,
+        "info": page_obj_n1,
+        "page_obj_n1": page_obj_n1,
+        "nbr": total_nbr,
+        "nbr2": total_nbr2,
+        "status": status,
+    }
+
+    return render(request, "declaration_effectif/DUR/affectation.html", context)
+    
 
 def envoyer_alert(request):
     try:
@@ -318,6 +430,8 @@ def envoyer_alert(request):
     )
 
     return JsonResponse({"status": "ok", "message": "Alerte envoyée."})
+
+
 @role_required('N+3')
 def dashboard_Dur(request):
     it = request.session.get("it")
@@ -325,18 +439,49 @@ def dashboard_Dur(request):
         return redirect("login")
 
     it_n1 = liste_N1_pr_N3(it)
+    maint = timezone.localdate()
     collaborateurs_n1 = Collaborateur.objects.filter(it__in=it_n1)
-
+    declaration = declaration_effectif.objects.filter(
+            date=maint, Ru_id__in=it_n1
+        )
+    liste_declares = set(declaration.values_list("Ru_id", flat=True))
+    
+    liste_ru_avec_operateurs = set(
+            Collaborateur.objects.filter(
+                ru_it_id__in=it_n1
+            )
+            .values_list("ru_it_id", flat=True)
+            .distinct()
+        )
+    non_valides = (
+            Collaborateur.objects.filter(it__in=liste_ru_avec_operateurs)
+            .exclude(it__in=liste_declares)
+            .count()
+        )
     liste_ru_stats = []
     total_syst = 0
     total_r = 0
     maquette_totale = 0
+    maint = timezone.localdate()
+
+    today = timezone.now().date()
+    dates = [today - timedelta(days=i) for i in range(6, -1, -1)]
+    labels_list = [d.strftime('%d %b') for d in dates]
+
+    data_totale_par_jour = [0] * len(dates)
 
     for collab in collaborateurs_n1:
-        maint = declaration_effectif.objects.filter(Ru_id=collab.it).order_by("-date").first()
+        maint_obj = declaration_effectif.objects.filter(Ru_id=collab.it).order_by("-date").first()
+        date_ref = maint_obj.date if maint_obj else timezone.localdate()
+
         systeme = Collaborateur.objects.filter(ru_it_id=collab.it).count()
-        dec = declaration_effectif.objects.filter(date=maint, Ru_id=collab.it)
-        reel = dec.count() if dec else systeme
+
+        dec = declaration_effectif.objects.filter(
+            date=date_ref,
+            Ru_id=collab.it,
+            nature__in=["A", "V"]
+        )
+        reel = dec.count() if dec.exists() else systeme
 
         unite_abrev = collab.unite_id
         maquette = 0
@@ -345,23 +490,55 @@ def dashboard_Dur(request):
             if u and u.maquette:
                 maquette = u.maquette
 
-        liste_ru_stats.append({"n1": collab, "reel": reel, "systeme": systeme, "maquette": maquette})
+        liste_ru_stats.append({
+            "n1": collab,
+            "matricule": collab.matricule,
+            "nom_complete": collab.nom_complete,
+            "unite": unite_abrev,
+            "reel": reel,
+            "systeme": systeme,
+            "maquette": maquette,
+            "mr": reel - maquette,
+            "ms": systeme - maquette,
+        })
+
         total_r += reel
         total_syst += systeme
+        if maint_obj:
+            maint = date_ref
+
+        for i, d in enumerate(dates):
+            derniere = declaration_effectif.objects.filter(
+                Ru_id=collab.it, date__lte=d
+            ).order_by("-date").first()
+
+            if derniere:
+                count = declaration_effectif.objects.filter(
+                    Ru_id=collab.it,
+                    date=derniere.date,
+                    nature__in=["A", "V"]
+                ).count()
+            else:
+                count = systeme
+
+            data_totale_par_jour[i] += count
 
     unites_ab = set(collaborateurs_n1.values_list("unite_id", flat=True))
     if unites_ab:
-        unites =set(Unite.objects.filter(abreviation__in=unites_ab).values_list("maquette",flat=True))
-        for u in unites:
-            maquette_totale += u
+        maquettes = Unite.objects.filter(abreviation__in=unites_ab).values_list("maquette", flat=True)
+        maquette_totale = sum(m or 0 for m in maquettes)
 
     return render(request, "declaration_effectif/DUR/dashboard.html", {
         "liste_ru_stats": liste_ru_stats,
         "total_r": total_r,
+        "MR": total_r - maquette_totale,
+        "MS": total_syst - maquette_totale,
         "total_syst": total_syst,
-        "maquette_totale": maquette_totale,"maint":maint if maint else timezone.localdate()
+        "maquette_totale": maquette_totale,
+        "maint": maint,
+        "chart_labels_json": json.dumps(labels_list),
+        "chart_data_json": json.dumps(data_totale_par_jour),"non_valides":non_valides
     })
-
 
 def get_all_n1_under(it_parent):
     """
@@ -396,85 +573,105 @@ def page_N4(request):
     it = request.session.get("it")
     if not it:
         return redirect("login")
-        
+
     maint = timezone.localdate()
 
-    # 1. Département(s) associés au N4
     dep = set(
         Collaborateur.objects.filter(it=it)
         .values_list("departement", flat=True)
     )
-
-    # 2. Récupération de tous les ITs des N1 dépendant du N4 (arbre hiérarchique)
-    n1_its = get_all_n1_under(it)
-
-    # Si le N4 a lui-même des opérateurs en direct, on s'assure de l'inclure si besoin
-    if not n1_its:
-        # Vérification si le N4 gère directement des opérateurs sans intermédiaire
-        if Collaborateur.objects.filter(ru_it=it).exists():
-            n1_its.add(it)
-
-    # 3. Récupération des objets Collaborateur N1 avec annotation de l'effectif système (opérateurs rattachés)
-    # select_related('unite') évite de refaire des requêtes SQL pour la maquette
-    liste_n1 = (
-        Collaborateur.objects.filter(it__in=n1_its)
-        .select_related("unite")
-        .annotate(systeme_count=Count("subordonnes"))
-    )
-
-    # 4. Chargement en 1 seule requête des déclarations du jour pour les N1
-    declarations_du_jour = dict(
-        declaration_effectif.objects.filter(date=maint, Ru_id__in=n1_its)
-        .values_list("Ru_id")
-        .annotate(total=Count("id"))
-    )
-
+    today = timezone.now().date()
+    dates = [today - timedelta(days=i) for i in range(6, -1, -1)]
+    labels_list = [d.strftime('%d %b') for d in dates]
+    liste = []
+    reel = 0
+    systeme = 0
     liste_ru_stats = []
-    total_syst = 0
-    total_r = 0
-    unites_traitees = set()
-    maquette_totale = 0
+    maquette = 0
 
-    # 5. Construction de la liste des statistiques
+    liste_N3 = liste_N3_N4(it)
+    for n in liste_N3:
+        liste.extend(liste_N1_pr_N3(n))
+
+    liste_n1 = Collaborateur.objects.filter(it__in=liste)
+    data_totale_par_jour = [0] * len(dates)
+
     for n1 in liste_n1:
-        collaborateur_it = n1.it
+        systeme1 = Collaborateur.objects.filter(ru_it_id=n1.it).count()
+        der = declaration_effectif.objects.filter(Ru_id=n1.it).order_by("-date").first()
+        if der:
+            reel1 = declaration_effectif.objects.filter(
+                Ru_id=n1.it, date=der.date, nature__in=["A", "V"]
+            ).count()
+        else:
+            reel1 = systeme1
 
-        # Effectif Système (nombre de subordonnés)
-        systeme = n1.systeme_count
+        maquette1 = 0
+        if n1.unite_id:
+            u = Unite.objects.filter(abreviation=n1.unite_id).first()
+            if u and u.maquette:
+                maquette1 = u.maquette
 
-        # Effectif Réel (depuis les déclarations ou valeur par défaut = systeme)
-        reel = declarations_du_jour.get(collaborateur_it, systeme)
+        for i, d in enumerate(dates):
+            derniere = declaration_effectif.objects.filter(
+                Ru_id=n1.it, date__lte=d
+            ).order_by("-date").first()
 
-        # Récupération de la maquette associée via l'Unite rattachée au N1
-        maquette = 0
-        if n1.unite:
-            maquette = n1.unite.maquette or 0
-            if n1.unite.abreviation not in unites_traitees:
-                maquette_totale += maquette
-                unites_traitees.add(n1.unite.abreviation)
+            if derniere:
+                count = declaration_effectif.objects.filter(
+                    Ru_id=n1.it,
+                    date=derniere.date,
+                    nature__in=["A", "V"]
+                ).count()
+            else:
+                count = systeme1   # <-- fixé (était "systeme")
+
+            data_totale_par_jour[i] += count
+
+        reel += reel1
+        systeme += systeme1
+        maquette += maquette1
 
         liste_ru_stats.append({
             "n1": n1,
-            "reel": reel,
-            "systeme": systeme,
-            "maquette": maquette,
+            "reel1": reel1,
+            "systeme1": systeme1,
+            "maquette1": maquette1,
+            "mr": reel1 - maquette1,
+            "ms": systeme1 - maquette1,
         })
 
-        total_r += reel
-        total_syst += systeme
-
-    # 6. Envoi des données au template dashboard.html
-    return render(
-        request,
-        "declaration_effectif/N4/dashboard.html",
-        {
-            "liste_ru_stats": liste_ru_stats,
-            "total_r": total_r,
-            "total_syst": total_syst,
-            "maquette_totale": maquette_totale,
-            "dep": dep,"maint":maint if maint else timezone.localdate()
-        },
+    # ---- Sorti de la boucle : calculé une seule fois ----
+    declaration = declaration_effectif.objects.filter(
+        date=maint, Ru_id__in=liste_n1.values_list("it", flat=True)
     )
+    liste_declares = set(declaration.values_list("Ru_id", flat=True))
+
+    liste_ru_avec_operateurs = set(
+        Collaborateur.objects.filter(
+            ru_it_id__in=liste_n1.values_list("it", flat=True)
+        )
+        .values_list("ru_it_id", flat=True)
+        .distinct()
+    )
+    non_valides = (
+        Collaborateur.objects.filter(it__in=liste_ru_avec_operateurs)
+        .exclude(it__in=liste_declares)
+        .count()
+    )
+
+    return render(request, "declaration_effectif/N4/dashboard.html", {
+        "liste_ru_stats": liste_ru_stats,
+        "reel": reel,
+        "systeme": systeme,
+        "maint": maint,
+        "maquette": maquette,
+        "MS": systeme - maquette,
+        "MR": reel - maquette,
+        "chart_labels_json": json.dumps(labels_list),
+        "chart_data_json": json.dumps(data_totale_par_jour),
+        "non_valides": non_valides,
+    })
 
 def get_n1_pour_niveau_orm(it_parent):
     # Niveau 1 sous le parent
@@ -515,65 +712,84 @@ def listes_de_N4(it_n4):
     return liste_N1
 
 
-def get_tous_les_sous_responsables(it_parent):
-    responsables = set()
-    
-    # 1. Récupération de tous les enfants directs du parent
-    enfants_its = list(
-        Collaborateur.objects.filter(ru_it=it_parent).values_list("it", flat=True)
-    )
 
-    for enfant_it in enfants_its:
-        # Vérifie si cet enfant a des subordonnés (est-ce un responsable ?)
-        subordonnes_its = list(
-            Collaborateur.objects.filter(ru_it=enfant_it).values_list("it", flat=True)
-        )
-
-        if subordonnes_its:
-            # C'est un responsable (N3, N2 ou N1), on l'ajoute
-            responsables.add(enfant_it)
-
-            # On vérifie si ses subordonnés ont à leur tour des personnes sous leurs ordres
-            a_des_sous_responsables = Collaborateur.objects.filter(
-                ru_it__in=subordonnes_its
-            ).exists()
-
-            if a_des_sous_responsables:
-                # C'est un responsable de niveau supérieur (N3 / N2) :
-                # On descend récursivement pour récupérer ses N2 et N1
-                responsables.update(get_tous_les_sous_responsables(enfant_it))
-
-    return responsables
-
+@role_required('N+4')
+@role_required('N+4')
 @role_required('N+4')
 def affectation_N4(request):
     util = request.session.get("it")
     if not util:
         return redirect("login")
 
-    # Récupération globale de TOUS les sous-responsables (N3, N2, N1)
-    sous_responsables_its = get_tous_les_sous_responsables(util)
+    status = request.GET.get("status", "all")
 
-    toutes_declarations = []
-    total_nbr = 0
-
-    # Parcours des ITs de tous les responsables uniques
-    for c_it in sous_responsables_its:
-        changements_n = histo(c_it)
-        toutes_declarations.extend(changements_n.get("declarations", []))
-        total_nbr += changements_n.get("nbr", 0)
+    liste_N3 = liste_N3_N4(util)
+    liste = []
+    for n3 in liste_N3:
+        liste.extend(Rg_Dur(n3))
+    liste.extend(liste_N1_pr_N3(util))
 
     # Historique propre au N4
     changements_n4 = histo(util)
-    
+    toutes_declarations_N4 = list(changements_n4.get("declarations", []))
+
+    # Historique cumulé de tous les niveaux sous ce N+4
+    toutes_declarations = []
+    for n in liste:
+        changements_n = histo(n)
+        toutes_declarations.extend(changements_n.get("declarations", []))
+
+    if status == "valide":
+        toutes_declarations_N4 = [
+            d for d in toutes_declarations_N4
+            if d.etat and "valid" in str(d.etat).lower()
+        ]
+        toutes_declarations = [
+            d for d in toutes_declarations
+            if d.etat and "valid" in str(d.etat).lower()
+        ]
+    elif status == "refuse":
+        toutes_declarations_N4 = [
+            d for d in toutes_declarations_N4
+            if d.etat and "refus" in str(d.etat).lower()
+        ]
+        toutes_declarations = [
+            d for d in toutes_declarations
+            if d.etat and "refus" in str(d.etat).lower()
+        ]
+    elif status == "non_demarrer":
+        toutes_declarations_N4 = [
+            d for d in toutes_declarations_N4
+            if d.etat and "non démarr" in str(d.etat).lower()
+        ]
+        toutes_declarations = [
+            d for d in toutes_declarations
+            if d.etat and "non démarr" in str(d.etat).lower()
+        ]
+
+    total_N4 = len(toutes_declarations_N4)
+    total_nbr = len(toutes_declarations)
+
+    # ---- Pagination pour les 2 listes ----
+    paginator_n4 = Paginator(toutes_declarations_N4, 10)
+    page_n4 = request.GET.get("page_n4", 1)
+    page_obj_n4 = paginator_n4.get_page(page_n4)
+
+    paginator_n1 = Paginator(toutes_declarations, 10)
+    page_n1 = request.GET.get("page_n1", 1)
+    page_obj_n1 = paginator_n1.get_page(page_n1)
+
     return render(
         request,
         "declaration_effectif/N4/affectation.html",
         {
-            "toutes_declarations_N4": changements_n4.get("declarations", []),
-            "toutes_declarations": toutes_declarations,
-            "total_N4": changements_n4.get("nbr", 0),
-            "total_nbr": total_nbr
+            "toutes_declarations_N4": page_obj_n4,
+            "page_obj_n4": page_obj_n4,
+            "toutes_declarations": page_obj_n1,
+            "page_obj_n1": page_obj_n1,
+            "total_N4": total_N4,
+            "total_nbr": total_nbr,
+            "status": status,
         }
     )
 
@@ -581,20 +797,18 @@ def affectation_N4(request):
 @role_required('N+4')
 def validation_N4(request):
     util = request.session.get("it")
+
     if not util:
         return redirect("login")
 
     maint = timezone.localdate()
+    liste=[]
+    liste_N3 = liste_N3_N4(util)
+    for n in liste_N3:
+        liste.extend(liste_N1_pr_N3(n))
 
-    # 1. Récupération récursive directe de TOUS les ITs des N1 sous ce N4
-    # (ce sont les responsables qui gèrent directement les opérateurs)
-    n1_its = get_all_n1_under(util)
-
-    # Si le N4 gère directement des opérateurs sans manager intermédiaire
-    if not n1_its:
-        if Collaborateur.objects.filter(ru_it=util).exists():
-            n1_its.add(util)
-
+    liste_n1 = Collaborateur.objects.filter(it__in=liste)
+    n1_its=set(liste_n1.values_list("it", flat=True))
     # 2. Récupérer la liste des ITs des RU/N1 qui ONT DÉJÀ soumis leur déclaration aujourd'hui
     liste_declares = set(
         declaration_effectif.objects.filter(
@@ -641,7 +855,7 @@ def validation_date(request):
     if query_date:
         declarations_faites = set(
             declaration_effectif.objects.filter(
-                date=query_date, 
+                date=query_date,
                 Ru_id__in=liste_n1
             ).values_list("Ru_id", flat=True)
         )

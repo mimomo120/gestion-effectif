@@ -9,7 +9,7 @@ urlpatterns=[
     path('validation/',views.validation_view,name='validation'),
     path("historique/",views.histo_aff,name="historique"),
     path("valider_operateurs/",views.valider,name="valider_operateurs"),
-    path("supprimer",views.supprimer,name="supprimer"),
+    path("supprimer/",views.supprimer,name="supprimer"),
     path("afficher_modifier",views.afficher_modifier),
     path("validation_rg/",views.liste_ru_non_valides_Rg,name="liste_ru_non_valides_rg"),
     path("affectation_Ru/",views.affectation_Ru,name="liste_affectation"),

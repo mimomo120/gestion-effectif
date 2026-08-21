@@ -1,3 +1,5 @@
+from itertools import count
+from utilisateur.decorators import role_required
 from django.shortcuts import render, redirect
 from utilisateur.models import utilisateur
 from Collaborateur.models import Departement , Collaborateur
@@ -7,68 +9,163 @@ from django.contrib import messages
 from django.utils import timezone
 from declaration_effectif.models import declaration_effectif
 from django.http import JsonResponse
-from datetime import date
+from datetime import date , datetime
+from django.core.paginator import Paginator
 
 def rec(request):
-    it= request.session.get("it")
-    der=declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
-    operateurs=Collaborateur.objects.filter(ru_it_id=it)
-    if der :
-        derniere= der.date
-        changements= declaration_effectif.objects.filter(nature__in=["C","D"] ,Ru_id=it , date=derniere)
-        ajouters=declaration_effectif.objects.filter(nature__in="A" ,Ru_id=it , date=derniere)
-        liste_ch=set(changements.values_list("collaborateur_it_id",flat=True))
-        liste_a=set(ajouters.values_list("collaborateur_it_id",flat=True))
+    it = request.session.get("it")
+    der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
+    operateurs = Collaborateur.objects.filter(ru_it_id=it)
+
+    if der:
+        derniere = der.date
+        changements = declaration_effectif.objects.filter(
+            nature__in=["C", "D"], Ru_id=it, date=derniere
+        )
+        ajouters = declaration_effectif.objects.filter(
+            nature="A", Ru_id=it, date=derniere
+        )
+        liste_ch = set(changements.values_list("collaborateur_it_id", flat=True))
+        liste_a = set(ajouters.values_list("collaborateur_it_id", flat=True))
+
         operateurs_finaux = Collaborateur.objects.filter(
-            (Q(ru_it_id=it) & ~Q(it__in=liste_ch)) | Q(it__in=liste_a)
+            Q(ru_it_id=it) & ~Q(it__in=liste_ch)
+            | Q(ru_it_id=it, it__in=liste_a)
         )
     else:
-        operateurs_finaux =operateurs
+        operateurs_finaux = operateurs
 
-    return (operateurs_finaux)
+    return operateurs_finaux
+from datetime import datetime
 
+def reelEff(request, date_reference=None):
+    it = request.session.get("it")
+
+    qs_declarations = declaration_effectif.objects.filter(Ru_id=it)
+    if date_reference:
+        qs_declarations = qs_declarations.filter(date__lte=date_reference)
+
+    der = qs_declarations.order_by("-date").first()
+
+    changements_tous = declaration_effectif.objects.filter(
+        nature__in=["C", "D"], Ru_id=it
+    )
+    if date_reference:
+        changements_tous = changements_tous.filter(date__lte=date_reference)
+    liste_ch = set(changements_tous.values_list("collaborateur_it_id", flat=True))
+
+    if der:
+        derniere = der.date
+        ajouters = declaration_effectif.objects.filter(
+            nature="A", Ru_id=it, date=derniere
+        )
+        liste_a = set(ajouters.values_list("collaborateur_it_id", flat=True))
+
+        operateurs_finaux = Collaborateur.objects.filter(
+            Q(ru_it_id=it) & ~Q(it__in=liste_ch)
+            | Q(ru_it_id=it, it__in=liste_a)
+        )
+    else:
+        operateurs_finaux = Collaborateur.objects.filter(ru_it_id=it)
+
+    return operateurs_finaux
+
+@role_required('N+1')
 def operateurs(request):
-    operateurs_finaux = rec(request)
-    return render(request, "Collaborateur/RU/liste_operateur.html", {"operateurs_finaux": operateurs_finaux})
-
+    operateurs_finaux = reelEff(request)
+    count = operateurs_finaux.count()
+    return render(
+    request,
+    "Collaborateur/RU/liste_operateur.html",
+    {"operateurs_finaux": operateurs_finaux, "count": count},
+)
 #filter la table de validation et liste des op
 def filter_tableau(request):
-        text = request.GET.get('q', '')
-        choix = request.GET.get('choix', '')
-        choix2=request.GET.get('choix2', '')
-        it = request.session.get("it")
-        operateurs = rec(request)
-        der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
-        maint = timezone.now()
-        if choix and choix != "Tous les lots":
-            operateurs = operateurs.filter(lot=choix)
+    text = request.GET.get('q', '')
+    choix = request.GET.get('choix', '')
+    choix2 = request.GET.get('choix2', '')
+    time_param = request.GET.get('time', '')
+    page_number = request.GET.get('page', 1)
+    it = request.session.get("it")
 
-        if text:
-            operateurs = operateurs.filter(
-                Q(nom_complete__icontains=text) |
-                Q(matricule__icontains=text) | Q(it__icontains=text)
-            )
-        if choix2 and choix2 != "Tous les post":
-            operateurs = operateurs.filter(post=choix2)
-        
+    date_reference = None
+    if time_param:
+        try:
+            date_reference = datetime.strptime(time_param, "%Y-%m-%d").date()
+        except ValueError:
+            date_reference = None
 
-        raw = operateurs.values("matricule","it", "nom_complete","lot","post")
+    operateurs = reelEff(request, date_reference)
 
-        data = [
-            {
-                "matricule": d["matricule"],
-                "it":d["it"],
-                "nom_complete": d["nom_complete"],
-                "lot": d["lot"],
-                "post": d["post"],
-            }
-            for d in raw
-        ]
-        if der and der.date == maint.date():
-                return JsonResponse(data, safe=True)
-        else:
-                return JsonResponse(data, safe=False)
+    if choix and choix != "Tous les lots":
+        operateurs = operateurs.filter(lot=choix)
 
+    if text:
+        operateurs = operateurs.filter(
+            Q(nom_complete__icontains=text) |
+            Q(matricule__icontains=text) |
+            Q(it__icontains=text)
+        )
+    if choix2 and choix2 != "Tous les post":
+        operateurs = operateurs.filter(post=choix2)
+
+    raw = operateurs.values("matricule", "it", "nom_complete", "lot", "post")
+
+    PER_PAGE = 10
+    paginator = Paginator(list(raw), PER_PAGE)
+
+    try:
+        page_obj = paginator.page(page_number)
+    except Exception:
+        page_obj = paginator.page(1)
+
+    data = {
+        "results": list(page_obj.object_list),
+        "page": page_obj.number,
+        "num_pages": paginator.num_pages,
+        "count": paginator.count,
+        "has_next": page_obj.has_next(),
+        "has_previous": page_obj.has_previous(),
+    }
+
+    return JsonResponse(data, safe=True)
+
+def filter_validation(request):
+    text = request.GET.get('q', '')
+    choix = request.GET.get('choix', '')
+    choix2 = request.GET.get('choix2', '')
+    time_param = request.GET.get('time', '')
+    it = request.session.get("it")
+
+    date_reference = None
+    if time_param:
+        try:
+            date_reference = datetime.strptime(time_param, "%Y-%m-%d").date()
+        except ValueError:
+            date_reference = None
+
+    operateurs = reelEff(request, date_reference)
+
+    if choix and choix != "Tous les lots":
+        operateurs = operateurs.filter(lot=choix)
+
+    if text:
+        operateurs = operateurs.filter(
+            Q(nom_complete__icontains=text) |
+            Q(matricule__icontains=text) |
+            Q(it__icontains=text)
+        )
+    if choix2 and choix2 != "Tous les post":
+        operateurs = operateurs.filter(post=choix2)
+
+    raw = operateurs.values("matricule", "it", "nom_complete", "lot", "post")
+
+    data = {
+        "results": list(raw),
+        "count": raw.count(),
+    }
+
+    return JsonResponse(data, safe=True)
 #recuperer les donnes d'un op
 def operateur(request):
     it = request.GET.get('q', '').strip()
@@ -80,7 +177,7 @@ def operateur(request):
     except Collaborateur.MultipleObjectsReturned:
         return JsonResponse({"error": "Plusieurs opérateurs trouvés."}, status=409)
 
-    if op.ru_it_id == request.session.get("it"):
+    if op.ru_it and op.ru_it.it == request.session.get("it"):
         return JsonResponse({"error": "Cet opérateur appartient déjà à votre lot."}, status=400)
 
     data = {
@@ -166,7 +263,11 @@ def liste_Rg_par_dur(request):
 
 
 def liste_N3_N4(it):
-    return Collaborateur.objects.filter(ru_it_id=it)
+    candidats_N3 = Collaborateur.objects.filter(ru_it_id=it)
+    n3_valides_ids = [
+            c.it for c in candidats_N3 if a_deux_niveaux(c.it)
+        ]
+    return n3_valides_ids
 
 
 def a_deux_niveaux(it):
@@ -189,11 +290,7 @@ def respo_N4(request):
     it = request.session.get("it")
     if not it:
         return redirect("login")
-
-    candidats_N3 = liste_N3_N4(it)
-    n3_valides_ids = [
-        c.it for c in candidats_N3 if a_deux_niveaux(c.it)
-    ]
+    n3_valides_ids = liste_N3_N4(it)
     N3 = Collaborateur.objects.filter(it__in=n3_valides_ids)
     nbr = N3.count()
 

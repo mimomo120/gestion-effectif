@@ -1,13 +1,15 @@
-{%extends 'utilisateur/navbar.html'%}
+{% extends 'utilisateur/navbar.html' %}
 {% load static %}
-{% block title %}<title>Liste Opérateurs</title>{% endblock %}
+
+{% block title %}Liste Opérateurs{% endblock %}
+
 {% block css %}
 <link rel="stylesheet" href="{% static 'utilisateur/css/RU/liste.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="operateurs-container">
-    <h1 class="page-title">Opérateurs</h1>
+    <h1 class="page-title">Opérateurs (<span id="counter">{{ count}}</span>)</h1>
 
     <!-- Filters Section -->
     <div class="filters-section">
@@ -47,9 +49,7 @@
                     <td class="cell-matricule">{{ operateur.matricule }}</td>
                     <td class="cell-utilisateur">{{ operateur.it }}</td>
                     <td class="cell-nom">{{ operateur.nom_complete }}</td>
-                    <td class="cell-lot">
-                        <span class="">{{operateur.lot}}</span>
-                    </td>
+                    <td class="cell-lot">{{ operateur.lot }}</td>
                 </tr>
                 {% empty %}
                 <tr>
@@ -61,6 +61,9 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination -->
+    <div class="pagination-container" id="pagination"></div>
 </div>
 {% endblock %}
 
@@ -68,45 +71,107 @@
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const resultat = document.getElementById("result");
+        const counter = document.getElementById("counter");
         const searchInput = document.getElementById("search");
         const lotSelect = document.getElementById("choix");
         const dateInput = document.getElementById("date");
         const resetBtn = document.getElementById("resetBtn");
+        const pagination = document.getElementById("pagination");
+
+        let currentPage = 1;
 
         // Set today's date on load
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, "0");
         const day = String(today.getDate()).padStart(2, "0");
-        dateInput.value = `${year}-${month}-${day}`;
+        const defaultDate = `${year}-${month}-${day}`;
+        dateInput.value = defaultDate;
 
-        // Search function
-        async function performSearch() {
+        // Échappement XSS
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const map = {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;"
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Construit les boutons de pagination (précédent / numéros / suivant)
+        function renderPagination(page, numPages, hasPrev, hasNext) {
+            if (numPages <= 1) {
+                pagination.innerHTML = "";
+                return;
+            }
+
+            let html = "";
+
+            html += `<button class="page-btn" data-page="${page - 1}" ${hasPrev ? "" : "disabled"}>&laquo; Précédent</button>`;
+
+            // Affiche au maximum 5 numéros de page autour de la page courante
+            const start = Math.max(1, page - 2);
+            const end = Math.min(numPages, page + 2);
+
+            if (start > 1) {
+                html += `<button class="page-btn" data-page="1">1</button>`;
+                if (start > 2) html += `<span class="page-ellipsis">…</span>`;
+            }
+
+            for (let p = start; p <= end; p++) {
+                html += `<button class="page-btn ${p === page ? "active" : ""}" data-page="${p}">${p}</button>`;
+            }
+
+            if (end < numPages) {
+                if (end < numPages - 1) html += `<span class="page-ellipsis">…</span>`;
+                html += `<button class="page-btn" data-page="${numPages}">${numPages}</button>`;
+            }
+
+            html += `<button class="page-btn" data-page="${page + 1}" ${hasNext ? "" : "disabled"}>Suivant &raquo;</button>`;
+
+            pagination.innerHTML = html;
+
+            pagination.querySelectorAll(".page-btn:not([disabled])").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    currentPage = Number(btn.dataset.page);
+                    applyFilters();
+                });
+            });
+        }
+
+        // Fonction unifiée pour filtrer les données
+        async function applyFilters() {
             const query = searchInput.value.trim();
             const lot = lotSelect.value;
-            const post = postSelect.value;
+            const time = dateInput.value;
+
+            const params = new URLSearchParams();
+            if (query) params.append("q", query);
+            if (lot) params.append("choix", lot);
+            if (time) params.append("time", time);
+            params.append("page", currentPage);
 
             try {
-                const response = await fetch(
-                    `/rechercher?q=${encodeURIComponent(query)}&choix=${encodeURIComponent(lot)}`
-                );
-
-                if (!response.ok) throw new Error("Erreur réseau");
+                const response = await fetch(`/rechercher?${params.toString()}`);
+                if (!response.ok) throw new Error("Erreur lors de la récupération des données");
 
                 const data = await response.json();
+                const results = data.results || [];
 
-                if (data.length > 0) {
-                    resultat.innerHTML = data.map(op => `
+                if (counter) counter.textContent = data.count ?? results.length;
+
+                if (results.length > 0) {
+                    resultat.innerHTML = results.map(op => `
                         <tr class="table-row">
-                            <td class="cell-matricule">${escapeHtml(op.matricule)}</td>
-                            <td class="cell-utilisateur">${escapeHtml(op.it)}</td>
-                            <td class="cell-nom">${escapeHtml(op.nom_complete)}</td>
+                            <td class="cell-matricule">${escapeHtml(op.matricule || '')}</td>
+                            <td class="cell-utilisateur">${escapeHtml(op.it || '')}</td>
+                            <td class="cell-nom">${escapeHtml(op.nom_complete || '')}</td>
                             <td class="cell-lot">
-                                <span class="badge badge-${op.lot?.toLowerCase() || ''}">
-                                    ${escapeHtml(op.lot || '-')}
-                                </span>
+                                    ${escapeHtml(op.lot)}
                             </td>
-
                         </tr>
                     `).join("");
                 } else {
@@ -118,106 +183,53 @@
                         </tr>
                     `;
                 }
+
+                renderPagination(
+                    data.page || 1,
+                    data.num_pages || 1,
+                    data.has_previous,
+                    data.has_next
+                );
             } catch (error) {
-                console.error("Erreur lors de la recherche:", error);
+                console.error("Erreur de filtrage :", error);
                 resultat.innerHTML = `
                     <tr>
                         <td colspan="4" class="empty-row error">
-                            <i class="fas fa-exclamation-circle"></i> Erreur lors de la recherche
+                            <i class="fas fa-exclamation-circle"></i> Une erreur s'est produite lors du filtrage
                         </td>
                     </tr>
                 `;
+                pagination.innerHTML = "";
             }
         }
 
-        // Date filter function
-        async function filterByDate() {
-            const date = dateInput.value;
-
-            if (!date) {
-                resultat.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="empty-row">Sélectionnez une date</td>
-                    </tr>
-                `;
-                return;
-            }
-
-            try {
-                const response = await fetch(`/filter?time=${encodeURIComponent(date)}`);
-
-                if (!response.ok) throw new Error("Erreur réseau");
-
-                const data = await response.json();
-
-                if (data.length > 0) {
-                    resultat.innerHTML = data.map(op => `
-                        <tr class="table-row">
-                            <td class="cell-matricule">${escapeHtml(op.matricule)}</td>
-                            <td class="cell-utilisateur">${escapeHtml(op.it)}</td>
-                            <td class="cell-nom">${escapeHtml(op.nom_complete)}</td>
-                            <td class="cell-lot">
-                                <span class="badge badge-${op.lot?.toLowerCase() || ''}">
-                                    ${escapeHtml(op.lot || '-')}
-                                </span>
-                            </td>
-                        </tr>
-                    `).join("");
-                } else {
-                    resultat.innerHTML = `
-                        <tr>
-                            <td colspan="4" class="empty-row">
-                                <i class="fas fa-calendar-times"></i> Aucune déclaration pour cette date
-                            </td>
-                        </tr>
-                    `;
-                }
-            } catch (error) {
-                console.error("Erreur lors du filtrage:", error);
-                resultat.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="empty-row error">
-                            <i class="fas fa-exclamation-circle"></i> Erreur lors du filtrage
-                        </td>
-                    </tr>
-                `;
-            }
-        }
-
-        // Reset function
+        // Réinitialisation des filtres
         function resetFilters() {
             searchInput.value = "";
             lotSelect.value = "";
-            postSelect.value = "";
-            dateInput.value = `${year}-${month}-${day}`;
-            performSearch();
+            dateInput.value = defaultDate;
+            currentPage = 1;
+            applyFilters();
         }
 
-        // XSS Protection
-        function escapeHtml(text) {
-            const map = {
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#039;"
-            };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
+        // Debounce pour l'input de recherche
+        let searchTimeout;
+        searchInput.addEventListener("input", () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentPage = 1; // toute nouvelle recherche repart de la page 1
+                applyFilters();
+            }, 300);
+        });
 
-        // Event listeners
-        searchInput.addEventListener("input", performSearch);
-        lotSelect.addEventListener("change", performSearch);
-        postSelect.addEventListener("change", performSearch);
-        dateInput.addEventListener("change", filterByDate);
+        // Tout changement de filtre repart de la page 1
+        lotSelect.addEventListener("change", () => { currentPage = 1; applyFilters(); });
+        dateInput.addEventListener("change", () => { currentPage = 1; applyFilters(); });
         resetBtn.addEventListener("click", resetFilters);
 
-        // Debounce for better performance
-        let searchTimeout;
-        searchInput.addEventListener("input", (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(performSearch, 300);
-        });
+        // Synchronise l'affichage initial (rendu Django, non filtré) avec le
+        // filtre par défaut actif à l'écran (date = aujourd'hui)
+        applyFilters();
     });
 </script>
 {% endblock %}

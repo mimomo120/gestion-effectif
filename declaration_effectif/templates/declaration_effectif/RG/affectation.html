@@ -13,21 +13,98 @@
         <h2 class="page-title">Gestion des affectations</h2>
     </div>
 
-    <!-- Onglets de basculement -->
+    <!-- Onglets de navigation (Conserve le filtre d'état en paramètre URL) -->
     <div class="tabs-switch" role="tablist">
-        <button type="button" class="tab-btn active" data-target="tab-mes" role="tab" aria-selected="true"
-            aria-controls="tab-mes">
-            Vos changements d'affectation
-        </button>
-        <button type="button" class="tab-btn" data-target="tab-toutes" role="tab" aria-selected="false"
-            aria-controls="tab-toutes">
+        <a href="?tab=tab-mes{% if status %}&status={{ status }}{% endif %}"
+            class="tab-btn {% if request.GET.tab != 'tab-toutes' %}active{% endif %}">
+            Vos changements d'affectation <span class="count-badge">{{ nbr2|default:"0" }}</span>
+        </a>
+        <a href="?tab=tab-toutes{% if status %}&status={{ status }}{% endif %}"
+            class="tab-btn {% if request.GET.tab == 'tab-toutes' %}active{% endif %}">
             Liste des affectations <span class="count-badge">{{ nbr|default:"0" }}</span>
-        </button>
+        </a>
+    </div>
+
+    <!-- Barre de recherche et de filtres -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <input type="text" id="searchInput" class="filter-input" placeholder="Rechercher par nom, RU ou état..." />
+        </div>
+        <div class="filter-box">
+            <select id="statusFilter" class="filter-select"
+                onchange="location.href='?tab={% if request.GET.tab == 'tab-toutes' %} tab-toutes {% else %}tab-mes{% endif %}&status=' + this.value">
+                <option value="all" {% if status == "all" or not status %}selected{% endif %}>Tous les états</option>
+                <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
+                <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
+            </select>
+        </div>
     </div>
 
     <div class="sections-wrapper">
-        <!-- Section 1 : Affectations N2 -->
-        <div class="section-card tab-panel" id="tab-mes" role="tabpanel">
+        {% if request.GET.tab == 'tab-toutes' %}
+        <!-- Section 2 : Toutes les affectations (N1) -->
+        <div class="section-card">
+            <div class="table-scroll">
+                <table class="table-affectations">
+                    <thead>
+                        <tr>
+                            <th>Collaborateur</th>
+                            <th>RU initial</th>
+                            <th>RU cible</th>
+                            <th class="text-center">État</th>
+                        </tr>
+                    </thead>
+                    <tbody id="result">
+                        {% for affectation in info %}
+                        <tr class="table-row">
+                            <td class="cell-primary">{{ affectation.collaborateur }}</td>
+                            <td>{{ affectation.initial }}</td>
+                            <td>
+                                {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
+                                {{ affectation.acceuil }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
+                                <span class="badge badge-{{ affectation.etat|slugify }}">
+                                    {{ affectation.etat }}
+                                </span>
+                                {% else %}
+                                <span class="badge badge-en-attente">En attente</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="empty-row">Aucune affectation à afficher.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if page_obj_n1.paginator.num_pages > 1 %}
+            <div class="pagination-container">
+                {% if page_obj_n1.has_previous %}
+                <a class="page-btn"
+                    href="?page_n1={{ page_obj_n1.previous_page_number }}&tab=tab-toutes{% if status %}&status={{ status }}{% endif %}">&laquo;
+                    Précédent</a>
+                {% endif %}
+                <span class="page-btn active">{{ page_obj_n1.number }}</span>
+                {% if page_obj_n1.has_next %}
+                <a class="page-btn"
+                    href="?page_n1={{ page_obj_n1.next_page_number }}&tab=tab-toutes{% if status %}&status={{ status }}{% endif %}">Suivant
+                    &raquo;</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% else %}
+        <!-- Section 1 : Affectations N2 (Vos changements) -->
+        <div class="section-card">
             <div class="table-scroll">
                 <table class="table-affectations">
                     <thead>
@@ -40,14 +117,24 @@
                     </thead>
                     <tbody id="result">
                         {% for affectation in n2 %}
-                        <tr>
+                        <tr class="table-row">
                             <td class="cell-primary">{{ affectation.collaborateur }}</td>
                             <td>{{ affectation.initial }}</td>
-                            <td>{{ affectation.acceuil }}</td>
+                            <td>
+                                {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
+                                {{ affectation.acceuil }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                             <td class="text-center">
+                                {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
                                 <span class="badge badge-{{ affectation.etat|slugify }}">
                                     {{ affectation.etat }}
                                 </span>
+                                {% else %}
+                                <span class="badge badge-en-attente">En attente</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
@@ -58,67 +145,52 @@
                     </tbody>
                 </table>
             </div>
-        </div>
 
-        <!-- Section 2 : Toutes les affectations -->
-        <div class="section-card tab-panel" id="tab-toutes" role="tabpanel" hidden>
-            <div class="table-scroll">
-                <table class="table-affectations">
-                    <thead>
-                        <tr>
-                            <th>Collaborateur</th>
-                            <th>RU initial</th>
-                            <th>RU cible</th>
-                            <th class="text-center">État</th>
-                        </tr>
-                    </thead>
-                    <tbody id="result2">
-                        {% for affectation in info %}
-                        <tr>
-                            <td class="cell-primary">{{ affectation.collaborateur }}</td>
-                            <td>{{ affectation.initial }}</td>
-                            <td>{{ affectation.acceuil }}</td>
-                            <td class="text-center">
-                                <span class="badge badge-{{ affectation.etat|slugify }}">
-                                    {{ affectation.etat }}
-                                </span>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="empty-row">Aucune affectation trouvée.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            {% if page_obj_n2.paginator.num_pages > 1 %}
+            <div class="pagination-container">
+                {% if page_obj_n2.has_previous %}
+                <a class="page-btn"
+                    href="?page_n2={{ page_obj_n2.previous_page_number }}&tab=tab-mes{% if status %}&status={{ status }}{% endif %}">&laquo;
+                    Précédent</a>
+                {% endif %}
+                <span class="page-btn active">{{ page_obj_n2.number }}</span>
+                {% if page_obj_n2.has_next %}
+                <a class="page-btn"
+                    href="?page_n2={{ page_obj_n2.next_page_number }}&tab=tab-mes{% if status %}&status={{ status }}{% endif %}">Suivant
+                    &raquo;</a>
+                {% endif %}
             </div>
+            {% endif %}
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block script %}
 <script>
+    function filterTable() {
+        const input = document.getElementById("searchInput");
+        const filter = input.value.toLowerCase();
+        const rows = document.querySelectorAll("#result .table-row");
+
+        rows.forEach(function (row) {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(filter) ? "" : "none";
+        });
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
-        const boutons = document.querySelectorAll(".tab-btn");
-        const panneaux = document.querySelectorAll(".tab-panel");
+        const searchInput = document.getElementById("searchInput");
 
-        boutons.forEach(function (bouton) {
-            bouton.addEventListener("click", function () {
-                const cible = bouton.dataset.target;
+        if (localStorage.getItem("savedSearch")) {
+            searchInput.value = localStorage.getItem("savedSearch");
+            filterTable();
+        }
 
-                boutons.forEach(function (b) {
-                    b.classList.remove("active");
-                    b.setAttribute("aria-selected", "false");
-                });
-
-                bouton.classList.add("active");
-                bouton.setAttribute("aria-selected", "true");
-
-                panneaux.forEach(function (p) {
-                    p.hidden = (p.id !== cible);
-                });
-            });
+        searchInput.addEventListener("keyup", function () {
+            localStorage.setItem("savedSearch", searchInput.value);
+            filterTable();
         });
     });
 </script>

@@ -1,3 +1,57 @@
+:root {
+    --bg-page: #f8fafc;
+    --primary: #1E2A38;
+    --secondary: #34465C;
+    --accent: #a69b87;
+    --danger: #C4425B;
+    --success: #1E8F63;
+    --warning: #E8A700;
+    --info: #2E6F8E;
+
+    --navy: #12213B;
+    --slate: #6B7280;
+    --border: #E5E8EE;
+    --paper: #FFFFFF;
+    --surface: #FFFFFF;
+
+    --badge-a: #EAF3F7;
+    --badge-a-text: #2E6F8E;
+    --badge-o: #E7F5EF;
+    --badge-o-text: #1E8F63;
+    --badge-p: #FDF4E2;
+    --badge-p-text: #a69b87;
+    --badge-t: #FBEBEE;
+    --badge-t-text: #C4425B;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15);
+
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ====== RESET & BASE ====== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    background-color: var(--bg-page) !important;
+    min-height: 100vh;
+    color: var(--navy);
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    background-attachment: fixed;
+}
+
 /* ==========================================================================
    validation.css — Page "Liste Ru sans validation"
    ========================================================================== */
