@@ -18,7 +18,6 @@ class Unite(models.Model):
 
     maquette = models.IntegerField(default=0)
     A = models.IntegerField(default=0)
-    O = models.IntegerField(default=0)
     P = models.IntegerField(default=0)
     C = models.IntegerField(default=0)
     T = models.IntegerField(default=0)
@@ -96,13 +95,5 @@ class Collaborateur(models.Model):
         on_delete=models.SET_NULL,
         null=True
     )
-
-    post = models.CharField(
-        max_length=1,
-        choices=POST_CHOICES,
-        null=True,
-        blank=True,
-    )
-
     def __str__(self):
         return self.it

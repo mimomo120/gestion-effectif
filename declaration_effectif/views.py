@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect , get_object_or_404
 from utilisateur.models import utilisateur
 from Collaborateur.models import Departement , Collaborateur ,Unite
 from django.contrib.auth.hashers import make_password , check_password
-from django.db.models import Q,Count,Sum
+from django.db.models import Q,Count,Sum ,Max
 from django.contrib import messages
 from django.utils import timezone
 from declaration_effectif.models import declaration_effectif ,Alert ,historique
@@ -13,11 +13,13 @@ import json
 from datetime import date , datetime , timedelta
 from django.db import transaction, IntegrityError
 from django.views.decorators.csrf import ensure_csrf_cookie
-from Collaborateur.views import rec , Ru_Rg, liste_Ru_par_Rg, Rg_Dur,liste_N1_pr_N3 ,liste_N3_N4
+from Collaborateur.views import rec , Ru_Rg, liste_Ru_par_Rg, Rg_Dur,liste_N1_pr_N3 ,liste_N3_N4 ,SystEff, reelEff
 from django.views.decorators.http import require_POST
 from utilisateur.decorators import role_required
 from django.utils.dateparse import parse_date
 from django.core.paginator import Paginator
+import bisect
+from django.shortcuts import render, redirect, get_object_or_404
 
 @ensure_csrf_cookie
 #valider la liste des operateurs d'un Ru
@@ -67,22 +69,69 @@ def valider(request):
 @role_required('N+1')
 def validation_view(request):
     it = request.session.get("it")
-    der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
+    if not it:
+        return render(request, 'declaration_effectif/Validation.html', {
+            "operateurs_finaux": [], "nbr": 0, "status": False, "date": timezone.localdate()
+        })
+
+    # 1) calculer les directs du RU (objets Collaborateur)
+    directs_qs = Collaborateur.objects.filter(ru_it__it=it).exclude(it=it)
+
+    # ids des directs (PK)
+    direct_ids = list(directs_qs.values_list('it', flat=True))
+
+    # 2) parmi ces directs, lesquels sont référencés comme managers (ru_it_id) par d'autres ?
+    # -> ids des directs qui sont managers
+    manager_direct_ids = set(
+        Collaborateur.objects.filter(ru_it_id__in=direct_ids)
+        .values_list('ru_it_id', flat=True)
+        .distinct()
+    )
+
+    # 3) récupérer les "it" correspondants à ces directs-managers pour comparaison avec declaration_effectif.collaborateur_it_id
+    manager_direct_its = set(
+        Collaborateur.objects.filter(it__in=manager_direct_ids)
+        .values_list('it', flat=True)
+    )
+
+    # 4) si il y a une déclaration aujourd'hui, prendre ses lignes puis exclure les managers
     aujourdhui = timezone.localdate()
+    der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
 
     if der and der.date == aujourdhui:
-        operateurs_finaux = declaration_effectif.objects.filter(Ru_id=it, date=aujourdhui)
-        status = "True"
+        # déclarations du jour pour ce RU
+        operateurs_finaux_qs = declaration_effectif.objects.filter(Ru_id=it, date=aujourdhui)
+        # exclure les entrées dont collaborateur_it_id correspond à un manager direct
+        operateurs_finaux_qs = operateurs_finaux_qs.exclude(collaborateur_it_id__in=manager_direct_its)
+        status = True
+        operateurs_finaux = operateurs_finaux_qs
     else:
-        operateurs_finaux = rec(request)
-        status = "False"
+        # rec(request) retourne probablement un QuerySet de Collaborateur ou une liste d'objets
+        candidats = rec(request)
 
-    nbr = operateurs_finaux.count()
+        # si c'est un QuerySet de Collaborateur, on peut exclure côté DB
+        if hasattr(candidats, 'exclude'):
+            operateurs_finaux = candidats.exclude(it__in=manager_direct_its)
+        else:
+            # sinon c'est une liste -> filtrer en python
+            operateurs_finaux = [c for c in candidatos if getattr(c, 'it', None) not in manager_direct_its]
+        status = False
+
+    # nombre (gérer QuerySet vs liste)
+    if hasattr(operateurs_finaux, 'count'):
+        nbr = operateurs_finaux.count()
+    else:
+        nbr = len(operateurs_finaux)
 
     return render(
         request,
         'declaration_effectif/Validation.html',
-        {"operateurs_finaux": operateurs_finaux, "nbr": nbr, "status": status, "date": aujourdhui}
+        {
+            "operateurs_finaux": operateurs_finaux,
+            "nbr": nbr,
+            "status": status,
+            "date": aujourdhui
+        }
     )
 
 #return la valeur par syste et par reel
@@ -93,18 +142,14 @@ def difference(request):
         Ru_id=it
     ).order_by("-date").first()
 
-    operateur_systeme = Collaborateur.objects.filter(ru_it=it)
+    operateur_systeme = SystEff(request)
     liste_s = set(operateur_systeme.values_list("it", flat=True))
 
-    if der:
-        operateur_reel = declaration_effectif.objects.filter(
-            Ru_id=it,
-            nature__in=["V", "A"],
-            date=der.date
-        )
 
+    operateur_reel = reelEff(request)
+    if  operateur_reel :
         liste_r = set(
-            operateur_reel.values_list("collaborateur_it__it", flat=True)
+            operateur_reel.values_list("it", flat=True)
         )
         r=liste_r - liste_s
         s=liste_s - liste_r
@@ -434,112 +479,142 @@ def envoyer_alert(request):
 
 @role_required('N+3')
 def dashboard_Dur(request):
-    it = request.session.get("it")
-    if not it:
+    it_session_original = request.session.get("it")
+    if not it_session_original:
         return redirect("login")
 
-    it_n1 = liste_N1_pr_N3(it)
-    maint = timezone.localdate()
-    collaborateurs_n1 = Collaborateur.objects.filter(it__in=it_n1)
-    declaration = declaration_effectif.objects.filter(
-            date=maint, Ru_id__in=it_n1
-        )
-    liste_declares = set(declaration.values_list("Ru_id", flat=True))
-    
-    liste_ru_avec_operateurs = set(
-            Collaborateur.objects.filter(
-                ru_it_id__in=it_n1
-            )
-            .values_list("ru_it_id", flat=True)
-            .distinct()
-        )
-    non_valides = (
-            Collaborateur.objects.filter(it__in=liste_ru_avec_operateurs)
-            .exclude(it__in=liste_declares)
-            .count()
-        )
+    it_n1 = liste_N1_pr_N3(it_session_original)
+    if not it_n1:
+        return render(request, "declaration_effectif/DUR/dashboard.html", {
+            "liste_ru_stats": [], "total_r": 0, "total_syst": 0, "MR": 0, "MS": 0,
+            "maquette_totale": 0, "maint": timezone.localdate(),
+            "chart_labels_json": json.dumps([]), "chart_data_json": json.dumps([]), "non_valides": 0
+        })
+
+    today = timezone.now().date()
+    start = today - timedelta(days=6)
+    dates = [start + timedelta(days=i) for i in range(7)]
+    labels_list = [d.strftime('%d %b') for d in dates]
+
+    collaborateurs_n1 = Collaborateur.objects.filter(it__in=it_n1).select_related('unite')
+
+    # 1) Calcul des stats par RU en utilisant SystEff et reelEff
     liste_ru_stats = []
     total_syst = 0
     total_r = 0
     maquette_totale = 0
-    maint = timezone.localdate()
+    maint_global = None
 
-    today = timezone.now().date()
-    dates = [today - timedelta(days=i) for i in range(6, -1, -1)]
-    labels_list = [d.strftime('%d %b') for d in dates]
+    try:
+        for collab in collaborateurs_n1:
+            ru_it = collab.it
+            
+            # Injection temporaire du RU dans la session pour exécuter vos 2 fonctions
+            request.session["it"] = ru_it
+            
+            # Effectif système issu de SystEff(request)
+            qs_syst = SystEff(request)
+            systeme = qs_syst.values('it').distinct().count()
+
+            # Effectif réel issu de reelEff(request)
+            qs_reel = reelEff(request)
+            reel = qs_reel.values('it').distinct().count()
+
+            # Récupération de la dernière date de déclaration (A/V) pour ce RU
+            last_decl = (
+                declaration_effectif.objects
+                .filter(Ru_id=ru_it, nature__in=["A", "V"])
+                .order_by("-date")
+                .first()
+            )
+            date_ref = last_decl.date if last_decl else None
+
+            maquette = collab.unite.maquette or 0 if collab.unite else 0
+
+            liste_ru_stats.append({
+                "n1": collab,
+                "matricule": getattr(collab, "matricule", None),
+                "nom_complete": getattr(collab, "nom_complete", ""),
+                "unite": getattr(collab, 'unite_id', None),
+                "reel": reel,
+                "systeme": systeme,
+                "maquette": maquette,
+                "mr": reel - maquette,
+                "ms": systeme - maquette,
+                "last_decl_date": date_ref,
+            })
+
+            total_r += reel
+            total_syst += systeme
+            maquette_totale += maquette
+            if date_ref and (maint_global is None or date_ref > maint_global):
+                maint_global = date_ref
+
+    finally:
+        # Restauration systématique du RU original dans la session
+        request.session["it"] = it_session_original
+
+    if maint_global is None:
+        maint_global = timezone.localdate()
+
+    # 2) Calcul des RU non validés aujourd'hui
+    liste_declares_today = set(
+        declaration_effectif.objects
+        .filter(date=today, Ru_id__in=it_n1)
+        .values_list('Ru_id', flat=True)
+    )
+    non_valides = sum(1 for stat in liste_ru_stats if stat["systeme"] > 0 and stat["n1"].it not in liste_declares_today)
+
+    # 3) Données de la session courante (N+3)
+    operateurs_systeme_session = SystEff(request)
+    syste_session = operateurs_systeme_session.values('it').distinct().count()
+
+    # 4) Série temporelle pour le graphique sur 7 jours
+    decl_window_qs = (
+        declaration_effectif.objects
+        .filter(Ru_id__in=it_n1, nature__in=["A", "V"], date__gte=start, date__lte=today)
+        .values('Ru_id', 'date')
+        .annotate(total=Count('collaborateur_it_id', distinct=True))
+    )
+
+    decls_by_ru = {}
+    for r in decl_window_qs:
+        decls_by_ru.setdefault(r['Ru_id'], []).append((r['date'], r['total']))
+    for ru_key in decls_by_ru:
+        decls_by_ru[ru_key].sort()
 
     data_totale_par_jour = [0] * len(dates)
+    stat_dict = {stat["n1"].it: stat["systeme"] for stat in liste_ru_stats}
 
-    for collab in collaborateurs_n1:
-        maint_obj = declaration_effectif.objects.filter(Ru_id=collab.it).order_by("-date").first()
-        date_ref = maint_obj.date if maint_obj else timezone.localdate()
+    for ru_it_key in [c.it for c in collaborateurs_n1]:
+        ru_decls = decls_by_ru.get(ru_it_key, [])
+        ru_system = stat_dict.get(ru_it_key, 0)
+        ru_dates = [dt for dt, _ in ru_decls]
+        ru_totals = [t for _, t in ru_decls]
 
-        systeme = Collaborateur.objects.filter(ru_it_id=collab.it).count()
+        for idx, d in enumerate(dates):
+            if ru_dates:
+                pos = bisect.bisect_right(ru_dates, d) - 1
+                if pos >= 0:
+                    data_totale_par_jour[idx] += ru_totals[pos]
+                    continue
+            data_totale_par_jour[idx] += ru_system
 
-        dec = declaration_effectif.objects.filter(
-            date=date_ref,
-            Ru_id=collab.it,
-            nature__in=["A", "V"]
-        )
-        reel = dec.count() if dec.exists() else systeme
-
-        unite_abrev = collab.unite_id
-        maquette = 0
-        if unite_abrev:
-            u = Unite.objects.filter(abreviation=unite_abrev).first()
-            if u and u.maquette:
-                maquette = u.maquette
-
-        liste_ru_stats.append({
-            "n1": collab,
-            "matricule": collab.matricule,
-            "nom_complete": collab.nom_complete,
-            "unite": unite_abrev,
-            "reel": reel,
-            "systeme": systeme,
-            "maquette": maquette,
-            "mr": reel - maquette,
-            "ms": systeme - maquette,
-        })
-
-        total_r += reel
-        total_syst += systeme
-        if maint_obj:
-            maint = date_ref
-
-        for i, d in enumerate(dates):
-            derniere = declaration_effectif.objects.filter(
-                Ru_id=collab.it, date__lte=d
-            ).order_by("-date").first()
-
-            if derniere:
-                count = declaration_effectif.objects.filter(
-                    Ru_id=collab.it,
-                    date=derniere.date,
-                    nature__in=["A", "V"]
-                ).count()
-            else:
-                count = systeme
-
-            data_totale_par_jour[i] += count
-
-    unites_ab = set(collaborateurs_n1.values_list("unite_id", flat=True))
-    if unites_ab:
-        maquettes = Unite.objects.filter(abreviation__in=unites_ab).values_list("maquette", flat=True)
-        maquette_totale = sum(m or 0 for m in maquettes)
-
-    return render(request, "declaration_effectif/DUR/dashboard.html", {
+    context = {
         "liste_ru_stats": liste_ru_stats,
         "total_r": total_r,
         "MR": total_r - maquette_totale,
         "MS": total_syst - maquette_totale,
         "total_syst": total_syst,
         "maquette_totale": maquette_totale,
-        "maint": maint,
+        "maint": maint_global,
         "chart_labels_json": json.dumps(labels_list),
-        "chart_data_json": json.dumps(data_totale_par_jour),"non_valides":non_valides
-    })
-
+        "chart_data_json": json.dumps(data_totale_par_jour),
+        "non_valides": non_valides,
+        "operateurs_systeme_session": operateurs_systeme_session,
+        "syste_session": syste_session,
+    }
+    return render(request, "declaration_effectif/DUR/dashboard.html", context)
 def get_all_n1_under(it_parent):
     """
     Récupère TOUS les ITs des responsables N1 (ceux qui gèrent directement des opérateurs)
@@ -712,9 +787,6 @@ def listes_de_N4(it_n4):
     return liste_N1
 
 
-
-@role_required('N+4')
-@role_required('N+4')
 @role_required('N+4')
 def affectation_N4(request):
     util = request.session.get("it")
@@ -834,7 +906,7 @@ def validation_N4(request):
         },
     )
 
-def validation_date(request):
+def validation_date_N2(request):
     time_str = request.GET.get("time", "")
     it = request.session.get("it")
 
@@ -870,6 +942,40 @@ def validation_date(request):
     )
 
     # 5. Retour sous forme de réponse JSON propre
+    return JsonResponse({
+        "resultats": resultats,
+        "status": status
+    })
+def validation_date_N3(request):
+    time_str = request.GET.get("time", "")
+    it = request.session.get("it")
+
+    query_date = parse_date(time_str) if time_str else None
+    is_today = (query_date == timezone.localdate()) if query_date else False
+    status = not is_today
+
+    # 1. Récupération des N+1 gérés (CORRIGÉ : liste_N1_pr_N3 au lieu de Ru_Rg)
+    liste_n1 = liste_N1_pr_N3(it)
+
+    # 2. Récupération des RU ayant déjà fait leur déclaration
+    declarations_faites = set()
+    if query_date:
+        declarations_faites = set(
+            declaration_effectif.objects.filter(
+                date=query_date,
+                Ru_id__in=liste_n1
+            ).values_list("Ru_id", flat=True)
+        )
+
+    # 3. Soustraction entre les 2 sets Python (les IT non encore déclarés)
+    liste_it_manquants = liste_n1 - declarations_faites
+
+    # 4. Filtrage des collaborateurs correspondants
+    resultats = list(
+        Collaborateur.objects.filter(it__in=liste_it_manquants)
+        .values("matricule", "it", "nom_complete", "lot")
+    )
+
     return JsonResponse({
         "resultats": resultats,
         "status": status

@@ -11,16 +11,16 @@
 {% block content %}
 {% csrf_token %}
 
-<div class="page-header">
-    <h1 class="page">Validation des Opérateurs</h1>
-    <h5>{{ date }}</h5>
+<div class="page-header mb-3">
+    <h1 class="page h4 fw-bold text-dark mb-1">Validation des Opérateurs</h1>
+    <h5 class="text-muted fs-6 fw-normal">{{ date }}</h5>
 </div>
 
 <div class="contenu">
     <div class="table-container">
-        {% if status == "False" or status == False %}
+        {% if not status %}
 
-        <!-- Barre de Recherche & Filtrage : visible uniquement en attente de validation -->
+        <!-- Barre de Recherche & Filtrage -->
         <div class="chercher">
             <input type="text" placeholder="IT - Nom" class="operateur" id="chercher">
             <select class="choix" id="choix">
@@ -89,7 +89,7 @@
                             <button class="btn-modifier" data-matricule="{{ operateur.it }}" title="Modifier">✎</button>
                         </div>
 
-                        <!-- Modal Refus Centré -->
+                        <!-- Modal Refus -->
                         <div class="modal fade" id="modal-{{ operateur.it|slugify }}" tabindex="-1">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content">
@@ -133,14 +133,14 @@
             </tbody>
         </table>
 
-        <div style="padding: 16px;">
-            <button id="btnValiderTout" data-nbr="{{ nbr }}" data-status="{{ status }}" class="alert_btn">Valider la
-                sélection</button>
+        <div class="pt-3">
+            <button id="btnValiderTout" data-nbr="{{ nbr }}" data-status="{{ status|lower }}" class="alert_btn">Valider
+                la sélection</button>
         </div>
-        <div class="alert"></div>
+        <div class="alert mt-2"></div>
 
         {% else %}
-        <!-- TABLEAU HISTORIQUE / VALIDE (pas de recherche, pas de bouton ajouter) -->
+        <!-- TABLEAU HISTORIQUE / VALIDE -->
         <table class="table-operateurs">
             <thead>
                 <tr>
@@ -168,7 +168,7 @@
             </tbody>
         </table>
 
-        <div style="padding: 16px;">
+        <div class="pt-3">
             <button id="btnModifierTout" class="alert_btn">Supprimer cette déclaration</button>
         </div>
         {% endif %}
@@ -180,7 +180,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const VALIDER_URL = "{% url 'valider_operateurs' %}";
-    const STATUS = "{{ status }}";
+    const STATUS = "{{ status|lower }}";
     const SUPPRIMER_URL = "{% url 'supprimer' %}";
 </script>
 <script src="{% static 'declaration_effectif/js/validation.js' %}"></script>

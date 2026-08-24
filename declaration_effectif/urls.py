@@ -20,5 +20,6 @@ urlpatterns=[
     path("Dashboard_N4/",views.page_N4,name="page_N4"),
     path("affectation_N4/",views.affectation_N4,name="affectation_N4"),
     path("validation_N4/",views.validation_N4,name="validation_N4"),
-    path("filter_date",views.validation_date,name="validation_date")
+    path("filter_date/",views.validation_date_N2,name="validation_date"),
+    path("filter_date_N3/",views.validation_date_N3,name="validation_date_N3"),
 ]

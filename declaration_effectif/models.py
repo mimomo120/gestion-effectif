@@ -43,4 +43,4 @@ class Alert(models.Model):
                                         null=False)
     contenu=models.CharField(max_length=100)
     date= models.DateField(auto_now_add=True)
-    lu=models.CharField(choices=[("0","true"),("1","false")],default=0)
+    lu = models.BooleanField(default=False)

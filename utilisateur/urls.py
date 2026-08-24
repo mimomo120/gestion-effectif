@@ -13,6 +13,5 @@ urlpatterns = [
     path("Dashboard/",views.dashboard_rg,name="dashboard_rg"),
     path("alerts",views.alertes,name="alerts"),
     path('changer-role/<str:nouveau_role>/', views.changer_role, name='changer_role'),
-    path("test/",views.test,name="test"),
 ]
 

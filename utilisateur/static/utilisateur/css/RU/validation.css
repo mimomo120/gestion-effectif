@@ -1,169 +1,141 @@
-:root {
-    --bg-page: #f8fafc;
-    --primary: #1E2A38;
-    --secondary: #34465C;
-    --accent: #a69b87;
-    --danger: #C4425B;
-    --success: #1E8F63;
-    --warning: #E8A700;
-    --info: #2E6F8E;
-
-    --navy: #12213B;
-    --slate: #6B7280;
-    --border: #E5E8EE;
-    --paper: #FFFFFF;
-    --surface: #FFFFFF;
-
-    --badge-a: #EAF3F7;
-    --badge-a-text: #2E6F8E;
-    --badge-o: #E7F5EF;
-    --badge-o-text: #1E8F63;
-    --badge-p: #FDF4E2;
-    --badge-p-text: #a69b87;
-    --badge-t: #FBEBEE;
-    --badge-t-text: #C4425B;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15);
-
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ====== RESET & BASE ====== */
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-html,
 body {
-    background-color: var(--bg-page) !important;
-    min-height: 100vh;
-    color: var(--navy);
-    font-family: 'Inter', system-ui, sans-serif;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    background-color: #f8fafc !important;
+    color: #334155;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-body {
-    background-attachment: fixed;
+.table-container {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    padding: 1.25rem;
+    border: 1px solid #e2e8f0;
 }
 
-/* ==========================================================================
-   validation.css — Page "Liste Ru sans validation"
-   ========================================================================== */
-
-.page-header {
-    padding: 24px 32px 16px;
-}
-
-.page-header h1 {
-    font-size: 22px;
-    font-weight: 600;
-    color: #1e293b;
-    margin: 0;
-}
-
-/* ----------------------------- Bar de Recherche -------------------------- */
+/* Barre de recherche */
 .chercher {
     display: flex;
-    gap: 12px;
-    margin: 0 32px 16px;
     align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
 }
 
-.chercher .operateur,
-.chercher .choix {
-    padding: 8px 14px;
+.chercher input[type="text"].operateur {
     border: 1px solid #cbd5e1;
     border-radius: 6px;
-    font-size: 14px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    color: #334155;
+    outline: none;
+    min-width: 240px;
+}
+
+.chercher input[type="text"].operateur:focus,
+.chercher select.choix:focus {
+    border-color: #94a3b8;
+    box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.2);
+}
+
+.chercher select.choix {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    color: #334155;
+    background-color: #ffffff;
     outline: none;
 }
 
-.chercher .operateur:focus,
-.chercher .choix:focus {
-    border-color: #253449;
-}
-
 #ajouter {
-    background-color: #253449;
-    color: white;
+    background-color: #0f172a;
+    color: #ffffff;
     border: none;
     border-radius: 6px;
-    padding: 6px 16px;
-    font-size: 18px;
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
 }
 
 #ajouter:hover {
     background-color: #1e293b;
 }
 
-/* ----------------------------- Conteneur --------------------------------- */
-.table-container {
-    margin: 0 32px 32px;
-    background: #ffffff;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    border: 1px solid #e2e8f0;
-}
-
-/* ------------------------------- Tableau ---------------------------------- */
+/* Tableau */
 .table-operateurs {
     width: 100%;
-    border-collapse: collapse;
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 14px;
-}
-
-.table-operateurs thead tr {
-    background-color: #253449;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .table-operateurs thead th {
-    color: #ffffff;
+    background-color: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.725rem;
     text-transform: uppercase;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
+    padding: 10px 14px;
+    border-bottom: 1px solid #e2e8f0;
     text-align: left;
-    padding: 14px 24px;
 }
 
-.table-operateurs tbody tr {
-    border-bottom: 1px solid #eef1f5;
-    transition: background-color 0.15s ease;
-}
-
-.table-operateurs tbody tr:last-child {
-    border-bottom: none;
+.table-operateurs tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.85rem;
+    color: #334155;
+    vertical-align: middle;
 }
 
 .table-operateurs tbody tr:hover {
     background-color: #f8fafc;
 }
 
-.table-operateurs tbody td {
-    padding: 14px 24px;
-    color: #334155;
-    vertical-align: middle;
-}
-
 .cell-mono {
-    font-family: "Consolas", "Courier New", monospace;
-    color: #475569;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 500;
 }
 
-/* -------------------------- Action Buttons ------------------------------- */
+.empty-row {
+    text-align: center;
+    color: #64748b;
+    font-style: italic;
+    padding: 2rem !important;
+}
+
+.select-all-header,
+.table-operateurs tbody td:first-child {
+    width: 40px;
+    text-align: center;
+}
+
+.op-checkbox,
+#selectAll {
+    cursor: pointer;
+    accent-color: #0f172a;
+}
+
+.chip-lot {
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Boutons d'action */
 .action-buttons {
     display: flex;
-    gap: 8px;
     align-items: center;
+    gap: 0.35rem;
 }
 
 .btn-valider,
@@ -171,10 +143,15 @@ body {
 .btn-modifier {
     border: none;
     border-radius: 4px;
-    padding: 4px 10px;
-    font-size: 13px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.825rem;
     cursor: pointer;
-    font-weight: 600;
+    transition: all 0.15s ease-in-out;
+    padding: 0 !important;
 }
 
 .btn-valider {
@@ -182,9 +159,17 @@ body {
     color: #15803d;
 }
 
+.btn-valider:hover {
+    background-color: #bbf7d0;
+}
+
 .btn-refuser {
     background-color: #fee2e2 !important;
-    color: #991b1b !important;
+    color: #b91c1c !important;
+}
+
+.btn-refuser:hover {
+    background-color: #fca5a5 !important;
 }
 
 .btn-modifier {
@@ -192,62 +177,75 @@ body {
     color: #475569;
 }
 
-/* -------------------------- Ligne "vide" ----------------------------------- */
-.empty-row {
-    text-align: center;
-    font-style: italic;
-    color: #64748b;
-    padding: 28px 0 !important;
+.btn-modifier:hover {
+    background-color: #e2e8f0;
 }
 
-/* ------------------------------- Chips ------------------------------------- */
-.chip {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: capitalize;
-    line-height: 1.4;
-}
-
-.chip-lot {
-    background-color: #e0f2fe;
-    color: #0369a1;
-}
-
-/* --------------------------- Bouton "Alerter" ------------------------------ */
 .alert_btn {
-    padding: 8px 18px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #253449;
-    background-color: #ffffff;
-    border: 1.5px solid #253449;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    white-space: nowrap;
-}
-
-.alert_btn:hover:not(:disabled) {
-    background-color: #253449;
+    background-color: #0f172a;
     color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.45rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
 }
 
-/* ------------------------------ Responsive --------------------------------- */
-@media (max-width: 768px) {
-    .table-container {
-        margin: 0 12px 24px;
-        overflow-x: auto;
-    }
+.alert_btn:hover {
+    background-color: #1e293b;
+}
 
-    .table-operateurs {
-        min-width: 650px;
-    }
+/* Modales */
+.modal-content {
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
 
-    .chercher {
-        flex-direction: column;
-        align-items: stretch;
-    }
+.modal-header {
+    border-bottom: 1px solid #f1f5f9;
+    padding: 1rem 1.25rem;
+}
+
+.modal-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.modal-body {
+    padding: 1.25rem;
+}
+
+.modal-body label {
+    display: block;
+    font-size: 0.825rem;
+    font-weight: 500;
+    color: #475569;
+    margin-bottom: 0.35rem;
+}
+
+.modal-motif,
+.nouveau-op-input,
+.nouveau-ru-input {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.85rem;
+    color: #334155;
+    outline: none;
+}
+
+.modal-footer {
+    border-top: 1px solid #f1f5f9;
+    padding: 0.75rem 1.25rem;
+}
+
+.modal-footer .btn {
+    font-size: 0.825rem;
+    border-radius: 6px;
+    padding: 0.4rem 0.85rem;
 }

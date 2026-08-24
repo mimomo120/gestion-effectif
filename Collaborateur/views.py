@@ -15,7 +15,7 @@ from django.core.paginator import Paginator
 def rec(request):
     it = request.session.get("it")
     der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
-    operateurs = Collaborateur.objects.filter(ru_it_id=it)
+    operateurs = Collaborateur.objects.filter(Q(ru_it_id=it) & ~Q(it=it))
 
     if der:
         derniere = der.date
@@ -29,61 +29,118 @@ def rec(request):
         liste_a = set(ajouters.values_list("collaborateur_it_id", flat=True))
 
         operateurs_finaux = Collaborateur.objects.filter(
-            Q(ru_it_id=it) & ~Q(it__in=liste_ch)
-            | Q(ru_it_id=it, it__in=liste_a)
-        )
+            (Q(ru_it_id=it) & ~Q(it__in=liste_ch)) | Q(it__in=liste_a)
+        ).exclude(it=it)
     else:
         operateurs_finaux = operateurs
 
     return operateurs_finaux
-from datetime import datetime
-
 def reelEff(request, date_reference=None):
     it = request.session.get("it")
-
+    if not it:
+        return Collaborateur.objects.none()
+ 
     qs_declarations = declaration_effectif.objects.filter(Ru_id=it)
     if date_reference:
         qs_declarations = qs_declarations.filter(date__lte=date_reference)
-
     der = qs_declarations.order_by("-date").first()
-
-    changements_tous = declaration_effectif.objects.filter(
-        nature__in=["C", "D"], Ru_id=it
-    )
+ 
+    changements_tous = declaration_effectif.objects.filter(nature__in=["C", "D"], Ru_id=it)
     if date_reference:
         changements_tous = changements_tous.filter(date__lte=date_reference)
     liste_ch = set(changements_tous.values_list("collaborateur_it_id", flat=True))
-
+ 
     if der:
         derniere = der.date
-        ajouters = declaration_effectif.objects.filter(
-            nature="A", Ru_id=it, date=derniere
-        )
+        ajouters = declaration_effectif.objects.filter(nature="A", Ru_id=it, date=derniere)
         liste_a = set(ajouters.values_list("collaborateur_it_id", flat=True))
-
-        operateurs_finaux = Collaborateur.objects.filter(
-            Q(ru_it_id=it) & ~Q(it__in=liste_ch)
-            | Q(ru_it_id=it, it__in=liste_a)
-        )
+ 
+        base_qs = Collaborateur.objects.filter(ru_it_id=it)
+        operateurs_qs = base_qs.filter(
+            Q(~Q(it__in=liste_ch)) | Q(it__in=liste_a)
+        ).exclude(it=it)
     else:
-        operateurs_finaux = Collaborateur.objects.filter(ru_it_id=it)
-
+        operateurs_qs = Collaborateur.objects.filter(ru_it_id=it).exclude(it=it)
+ 
+    try:
+        ru_it_field = Collaborateur._meta.get_field("ru_it")
+    except Exception:
+        ru_it_field = None
+ 
+    if ru_it_field is not None and getattr(ru_it_field, "is_relation", False):
+        managers_qs = Collaborateur.objects.exclude(ru_it_id__isnull=True).values_list("ru_it_id", flat=True).distinct()
+        operateurs_finaux = operateurs_qs.exclude(pk__in=managers_qs)
+    else:
+        managers_vals = Collaborateur.objects.exclude(ru_it__isnull=True).values_list("ru_it", flat=True).distinct()
+        operateurs_finaux = operateurs_qs.exclude(it__in=managers_vals)
+ 
     return operateurs_finaux
+ 
+ 
+def SystEff(request):
+    it = request.session.get("it")
+    if not it:
+        return Collaborateur.objects.none()
+ 
+    managers_its = (
+        Collaborateur.objects
+        .exclude(ru_it_id__isnull=True)
+        .values_list('ru_it_id', flat=True)
+        .distinct()
+    )
+ 
+    operateur_syst = (
+        Collaborateur.objects
+        .filter(ru_it_id=it)
+        .exclude(it__in=managers_its)
+        .exclude(it=it)
+    )
+ 
+    return operateur_syst
+
+    # rapports directs du RU (ru_it_id == it), exclure ceux qui sont managers et le RU lui-même
+    operateur_syst = (
+        Collaborateur.objects
+        .filter(ru_it_id=it)
+        .exclude(it__in=managers_its)
+        .exclude(it=it)
+    )
+
+    return operateur_syst
 
 @role_required('N+1')
 def operateurs(request):
-    operateurs_finaux = reelEff(request)
-    count = operateurs_finaux.count()
-    return render(
-    request,
-    "Collaborateur/RU/liste_operateur.html",
-    {"operateurs_finaux": operateurs_finaux, "count": count},
-)
+    operateurs_list = reelEff(request)
+    count = operateurs_list.count()
+
+    # Définition du nombre d'éléments par page
+    items_per_page = 10
+    paginator = Paginator(operateurs_list, items_per_page)
+
+    # Récupération du numéro de page depuis l'URL (?page=1)
+    page_number = request.GET.get('page', 1)
+
+    try:
+        operateurs_finaux = paginator.page(page_number)
+    except PageNotAnInteger:
+        # Si la page n'est pas un entier, afficher la première page
+        operateurs_finaux = paginator.page(1)
+    except EmptyPage:
+        # Si la page est hors limites, afficher la dernière page
+        operateurs_finaux = paginator.page(paginator.num_pages)
+
+    context = {
+        "operateurs_finaux": operateurs_finaux,
+        "count": count,
+        "page_obj": operateurs_finaux,
+        "paginator": paginator,
+    }
+
+    return render(request, "Collaborateur/RU/liste_operateur.html", context)
 #filter la table de validation et liste des op
 def filter_tableau(request):
     text = request.GET.get('q', '')
     choix = request.GET.get('choix', '')
-    choix2 = request.GET.get('choix2', '')
     time_param = request.GET.get('time', '')
     page_number = request.GET.get('page', 1)
     it = request.session.get("it")
@@ -106,10 +163,8 @@ def filter_tableau(request):
             Q(matricule__icontains=text) |
             Q(it__icontains=text)
         )
-    if choix2 and choix2 != "Tous les post":
-        operateurs = operateurs.filter(post=choix2)
 
-    raw = operateurs.values("matricule", "it", "nom_complete", "lot", "post")
+    raw = operateurs.values("matricule", "it", "nom_complete", "lot")
 
     PER_PAGE = 10
     paginator = Paginator(list(raw), PER_PAGE)
@@ -133,7 +188,6 @@ def filter_tableau(request):
 def filter_validation(request):
     text = request.GET.get('q', '')
     choix = request.GET.get('choix', '')
-    choix2 = request.GET.get('choix2', '')
     time_param = request.GET.get('time', '')
     it = request.session.get("it")
 
@@ -155,10 +209,9 @@ def filter_validation(request):
             Q(matricule__icontains=text) |
             Q(it__icontains=text)
         )
-    if choix2 and choix2 != "Tous les post":
-        operateurs = operateurs.filter(post=choix2)
 
-    raw = operateurs.values("matricule", "it", "nom_complete", "lot", "post")
+
+    raw = operateurs.values("matricule", "it", "nom_complete", "lot")
 
     data = {
         "results": list(raw),
@@ -191,7 +244,7 @@ def operateur(request):
 def liste_par_jour(request):
     jour=request.GET.get("time","")
     it=request.session.get("it")
-    operateurs=declaration_effectif.objects.filter(Ru_id=it,date=jour,nature__in=["V","A"])
+    operateurs=declaration_effectif.objects.filter(Q(Ru_id=it,date=jour,nature__in=["V","A"])&~Q(collaborateur_it__it=it))
     raw = operateurs.values(
             "collaborateur_it__matricule",
             "collaborateur_it_id",
@@ -214,14 +267,14 @@ def liste_par_jour(request):
     return JsonResponse(data ,safe=False)
 
 def Ru_Rg(it):
-    collab=Collaborateur.objects.filter(ru_it_id=it)
-    liste=[]
+    collab = Collaborateur.objects.filter(ru_it_id=it).exclude(it=it)
+    liste = []
     if collab:
         for c in collab:
-            if Collaborateur.objects.filter(ru_it_id=c.it).count()>0:
+            if Collaborateur.objects.filter(Q(ru_it_id=c.it) & ~Q(it=it)).count() > 0:
                 liste.append(c.it)
-    result=Collaborateur.objects.filter(it__in=liste)
-    return(result)
+    result = Collaborateur.objects.filter(it__in=liste)
+    return result
 
 def liste_Ru_par_Rg(request):
     it=request.session.get("it")
@@ -231,7 +284,7 @@ def liste_Ru_par_Rg(request):
     return render(request, "Collaborateur/RG/liste_RU.html", {"operateurs": operat,"col":col})
 
 def Rg_Dur(it):
-    operateurs=Collaborateur.objects.filter(ru_it_id=it)
+    operateurs=Collaborateur.objects.filter(Q(ru_it_id=it)&~Q(it=it))
     liste=[]
     for c in operateurs :
         lis=Ru_Rg(c.it).count()
@@ -263,7 +316,7 @@ def liste_Rg_par_dur(request):
 
 
 def liste_N3_N4(it):
-    candidats_N3 = Collaborateur.objects.filter(ru_it_id=it)
+    candidats_N3 = Collaborateur.objects.filter(Q(ru_it_id=it)&~Q(it=it))
     n3_valides_ids = [
             c.it for c in candidats_N3 if a_deux_niveaux(c.it)
         ]
