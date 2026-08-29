@@ -77,12 +77,12 @@ function resetLigneStyle(ligne) {
     }
 
     if (btn_v) {
-        btn_v.innerHTML = "✓";
+        btn_v.innerHTML = '<i class="fas fa-check"></i>';
         btn_v.style.display = "inline-flex";
     }
 
     if (btn_inv) {
-        btn_inv.innerHTML = "✗";
+        btn_inv.innerHTML = '<i class="fas fa-times"></i>';
         btn_inv.style.display = "inline-flex";
     }
 
@@ -98,16 +98,20 @@ function resetLigneStyle(ligne) {
 function appliquerEtatExistant(ligne, it) {
     const btn_v = ligne.querySelector(".btn-valider");
     const btn_inv = ligne.querySelector(".btn-refuser");
+    const checkbox = ligne.querySelector(".op-checkbox");
 
     if (liste_valider.includes(it)) {
         if (btn_v) btn_v.innerHTML = "✓ Validé";
         if (btn_inv) btn_inv.style.display = "none";
+        if (checkbox) checkbox.checked = true;
     } else if (liste_D.includes(it)) {
         if (btn_inv) btn_inv.innerHTML = "⊘ Départ";
         if (btn_v) btn_v.style.display = "none";
+        if (checkbox) checkbox.checked = true;
     } else if (liste_C.some(o => o.it === it)) {
         if (btn_inv) btn_inv.innerHTML = "↻ Changement";
         if (btn_v) btn_v.style.display = "none";
+        if (checkbox) checkbox.checked = true;
     }
 }
 
@@ -120,16 +124,17 @@ function fermerModalEnSecurite(modal) {
         console.error("Erreur lors de la fermeture du modal:", error);
     }
 
-    setTimeout(() => {
-        const backdropsResiduels = document.querySelectorAll(".modal-backdrop");
+    // Nettoyage fiable : on attend l'événement Bootstrap plutôt qu'un délai fixe
+    modal.addEventListener("hidden.bs.modal", function nettoyer() {
+        modal.removeEventListener("hidden.bs.modal", nettoyer);
         const modalOuvert = document.querySelector(".modal.show");
         if (!modalOuvert) {
-            backdropsResiduels.forEach(b => b.remove());
+            document.querySelectorAll(".modal-backdrop").forEach(b => b.remove());
             document.body.classList.remove("modal-open");
             document.body.style.removeProperty("overflow");
             document.body.style.removeProperty("padding-right");
         }
-    }, 350);
+    }, { once: true });
 }
 
 function findRowByIT(it) {
@@ -162,9 +167,15 @@ function construireLigneOperateur(op) {
         <td class="lot"><span class="chip chip-lot">${escapeHtml(op.lot)}</span></td>
         <td class="actions">
             <div class="action-buttons">
-                <button class="btn-valider" data-matricule="${escapeHtml(it)}" title="Valider">✓</button>
-                <button type="button" class="btn btn-primary btn-refuser" data-bs-toggle="modal" data-bs-target="#modal-${idSafe}" title="Refuser">✗</button>
-                <button class="btn-modifier" data-matricule="${escapeHtml(it)}" title="Modifier">✎</button>
+                <button type="button" class="btn-valider" data-matricule="${escapeHtml(it)}" title="Valider">
+                    <i class="fas fa-check"></i>
+                </button>
+                <button type="button" class="btn btn-primary btn-refuser" data-bs-toggle="modal" data-bs-target="#modal-${idSafe}" title="Refuser">
+                    <i class="fas fa-times"></i>
+                </button>
+                <button type="button" class="btn-modifier" data-matricule="${escapeHtml(it)}" title="Modifier">
+                    <i class="fas fa-pen"></i>
+                </button>
             </div>
             <div class="modal fade" id="modal-${idSafe}" tabindex="-1">
                 <div class="modal-dialog modal-dialog-centered">
@@ -214,27 +225,28 @@ document.addEventListener("change", function (e) {
 });
 
 document.addEventListener("click", async function (e) {
-    const target = e.target;
 
     // --- BUTTON VALIDATE (✓) ---
-    if (target.classList.contains("btn-valider")) {
-        const it = target.dataset.matricule;
-        const ligne = target.closest("tr");
+    const btnValider = e.target.closest(".btn-valider");
+    if (btnValider) {
+        const it = btnValider.dataset.matricule;
+        const ligne = btnValider.closest("tr");
         const btn_inv = ligne.querySelector(".btn-refuser");
 
         retirerDesListes(it);
         liste_valider.push(it);
 
-        target.innerHTML = "✓ Validé";
+        btnValider.innerHTML = "✓ Validé";
         if (btn_inv) btn_inv.style.display = "none";
         return;
     }
 
     // --- CONFIRM IN MODAL ---
-    if (target.classList.contains("btn-confirmer")) {
-        const modal = target.closest(".modal");
+    const btnConfirmer = e.target.closest(".btn-confirmer");
+    if (btnConfirmer) {
+        const modal = btnConfirmer.closest(".modal");
         const motif = modal.querySelector(".modal-motif");
-        const it = target.dataset.matricule;
+        const it = btnConfirmer.dataset.matricule;
         const ligne = findRowByIT(it);
 
         if (!ligne) {
@@ -298,11 +310,12 @@ document.addEventListener("click", async function (e) {
     }
 
     // --- BUTTON MODIFY (✎) ---
-    if (target.classList.contains("btn-modifier")) {
-        const it = target.dataset.matricule;
+    const btnModifier = e.target.closest(".btn-modifier");
+    if (btnModifier) {
+        const it = btnModifier.dataset.matricule;
         retirerDesListes(it);
 
-        const ligne = target.closest("tr");
+        const ligne = btnModifier.closest("tr");
         resetLigneStyle(ligne);
         return;
     }
@@ -313,68 +326,71 @@ document.addEventListener("click", async function (e) {
 // =====================================================================
 
 document.addEventListener("click", async function (e) {
-    if (e.target.classList.contains("btn-confirmer1")) {
-        const modal = e.target.closest(".modal");
-        const inputElement = modal.querySelector(".nouveau-op-input");
-        const it = inputElement.value.trim();
+    const btnConfirmer1 = e.target.closest(".btn-confirmer1");
+    if (!btnConfirmer1) return;
 
-        if (!it) {
-            showAlert2("Veuillez entrer un identifiant");
-            return;
-        }
+    const modal = btnConfirmer1.closest(".modal");
+    const inputElement = modal.querySelector(".nouveau-op-input");
+    const it = inputElement.value.trim();
 
-        if (findRowByIT(it) || liste_A.includes(it)) {
-            showAlert("Cet opérateur figure déjà dans la liste");
-            return;
-        }
+    if (!it) {
+        showAlert2("Veuillez entrer un identifiant");
+        return;
+    }
 
-        try {
-            const response = await fetch(`/operateur?q=${encodeURIComponent(it)}`);
-            const data = await response.json();
+    if (findRowByIT(it) || liste_A.includes(it)) {
+        showAlert2("  Cet opérateur figure déjà dans la liste");
+        inputElement.value = "";
+        return;
+    }
 
-            if (!response.ok) {
-                showAlert2(data.error || "Opérateur non trouvé");
-                return;
-            }
-
-            liste_A.push(it);
-
-            const tbody = document.getElementById("result");
-
-            // Retire la ligne "Aucun opérateur..." si présente, sinon la
-            // nouvelle ligne s'ajoute à côté d'elle au lieu de la remplacer
-            const emptyRow = tbody.querySelector(".empty-row");
-            if (emptyRow) {
-                const emptyTr = emptyRow.closest("tr");
-                if (emptyTr) emptyTr.remove();
-            }
-
-            const newRow = construireLigneOperateur(data);
-            tbody.appendChild(newRow);
-
-            // Si "Tout sélectionner" est déjà coché, on aligne la nouvelle ligne
-            const selectAll = document.getElementById('selectAll');
-            if (selectAll && selectAll.checked) {
-                const cb = newRow.querySelector('.op-checkbox');
-                if (cb) {
-                    cb.checked = true;
-                    cb.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
-
-            const btnValiderTout = document.getElementById("btnValiderTout");
-            if (btnValiderTout) {
-                const nbrActuel = Number(btnValiderTout.dataset.nbr) || 0;
-                btnValiderTout.dataset.nbr = String(nbrActuel + 1);
-            }
-
+    try {
+        const response = await fetch(`${OPERATEUR_URL}?q=${encodeURIComponent(it)}`);
+        const data = await response.json();
+        if (!response.ok) {
+            showAlert2(data.error || "  Opérateur non trouvé");
             inputElement.value = "";
-            fermerModalEnSecurite(modal);
-            showAlert("Opérateur ajouté avec succès", "success");
-        } catch (error) {
-            console.error("Erreur lors de l'ajout:", error);
-            showAlert("Erreur lors de l'ajout de l'opérateur");
+            return;
         }
+
+        liste_A.push(it);
+
+        const tbody = document.getElementById("result");
+
+        // Retire la ligne "Aucun opérateur..." si présente, sinon la
+        // nouvelle ligne s'ajoute à côté d'elle au lieu de la remplacer
+        const emptyRow = tbody.querySelector(".empty-row");
+        if (emptyRow) {
+            const emptyTr = emptyRow.closest("tr");
+            if (emptyTr) emptyTr.remove();
+        }
+
+        const newRow = construireLigneOperateur(data);
+        tbody.appendChild(newRow);
+
+        // Si "Tout sélectionner" est déjà coché, on aligne la nouvelle ligne
+        const selectAll = document.getElementById('selectAll');
+        if (selectAll && selectAll.checked) {
+            const cb = newRow.querySelector('.op-checkbox');
+            if (cb) {
+                cb.checked = true;
+                cb.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        const btnValiderTout = document.getElementById("btnValiderTout");
+        if (btnValiderTout) {
+            const nbrActuel = Number(btnValiderTout.dataset.nbr) || 0;
+            btnValiderTout.dataset.nbr = String(nbrActuel + 1);
+        }
+
+        inputElement.value = "";
+        fermerModalEnSecurite(modal);
+        showAlert("Opérateur ajouté avec succès", "success");
+    } catch (error) {
+        console.error("  Erreur lors de l'ajout:", error);
+        showAlert2("  Erreur lors de l'ajout de l'opérateur");
+        inputElement.value = "";
     }
 });
 
@@ -385,24 +401,17 @@ document.addEventListener("click", async function (e) {
 document.addEventListener("DOMContentLoaded", function () {
     const searchInput = document.getElementById("chercher");
     const lotSelect = document.getElementById("choix");
-    const postSelect = document.getElementById("choix2"); // optionnel, absent de ce template
     const result = document.getElementById("result");
-
-    // "choix2" n'existe pas dans ce template : on ne le rend plus obligatoire,
-    // sinon la recherche/filtrage ne se déclenche jamais.
     if (searchInput && lotSelect && result) {
         async function performSearch() {
             const query = searchInput.value.trim();
             const lot = lotSelect.value;
-            const post = postSelect ? postSelect.value : "";
-
             try {
                 const params = new URLSearchParams();
                 if (query) params.append("q", query);
                 if (lot) params.append("choix", lot);
-                if (post) params.append("choix2", post);
-
-                const response = await fetch(`/filter_validation?${params.toString()}`);
+                liste_A.forEach(it => params.append("ajoutes", it));
+                const response = await fetch(`${VALIDATION}?${params.toString()}`);
                 const data = await response.json();
 
                 result.innerHTML = "";
@@ -422,13 +431,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
 
-        let debounceTimer = null;
-        searchInput.addEventListener("input", () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(performSearch, 300);
-        });
+        searchInput.addEventListener("keyup", performSearch);
         lotSelect.addEventListener("change", performSearch);
-        if (postSelect) postSelect.addEventListener("change", performSearch);
     }
 
     // Select All Checkbox logic
@@ -517,7 +521,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 showAlert(`Tous les opérateurs doivent être traités (${totalActions}/${totalOperators})`);
                 return;
             }
-
+            liste_valider = liste_valider.filter(x => !liste_A.includes(x));
             try {
                 const response = await fetch(VALIDER_URL, {
                     method: "POST",

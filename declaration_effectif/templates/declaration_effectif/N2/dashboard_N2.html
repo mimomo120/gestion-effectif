@@ -1,0 +1,337 @@
+{% extends 'utilisateur/navbar_N2.html' %}
+{% load static %}
+
+{% block title %}Tableau de bord{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'utilisateur/css/N2/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <header class="dashboard-header d-flex justify-content-between align-items-center mb-4">
+        <h1 class="dashboard-title">Tableau de bord</h1>
+        <div class="date-picker-badge">
+            <span>{{ date|default:"Aug. 26, 2026" }}</span>
+            <i class="far fa-calendar ms-2"></i>
+        </div>
+    </header>
+    <!-- ===== STATISTIQUES GÉNÉRALES ===== -->
+    <div class="statistique-cards">
+        <div class="stat-card card-reel">
+            <h3>Effectif réel</h3>
+            <div class="stat-valeur-group">
+                <span class="valeur">{{ effectif_reel|default:"0" }}</span>
+                <span class="unite">opérateurs</span>
+            </div>
+            {% if MR > 0 %} <span class="badge-vs positive">&#9650; +{{ MR }} vs maquette</span>
+                {% elif MR < 0 %}
+                <span class="badge-vs negative">&#9660; {{ MR }} vs maquette</span>
+                {% endif %}
+        </div>
+
+        <div class="stat-card card-systeme">
+            <h3>Effectif système</h3>
+            <div class="stat-valeur-group">
+                <span class="valeur">{{ effectif_syste|default:"0" }}</span>
+                <span class="unite">opérateurs</span>
+            </div>
+            {% if MS > 0 %} <span class="badge-vs positive">&#9650; +{{ MS }} vs maquette</span>
+                {% elif MS < 0 %}
+                <span class="badge-vs negative">&#9660; {{ MS }} vs maquette</span>
+                {% endif %}
+        </div>
+
+        <div class="stat-card card-maquette">
+            <h3>Effectif maquette</h3>
+            <div class="stat-valeur-group">
+                <span class="valeur">{{ maquette_total|default:"0" }}</span>
+                <span class="unite">opérateurs</span>
+            </div>
+        </div>
+
+        <div class="stat-card card-warning">
+            <h3>RU non validés</h3>
+            <div class="stat-valeur-group">
+                <span class="valeur">{{ non_valides|default:"0" }}</span>
+                <span class="unite">responsables</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== CONTENU GRAPHIQUES & TABLEAU ===== -->
+    <div class="contenue">
+        <div class="charts-grid">
+            <div class="ru-card">
+                <h4>Évolution Réel</h4>
+                <div class="chart-container">
+                    <canvas id="chart-global"></canvas>
+                </div>
+            </div>
+            <div class="ru-card">
+                <h4>Réel vs Système vs Maquette par RU</h4>
+                <div class="chart-container">
+                    <canvas id="chart-comparatif"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Données JSON pour JS -->
+        {{ liste_ru_stats|json_script:"donnees-ru" }}
+
+        <!-- ===== STATISTIQUES PAR RU ===== -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Statistiques par responsable d'unité</h2>
+                <div class="recherche-ru">
+                    <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="recherche-ru" placeholder="Rechercher par Id ou nom...">
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="table-ru">
+                    <thead>
+                        <tr>
+                            <th>Utilisateur</th>
+                            <th>Responsable Unité</th>
+                            <th>Lot</th>
+                            <th>Unité</th>
+                            <th>DPT</th>
+                            <th>Effectif réel</th>
+                            <th>Effectif système</th>
+                            <th>Effectif maquette</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corps-tableau-ru">
+                        {% for ru in liste_ru_stats %}
+                        <tr data-it="{{ ru.it }}" data-nom="{{ ru.nom_complete }}">
+                            <td class="it">{{ ru.it|default:"-" }}</td>
+                            <td>{{ ru.nom_complete|default:"-" }}</td>
+                            <td>{{ ru.lot|default:"-" }}</td>
+                            <td>{% if ru.unite and ru.unite != "None" %}{{ ru.unite }}{% else %}-{% endif %}</td>
+                            <td>{{ ru.dpt|default:"-" }}</td>
+                            <td>
+                                <div class="cell-stat-container">
+                                    <span class="valeur-chiffre">{{ ru.reel|default:"0" }}</span>
+                                    {% if ru.MR > 0 %} <span class="badge-vs positive">&#9650; +{{ ru.MR }}</span>
+                                        {% elif ru.MR < 0 %}
+                                        <span class="badge-vs negative">&#9660; {{ ru.MR }}</span>
+                                        {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="cell-stat-container">
+                                    <span class="valeur-chiffre">{{ ru.systeme|default:"0" }}</span>
+                                    {% if ru.MS > 0 %} <span class="badge-vs positive">&#9650; +{{ ru.MS }}</span>
+                                        {% elif ru.MS < 0 %}
+                                        <span class="badge-vs negative">&#9660; {{ ru.MS }}</span>
+                                        {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="cell-stat-container">
+                                    <span class="valeur-chiffre">{{ ru.maquette|default:"0" }}</span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="empty-row">Aucune donnée disponible</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination-bar" id="pagination-bar">
+                <span class="pagination-info" id="pagination-info"></span>
+                <div class="pagination-controls">
+                    <button type="button" id="page-prec" class="pagination-btn">&laquo; Précédent</button>
+                    <span class="pagination-pages" id="pagination-pages"></span>
+                    <button type="button" id="page-suiv" class="pagination-btn">Suivant &raquo;</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+{{ block.super }}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    new Chart(document.getElementById("chart-global"), {
+        type: "line",
+        data: {
+            labels: {{ chart_labels| safe }},
+        datasets: [{
+            label: "Évolution Réel",
+            data: {{ chart_data| safe }},
+        borderColor: "#2563eb",
+        backgroundColor: "rgba(37, 99, 235, 0.1)",
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: "#2563eb",
+        pointRadius: 4,
+            }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+    });
+</script>
+<!-- Fichier JS externe -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        /* =========================================================
+        1. GRAPHIQUE CHART.JS
+        ========================================================= */
+        const donneesRuEl = document.getElementById("donnees-ru");
+        if (donneesRuEl) {
+            const donneesRu = JSON.parse(donneesRuEl.textContent || "[]");
+
+            const labels = donneesRu.map(r => r.nom_complete || "Inconnu");
+            const reel = donneesRu.map(r => r.reel || 0);
+            const systeme = donneesRu.map(r => r.systeme || 0);
+            const maquette = donneesRu.map(r => r.maquette || 0);
+
+            const ctx = document.getElementById("chart-comparatif");
+            if (ctx) {
+                new Chart(ctx, {
+                    type: "bar",
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: "Réel",
+                                data: reel,
+                                backgroundColor: "#dc2626"
+                            },
+                            {
+                                label: "Système",
+                                data: systeme,
+                                backgroundColor: " #16a34a"
+                            },
+                            {
+                                label: "Maquette",
+                                data: maquette,
+                                backgroundColor: "#d97706"
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false, barThickness: 15,
+                        plugins: {
+                            legend: { position: "top" },
+                            tooltip: { mode: "index", intersect: false }
+                        },
+                        scales: {
+                            x: { ticks: { autoSkip: false, maxRotation: 45, minRotation: 0 } },
+                            y: { beginAtZero: true, ticks: { precision: 0 } }
+                        }
+                    }
+                });
+            }
+        }
+
+        /* =========================================================
+           2. RECHERCHE ET PAGINATION DYNAMIQUES
+        ========================================================= */
+        const rechercheInput = document.getElementById("recherche-ru");
+        const tbody = document.getElementById("corps-tableau-ru");
+        if (!rechercheInput || !tbody) return;
+
+        const LIGNES_PAR_PAGE = 10;
+        const toutesLesLignes = Array.from(tbody.querySelectorAll("tr[data-it]"));
+        let pageActuelle = 1;
+
+        const btnPrec = document.getElementById("page-prec");
+        const btnSuiv = document.getElementById("page-suiv");
+        const infoEl = document.getElementById("pagination-info");
+        const pagesEl = document.getElementById("pagination-pages");
+        const barreEl = document.getElementById("pagination-bar");
+
+        function normaliser(texte) {
+            return String(texte)
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+        }
+
+        function lignesCorrespondantes() {
+            const requete = normaliser(rechercheInput.value.trim());
+            if (requete === "") return toutesLesLignes;
+            return toutesLesLignes.filter(function (ligne) {
+                const it = normaliser(ligne.dataset.it || "");
+                const nom = normaliser(ligne.dataset.nom || "");
+                return it.includes(requete) || nom.includes(requete);
+            });
+        }
+
+        function afficher() {
+            const ligneVideExistante = tbody.querySelector(".empty-row-recherche");
+            if (ligneVideExistante) ligneVideExistante.remove();
+
+            const correspondances = lignesCorrespondantes();
+            const total = correspondances.length;
+            const totalPages = Math.max(1, Math.ceil(total / LIGNES_PAR_PAGE));
+
+            if (pageActuelle > totalPages) pageActuelle = totalPages;
+            if (pageActuelle < 1) pageActuelle = 1;
+
+            const debut = (pageActuelle - 1) * LIGNES_PAR_PAGE;
+            const fin = debut + LIGNES_PAR_PAGE;
+            const aAfficher = new Set(correspondances.slice(debut, fin));
+
+            toutesLesLignes.forEach(function (ligne) {
+                ligne.style.display = aAfficher.has(ligne) ? "" : "none";
+            });
+
+            if (total === 0) {
+                const ligneVide = document.createElement("tr");
+                ligneVide.className = "empty-row-recherche";
+                ligneVide.innerHTML = '<td colspan="8" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
+                tbody.appendChild(ligneVide);
+            }
+
+            if (total > 0) {
+                infoEl.textContent = `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}`;
+            } else {
+                infoEl.textContent = "";
+            }
+            pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
+            btnPrec.disabled = pageActuelle <= 1;
+            btnSuiv.disabled = pageActuelle >= totalPages;
+            barreEl.style.display = (total <= LIGNES_PAR_PAGE) ? "none" : "flex";
+        }
+
+        rechercheInput.addEventListener("input", function () {
+            pageActuelle = 1;
+            afficher();
+        });
+
+        btnPrec.addEventListener("click", function () {
+            pageActuelle -= 1;
+            afficher();
+        });
+
+        btnSuiv.addEventListener("click", function () {
+            pageActuelle += 1;
+            afficher();
+        });
+
+        afficher();
+    });
+</script>
+{% endblock %}

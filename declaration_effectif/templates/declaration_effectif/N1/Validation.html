@@ -1,0 +1,199 @@
+{% extends 'utilisateur/navbar_N1.html' %}
+{% load static %}
+
+{% block title %}Validation des Opérateurs{% endblock %}
+{% block css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'utilisateur/css/N1/validation.css' %}">
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<header class="header">
+    <h1>Validation des Opérateurs</h1>
+    <div class="time">
+        <h5 id="time" aria-live="polite">{{ date }}</h5>
+    </div>
+</header>
+
+<div class="contenu">
+    <div class="table-container">
+        {% if not status %}
+
+        <!-- Barre de Recherche & Filtrage -->
+        <div class="chercher">
+            <input type="text" placeholder="IT - Nom" class="operateur" id="chercher">
+            <select class="choix" id="choix">
+                <option value="">Tous les lots</option>
+                <option value="A">Lot A</option>
+                <option value="O">Lot O</option>
+                <option value="P">Lot P</option>
+                <option value="E">Lot E</option>
+                <option value="C">Lot C</option>
+            </select>
+        <button id="ajouter" type="button" data-bs-toggle="modal" data-bs-target="#modal-ajouter" title="Ajouter un opérateur">
+            <i class="fas fa-plus"></i>
+        </button>
+        </div>
+
+        <!-- Modal: Ajouter un opérateur -->
+        <div class="modal fade" id="modal-ajouter" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Ajouter un Opérateur</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label for="nouveau-op-input">Identifiant</label>
+                        <input type="text" id="nouveau-op-input" placeholder="Ex: M13-87424" class="nouveau-op-input"
+                            required>
+                    </div>
+                    <div class="alert2"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="button" class="btn btn-primary btn-confirmer1">Confirmer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="alert mt-2"></div>
+        <!-- TABLEAU EN ATTENTE DE VALIDATION -->
+        <table class="table-operateurs">
+            <thead>
+                <tr>
+                    <th class="select-all-header">
+                        <input type="checkbox" id="selectAll" title="Tout sélectionner">
+                    </th>
+                    <th>Matricule</th>
+                    <th>Utilisateur</th>
+                    <th>Nom & Prénom</th>
+                    <th>Lot</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="result">
+                {% for operateur in operateurs_finaux %}
+                <tr id="row-{{ operateur.it|slugify }}">
+                    <td>
+                        <input type="checkbox" class="op-checkbox" value="{{ operateur.it }}">
+                    </td>
+                    <td class="matricule cell-mono">{{ operateur.matricule }}</td>
+                    <td class="utilisateur cell-mono">{{ operateur.it }}</td>
+                    <td class="nom">{{ operateur.nom_complete }}</td>
+                    <td class="lot"><span class="chip chip-lot">{{ operateur.lot }}</span></td>
+                    <td class="actions">
+                    <div class="action-buttons">
+                        <button type="button" class="btn-valider" data-matricule="{{ operateur.it }}" title="Valider">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button type="button" class="btn btn-primary btn-refuser" data-bs-toggle="modal"
+                            data-bs-target="#modal-{{ operateur.it|slugify }}" title="Refuser">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button type="button" class="btn-modifier" data-matricule="{{ operateur.it }}" title="Modifier">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                        </button>
+                    </div>
+
+                        <!-- Modal Refus -->
+                        <div class="modal fade" id="modal-{{ operateur.it|slugify }}" tabindex="-1">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Refuser {{ operateur.nom_complete }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                            aria-label="Fermer"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <label for="motif-{{ operateur.it|slugify }}">Motif</label>
+                                        <select class="modal-motif" id="motif-{{ operateur.it|slugify }}">
+                                            <option value="depart">Départ</option>
+                                            <option value="changement">Changement d'affectation</option>
+                                        </select>
+                                        <div class="nv_Ru" style="display: none; margin-top: 10px;">
+                                            <label for="nouveau-ru-{{ operateur.it|slugify }}">Identifiant du nouveau
+                                                RU</label>
+                                            <input type="text" id="nouveau-ru-{{ operateur.it|slugify }}"
+                                                class="nouveau-ru-input" placeholder="Ex: RU-0234" required>
+                                            <p class="erreur-nv-ru"
+                                                style="display: none; color: #dc2626; font-size: 12px; margin-top: 4px;">
+                                                Ce champ est obligatoire.</p>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Annuler</button>
+                                        <button type="button" class="btn btn-primary btn-confirmer"
+                                            data-matricule="{{ operateur.it }}">Confirmer</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="empty-row">Aucun opérateur à valider.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="pt-3">
+        <button type="button" id="btnValiderTout" data-nbr="{{ nbr }}" data-status="{{ status|lower }}" class="alert_btn">Valider la
+            sélection</button>
+        </div>
+        
+
+        {% else %}
+        <!-- TABLEAU HISTORIQUE / VALIDE -->
+        <table class="table-operateurs">
+            <thead>
+                <tr>
+                    <th>Matricule</th>
+                    <th>Identifiant</th>
+                    <th>Nom & Prénom</th>
+                    <th>Lot</th>
+                    <th>Statut</th>
+                </tr>
+            </thead>
+            <tbody id="result">
+                {% for operateur in operateurs_finaux %}
+                <tr id="row-{{ operateur.collaborateur_it.it|slugify }}">
+                    <td class="cell-mono">{{ operateur.collaborateur_it.matricule }}</td>
+                    <td class="cell-mono">{{ operateur.collaborateur_it.it }}</td>
+                    <td>{{ operateur.collaborateur_it.nom_complete }}</td>
+                    <td><span class="chip chip-lot">{{ operateur.collaborateur_it.lot }}</span></td>
+                    <td>{{ operateur.nature }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="empty-row">Aucune déclaration.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="pt-3">
+            <button type="button" id="btnModifierTout" class="alert_btn">Supprimer cette déclaration</button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+{{ block.super }}
+<script>
+    const VALIDER_URL = "{% url 'valider_operateurs' %}";
+    const STATUS = "{{ status|lower }}";
+    const SUPPRIMER_URL = "{% url 'supprimer' %}";
+    const OPERATEUR_URL = "{% url 'operateur' %}";
+    const VALIDATION = "{% url 'filter_validation' %}";
+</script>
+<script src="{% static 'declaration_effectif/js/validation.js' %}"></script>
+{% endblock %}

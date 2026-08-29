@@ -7,11 +7,16 @@ from  utilisateur import views
 urlpatterns = [
     path('',views.login_view,name="login"),
     path('register/',views.register_view,name="register"),
-    path('dashboard/',views.tableau,name='ru'),
+    path('dashboard/',views.tableau,name='dashboard_N1'),
     path("verifier/",views.verifier,name="verifier"),
     path("deconnecter/",views.deconnecter,name="deconnecter"),
-    path("Dashboard/",views.dashboard_rg,name="dashboard_rg"),
-    path("alerts",views.alertes,name="alerts"),
+    path("Dashboard/",views.dashboard_N2,name="dashboard_N2"),
     path('changer-role/<str:nouveau_role>/', views.changer_role, name='changer_role'),
+    path("votre-url-alertes/",views.alerts,name="votre-url-alertes"),
+    path("Admin_Dashboard/",views.admin_dashboard,name="Admin"),
+    path("utilisateurs/ajouter/",views.ajouter_user,name="ajouter_user"),
+    path("utilisateurs/supprimer/<str:id>/", views.supprimer_user, name="supprimer_user"),
+    path("utilisateurs/modifier/<str:id>/", views.modifier_user, name="modifier_user"),
+    path("dashboard_rh/", views.dashboard_rh, name="HRBP"),
 ]
 

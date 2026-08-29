@@ -13,7 +13,7 @@ import json
 from datetime import date , datetime , timedelta
 from django.db import transaction, IntegrityError
 from django.views.decorators.csrf import ensure_csrf_cookie
-from Collaborateur.views import rec , Ru_Rg, liste_Ru_par_Rg, Rg_Dur,liste_N1_pr_N3 ,liste_N3_N4 ,SystEff, reelEff
+from Collaborateur.views import rec , Ru_Rg, liste_N1_par_N2, Rg_Dur,liste_N1_pr_N3 ,liste_N3_N4 ,SystEff, reelEff
 from django.views.decorators.http import require_POST
 from utilisateur.decorators import role_required
 from django.utils.dateparse import parse_date
@@ -22,7 +22,10 @@ import bisect
 from django.shortcuts import render, redirect, get_object_or_404
 
 @ensure_csrf_cookie
-#valider la liste des operateurs d'un Ru
+
+# ============================================================
+# Valider la liste des operateurs
+# ============================================================
 def valider(request):
     if request.method != "POST":
         return JsonResponse({"error": "Méthode non autorisée"}, status=405)
@@ -65,7 +68,10 @@ def valider(request):
 
     return JsonResponse({"status": "valider"})
 
-#rederiger vers la page de validation
+# ============================================================
+#fct pr rederiger vers la page validation + liste des operateurs
+# ============================================================
+
 @role_required('N+1')
 def validation_view(request):
     it = request.session.get("it")
@@ -114,7 +120,7 @@ def validation_view(request):
             operateurs_finaux = candidats.exclude(it__in=manager_direct_its)
         else:
             # sinon c'est une liste -> filtrer en python
-            operateurs_finaux = [c for c in candidatos if getattr(c, 'it', None) not in manager_direct_its]
+            operateurs_finaux = [c for c in candidats if getattr(c, 'it', None) not in manager_direct_its]
         status = False
 
     # nombre (gérer QuerySet vs liste)
@@ -125,7 +131,7 @@ def validation_view(request):
 
     return render(
         request,
-        'declaration_effectif/Validation.html',
+        'declaration_effectif/N1/Validation.html',
         {
             "operateurs_finaux": operateurs_finaux,
             "nbr": nbr,
@@ -134,7 +140,9 @@ def validation_view(request):
         }
     )
 
-#return la valeur par syste et par reel
+# ============================================================
+# return ecart S/R et R/S
+# ============================================================
 def difference(request):
     it = request.session.get("it")
 
@@ -142,11 +150,11 @@ def difference(request):
         Ru_id=it
     ).order_by("-date").first()
 
-    operateur_systeme = SystEff(request)
+    operateur_systeme = SystEff(it)
     liste_s = set(operateur_systeme.values_list("it", flat=True))
 
 
-    operateur_reel = reelEff(request)
+    operateur_reel = reelEff(it)
     if  operateur_reel :
         liste_r = set(
             operateur_reel.values_list("it", flat=True)
@@ -166,7 +174,9 @@ def difference(request):
         "reel1": Collaborateur.objects.none(),
     }
 
-#rederiger ver page histo avec declaration ch
+# ============================================================
+# recupere la liste des affectations d'un collaborateur
+# ============================================================
 def histo(ut):
     # Si 'ut' est vide/None ou si le collaborateur n'existe pas
     if not ut:
@@ -184,6 +194,9 @@ def histo(ut):
 
     return {"declarations": declarations, "nbr": nbr}
 
+# ============================================================
+# rederiger vers la page des affectations avec  les affectations
+# ============================================================
 @role_required('N+1')
 def histo_aff(request):
     util = request.session.get("it")
@@ -209,10 +222,12 @@ def histo_aff(request):
     }
     return render(
         request,
-        "declaration_effectif/Affectations_historique.html",
+        "declaration_effectif/N1/Affectations_historique.html",
         context,
     )
-#supp une declaration
+# ============================================================
+# Supprimer la declaration effectuers ds le jour meme
+# ============================================================
 def supprimer(request):
     it = request.session.get("it")
 
@@ -227,7 +242,9 @@ def supprimer(request):
 
     return JsonResponse({"status": "erreur", "error": "Aucune déclaration à supprimer"}, status=404)
 
-#afficher btn mod ds page validation
+# ============================================================
+# rederiger vers la page des affectations avec  les affectations
+# ============================================================
 def afficher_modifier(request):
     it = request.session.get("it")
     der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
@@ -237,9 +254,12 @@ def afficher_modifier(request):
         return JsonResponse({"valide": True})
     return JsonResponse({"valide": False})
 
-#rederiger vers la page validation_rg+ liste de Ru pas valider
+
+# ============================================================
+# rederiger vers la page des respo N+1 ss validation
+# ============================================================
 @role_required('N+2')
-def liste_ru_non_valides_Rg(request):
+def liste_N1_non_valides_N2(request):
     maint = timezone.localdate()
     it=request.session.get("it")
     liste_ru = Ru_Rg(it)
@@ -263,13 +283,16 @@ def liste_ru_non_valides_Rg(request):
 
     return render(
         request,
-        "declaration_effectif/RG/validation_rg.html",
+        "declaration_effectif/N2/validation.html",
         {"non_valides": non_valides,"date": maint},
     )
 
-#liste des affectations des n+2
+
+# ============================================================
+# rederiger vers la page des affectations de N+2 et c'est N+1
+# ============================================================
 @role_required('N+2')
-def affectation_Ru(request):
+def affectation_N1(request):
     util = request.session.get("it")
     
     # Récupération du paramètre status depuis la requête GET
@@ -331,10 +354,11 @@ def affectation_Ru(request):
         "status": status,  # Transmis au template pour maintenir l'option sélectionnée
     }
 
-    return render(request, "declaration_effectif/RG/affectation.html", context)
+    return render(request, "declaration_effectif/N2/affectation.html", context)
 
-
-#rederiger vers la page validation_n+3 + liste de n+1 pas valider
+# ============================================================
+# rederiger vers la page des respo N+1 ss validation pr N+3
+# ============================================================
 @role_required('N+3')
 def liste_N1_non_valides_N3(request):
     maint = timezone.localdate()
@@ -358,11 +382,12 @@ def liste_N1_non_valides_N3(request):
 
     return render(
         request,
-        "declaration_effectif/DUR/validation.html",
+        "declaration_effectif/N3/validation.html",
         {"non_valides": non_valides,"date": maint}
     )
-
-#liste des affectations des Ru
+# ============================================================
+# # rederiger vers la page des affectations de N+2 et c'est N+1 ,N+2
+# ============================================================
 @role_required('N+3')
 def affectation_N3(request):
     util = request.session.get("it")
@@ -447,9 +472,11 @@ def affectation_N3(request):
         "status": status,
     }
 
-    return render(request, "declaration_effectif/DUR/affectation.html", context)
+    return render(request, "declaration_effectif/N3/affectation.html", context)
     
-
+# ============================================================
+# fct pr engregistrer les alerts envoier
+# ============================================================
 def envoyer_alert(request):
     try:
         data = json.loads(request.body)
@@ -476,16 +503,18 @@ def envoyer_alert(request):
 
     return JsonResponse({"status": "ok", "message": "Alerte envoyée."})
 
-
+# ============================================================
+# # rederiger vers dashboard de N+3
+# ============================================================
 @role_required('N+3')
-def dashboard_Dur(request):
+def dashboard_N3 (request):
     it_session_original = request.session.get("it")
     if not it_session_original:
         return redirect("login")
 
     it_n1 = liste_N1_pr_N3(it_session_original)
     if not it_n1:
-        return render(request, "declaration_effectif/DUR/dashboard.html", {
+        return render(request, "declaration_effectif/N3/dashboard.html", {
             "liste_ru_stats": [], "total_r": 0, "total_syst": 0, "MR": 0, "MS": 0,
             "maquette_totale": 0, "maint": timezone.localdate(),
             "chart_labels_json": json.dumps([]), "chart_data_json": json.dumps([]), "non_valides": 0
@@ -513,11 +542,11 @@ def dashboard_Dur(request):
             request.session["it"] = ru_it
             
             # Effectif système issu de SystEff(request)
-            qs_syst = SystEff(request)
+            qs_syst = SystEff(collab.it)
             systeme = qs_syst.values('it').distinct().count()
 
             # Effectif réel issu de reelEff(request)
-            qs_reel = reelEff(request)
+            qs_reel = reelEff(collab.it)
             reel = qs_reel.values('it').distinct().count()
 
             # Récupération de la dernière date de déclaration (A/V) pour ce RU
@@ -566,7 +595,7 @@ def dashboard_Dur(request):
     non_valides = sum(1 for stat in liste_ru_stats if stat["systeme"] > 0 and stat["n1"].it not in liste_declares_today)
 
     # 3) Données de la session courante (N+3)
-    operateurs_systeme_session = SystEff(request)
+    operateurs_systeme_session = SystEff(it_session_original)
     syste_session = operateurs_systeme_session.values('it').distinct().count()
 
     # 4) Série temporelle pour le graphique sur 7 jours
@@ -614,35 +643,10 @@ def dashboard_Dur(request):
         "operateurs_systeme_session": operateurs_systeme_session,
         "syste_session": syste_session,
     }
-    return render(request, "declaration_effectif/DUR/dashboard.html", context)
-def get_all_n1_under(it_parent):
-    """
-    Récupère TOUS les ITs des responsables N1 (ceux qui gèrent directement des opérateurs)
-    situés sous 'it_parent', peu importe la profondeur hiérarchique.
-    """
-    n1_set = set()
-    
-    # Enfants directs du parent
-    enfants_its = list(Collaborateur.objects.filter(ru_it_id=it_parent).values_list("it", flat=True))
-    
-    for enfant_it in enfants_its:
-        # Est-ce que cet enfant a lui-même des subordonnés ?
-        a_des_subordonnes = Collaborateur.objects.filter(ru_it_id=enfant_it).exists()
-        
-        if a_des_subordonnes:
-            # On vérifie si ses subordonnés sont des "feuilles" (opérateurs) ou d'autres responsables
-            # On descend récursivement
-            sub_n1 = get_all_n1_under(enfant_it)
-            
-            if sub_n1:
-                # Il a des N1 en dessous de lui (c'est donc un N2, N3...)
-                n1_set.update(sub_n1)
-            else:
-                # Il n'a pas d'autres responsables sous lui, mais gère des opérateurs : c'est un N1 !
-                n1_set.add(enfant_it)
-
-    return n1_set
-
+    return render(request, "declaration_effectif/N3/dashboard.html", context)
+# ============================================================
+# # rederiger vers dashboard de N+4
+# ============================================================
 @role_required('N+4')
 def page_N4(request):
     it = request.session.get("it")
@@ -672,14 +676,8 @@ def page_N4(request):
     data_totale_par_jour = [0] * len(dates)
 
     for n1 in liste_n1:
-        systeme1 = Collaborateur.objects.filter(ru_it_id=n1.it).count()
-        der = declaration_effectif.objects.filter(Ru_id=n1.it).order_by("-date").first()
-        if der:
-            reel1 = declaration_effectif.objects.filter(
-                Ru_id=n1.it, date=der.date, nature__in=["A", "V"]
-            ).count()
-        else:
-            reel1 = systeme1
+        systeme1 =SystEff(n1.it).count()
+        reel1=reelEff(n1.it).count()
 
         maquette1 = 0
         if n1.unite_id:
@@ -748,45 +746,9 @@ def page_N4(request):
         "non_valides": non_valides,
     })
 
-def get_n1_pour_niveau_orm(it_parent):
-    # Niveau 1 sous le parent
-    niv1 = set(Collaborateur.objects.filter(ru_it_id=it_parent).values_list("it", flat=True))
-    
-    # Niveau 2
-    niv2 = set(Collaborateur.objects.filter(ru_it_id__in=niv1).values_list("it", flat=True))
-    
-    # Niveau 3
-    niv3 = set(Collaborateur.objects.filter(ru_it_id__in=niv2).values_list("it", flat=True))
-
-    # On ne garde QUE les ITs de ceux qui ont réellement des opérateurs sous leurs ordres
-    n1_its = set(
-        Collaborateur.objects.filter(ru_it_id__in=niv3)
-        .values_list("ru_it_id", flat=True)
-        .distinct()
-    )
-
-    # Si le parent est LUI-MÊME un N1 direct (ses enfants sont des opérateurs)
-    if not n1_its and niv1:
-        return niv1
-
-    return n1_its
-
-
-def listes_de_N4(it_n4):
-    collaborateurs = Collaborateur.objects.filter(ru_it_id=it_n4)
-    liste_N1 = set()
-
-    for c in collaborateurs:
-        n1_its = get_n1_pour_niveau_orm(c.it)
-        liste_N1.update(n1_its)
-
-    
-    n4_n1_directs = get_n1_pour_niveau_orm(it_n4)
-    liste_N1.update(n4_n1_directs)
-
-    return liste_N1
-
-
+# ============================================================
+# # rederiger LISTE DES AFFECTATION DE N+4
+# ============================================================
 @role_required('N+4')
 def affectation_N4(request):
     util = request.session.get("it")
@@ -865,7 +827,9 @@ def affectation_N4(request):
         }
     )
 
-
+# ============================================================
+# # rederiger vers la page des N+1 sous N+4 non pas valider liste
+# ============================================================
 @role_required('N+4')
 def validation_N4(request):
     util = request.session.get("it")
@@ -905,7 +869,9 @@ def validation_N4(request):
             "total_non_valides": non_valides.count(),
         },
     )
-
+# ============================================================
+# liste des validation filtre par date pr N+2
+# ============================================================
 def validation_date_N2(request):
     time_str = request.GET.get("time", "")
     it = request.session.get("it")
@@ -946,6 +912,9 @@ def validation_date_N2(request):
         "resultats": resultats,
         "status": status
     })
+# ============================================================
+# liste des validation filtre par date pr N+3
+# ============================================================
 def validation_date_N3(request):
     time_str = request.GET.get("time", "")
     it = request.session.get("it")
@@ -979,4 +948,112 @@ def validation_date_N3(request):
     return JsonResponse({
         "resultats": resultats,
         "status": status
+    })
+
+
+def get_badge_class(etat):
+    """Retourne la classe CSS du badge selon le texte de l'état."""
+    if not etat:
+        return "badge-en-attente"
+    etat_lower = str(etat).lower()
+    if "valid" in etat_lower:
+        return "badge-valide"
+    elif "refus" in etat_lower:
+        return "badge-refuse"
+    elif "non démarr" in etat_lower or "non demarr" in etat_lower:
+        return "badge-non-demarrer"
+    else:
+        return "badge-en-attente"
+
+
+def affectation_HRBP(request):
+    it = request.session.get("it")
+    status = request.GET.get("status", "all")
+
+    departements_qs = Departement.objects.filter(HRBP_id=it)
+    departements = departements_qs.values_list("abreviation", flat=True)
+
+    collab = Collaborateur.objects.filter(departement_id__in=departements)
+    noms = list(collab.values_list("nom_complete", flat=True))
+
+    affectation = historique.objects.filter(
+        Q(collaborateur__in=noms) | Q(initial__in=noms) | Q(acceuil__in=noms)
+    ).exclude(etat="Terminé")
+
+    if status == "valide":
+        affectation = [d for d in affectation if d.etat and "valid" in str(d.etat).lower()]
+    elif status == "refuse":
+        affectation = [d for d in affectation if d.etat and "refus" in str(d.etat).lower()]
+    elif status == "non_demarrer":
+        affectation = [d for d in affectation if d.etat and "non démarr" in str(d.etat).lower()]
+
+    # --- Ajout de la classe badge calculée pour chaque ligne ---
+    affectation_list = list(affectation)
+    for a in affectation_list:
+        a.badge_class = get_badge_class(a.etat)
+
+    # --- Pagination ---
+    paginator = Paginator(affectation_list, 20)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "declaration_effectif/HRBP/affectation.html", {
+        "info": page_obj,
+        "page_obj": page_obj,
+        "status": status,
+    })
+
+def responsables_ru_sans_declaration_du_jour(request):
+    today = timezone.now().date()
+    it = request.session.get("it")
+
+    departements_qs = Departement.objects.filter(HRBP_id=it)
+    departements = departements_qs.values_list("abreviation", flat=True)
+    collaborateurs_base = Collaborateur.objects.filter(departement_id__in=departements)
+    print("collaborateurs_base :", collaborateurs_base)
+    responsable = list(
+        collaborateurs_base
+        .exclude(ru_it_id__isnull=True)
+        .values_list("ru_it_id", flat=True)
+        .distinct()
+    )
+    print("responsable (RU ids détectés) :", responsable)
+
+    operateur = Collaborateur.objects.filter(
+        departement_id__in=departements
+    ).exclude(it__in=responsable)
+    print("Nb opérateurs :", operateur.count())
+
+    ru_ids = list(
+        operateur
+        .exclude(ru_it_id__isnull=True)
+        .values_list("ru_it_id", flat=True)
+        .distinct()
+    )
+    print("ru_ids (RU réels avec opérateurs) :", ru_ids)
+
+    ru_avec_declaration = set(
+        declaration_effectif.objects.filter(date=today)
+        .values_list("Ru_id", flat=True)
+        .distinct()
+    )
+    print("ru_avec_declaration :", ru_avec_declaration)
+
+    ru_ids_sans_declaration = [
+        ru_id for ru_id in ru_ids if ru_id not in ru_avec_declaration
+    ]
+    print("ru_ids_sans_declaration :", ru_ids_sans_declaration)
+
+    ru = Collaborateur.objects.filter(it__in=ru_ids_sans_declaration)
+    print("Nb RU finaux :", ru.count())
+
+    # --- Pagination ---
+    paginator = Paginator(ru, 20)  # 20 RU par page, ajustable
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "declaration_effectif/HRBP/declaration.html", {
+        "ru": page_obj,             # objet paginé, itérable dans le template comme avant
+        "non_valides": ru,          # total réel (non paginé) pour le KPI "Non Validés"
+        "page_obj": page_obj,       # pour les contrôles de pagination dans le template
     })

@@ -1,11 +1,34 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
-
-
 class Departement(models.Model):
     nom_departement = models.CharField(max_length=30, unique=True)
     abreviation = models.CharField(max_length=5, unique=True)
+    maquette = models.IntegerField(default=0)
+    HRBP = models.ForeignKey(
+        "Collaborateur", to_field="it",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='departements_RH',
+        verbose_name="RH Responsable"
+    )
+    ADNMIN = models.ForeignKey(
+            "Collaborateur", to_field="it",
+            on_delete=models.SET_NULL,
+            null=True,
+            blank=True,
+            related_name='departement_admine',
+            verbose_name="admin"
+        )
+    DRH = models.ForeignKey(
+            "Collaborateur", to_field="it",
+            on_delete=models.SET_NULL,
+            null=True,
+            blank=True,
+            related_name='departements_DRH',
+            verbose_name=" DRH"
+        )
     def __str__(self):
         return self.nom_departement
 
@@ -17,7 +40,7 @@ class Unite(models.Model):
     abreviation = models.CharField(max_length=20, unique=True)
 
     maquette = models.IntegerField(default=0)
-    A = models.IntegerField(default=0)
+    A = models.IntegerField(default=0)# A+O
     P = models.IntegerField(default=0)
     C = models.IntegerField(default=0)
     T = models.IntegerField(default=0)
@@ -27,17 +50,12 @@ class Unite(models.Model):
 
 #Tableau Collaborateur:
 class Collaborateur(models.Model):
-    POST_CHOICES = [
-        ("O", "Opérateur"),
-        ("T", "Team Leader"),
-    ]
-
     SEXE_CHOICES = [
         (0, "Femme"),
         (1, "Homme"),
     ]
 
-    it = models.CharField(max_length=8, primary_key=True)
+    it = models.CharField(max_length=8, primary_key=True) # it=utilisateur
     matricule = models.CharField(max_length=20, unique=True, null=True, blank=True)
     cin = models.CharField(max_length=8, unique=True, null=True, blank=True)
 

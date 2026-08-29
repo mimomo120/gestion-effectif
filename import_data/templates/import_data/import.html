@@ -1,51 +1,86 @@
+{% extends 'declaration_effectif/HRBP/navbar.html' %}
+
+{% load static %}
+
+{% block title %}Importer{% endblock %}
+
+{% block css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'utilisateur/css/Super/impo.css' %}">
+{% endblock %}
+
+{% block content %}
 <div class="import-container">
     <h1 class="import-title">Importation des Fichiers</h1>
     <p class="import-subtitle">
-        Veuillez charger simultanément le fichier des Unités et celui des Collaborateurs (.xlsx, .xls, .csv).
+        Veuillez charger les fichiers des Départements, des Unités et des Collaborateurs (.xlsx, .xls, .csv).
     </p>
 
     <!-- Guide des structures de fichiers attendues -->
     <div class="import-guide">
         <h2 class="guide-title">💡 Format et colonnes requis pour les fichiers</h2>
 
-        <!-- Fichier Unités -->
-        <div class="guide-card">
-            <div class="guide-card-header">
-                <span class="guide-icon">📊</span>
-                <strong>Fichier Unités</strong>
+        <div class="row g-3">
+            <!-- Fichier Départements -->
+            <div class="col-md-4">
+                <div class="guide-card h-100">
+                    <div class="guide-card-header">
+                        <span class="guide-icon">📂</span>
+                        <strong>Fichier Départements</strong>
+                    </div>
+                    <p class="guide-text">Doit contenir au minimum la colonne suivante :</p>
+                    <div class="column-tags">
+                        <span class="tag tag-required">Nom *</span>
+                        <span class="tag">Abreviation</span>
+                        <span class="tag">RH</span>
+                        <span class="tag">Maquette</span>
+                    </div>
+                </div>
             </div>
-            <p class="guide-text">Doit contenir au minimum la colonne principale suivante :</p>
-            <div class="column-tags">
-                <span class="tag tag-required">abreviation *</span>
-                <span class="tag">nom</span>
-                <span class="tag">maquette</span>
-                <span class="tag">T</span>
-                <span class="tag">O</span>
-                <span class="tag">P</span>
-                <span class="tag">C</span>
-            </div>
-        </div>
 
-        <!-- Fichier Collaborateurs -->
-        <div class="guide-card">
-            <div class="guide-card-header">
-                <span class="guide-icon">👥</span>
-                <strong>Fichier Collaborateurs</strong>
+            <!-- Fichier Unités -->
+            <div class="col-md-4">
+                <div class="guide-card h-100">
+                    <div class="guide-card-header">
+                        <span class="guide-icon">📊</span>
+                        <strong>Fichier Unités</strong>
+                    </div>
+                    <p class="guide-text">Doit contenir au minimum la colonne principale :</p>
+                    <div class="column-tags">
+                        <span class="tag tag-required">Abreviation *</span>
+                        <span class="tag">Nom</span>
+                        <span class="tag">Maquette</span>
+                        <span class="tag">T</span>
+                        <span class="tag">A</span>
+                        <span class="tag">P</span>
+                        <span class="tag">C</span>
+                    </div>
+                </div>
             </div>
-            <p class="guide-text">Doit obligatoirement inclure les colonnes requises (*), les autres étant optionnelles
-                :</p>
-            <div class="column-tags">
-                <span class="tag tag-required">Utilisateur *</span>
-                <span class="tag tag-required">Nom *</span>
-                <span class="tag tag-required">Prénom *</span>
-                <span class="tag tag-required">Lot *</span>
-                <span class="tag">Matricule</span>
-                <span class="tag">DPT</span>
-                <span class="tag">Unite</span>
-                <span class="tag">Equipe</span>
-                <span class="tag">Shift</span>
-                <span class="tag">Sexe</span>
-                <span class="tag">RU</span>
+
+            <!-- Fichier Collaborateurs -->
+            <div class="col-md-4">
+                <div class="guide-card h-100">
+                    <div class="guide-card-header">
+                        <span class="guide-icon">👥</span>
+                        <strong>Fichier Collaborateurs</strong>
+                    </div>
+                    <p class="guide-text">Doit obligatoirement inclure les colonnes requises (*) :</p>
+                    <div class="column-tags">
+                        <span class="tag tag-required">Utilisateur *</span>
+                        <span class="tag tag-required">Nom *</span>
+                        <span class="tag tag-required">Prénom *</span>
+                        <span class="tag tag-required">Lot *</span>
+                        <span class="tag">Matricule</span>
+                        <span class="tag">DPT</span>
+                        <span class="tag">Unite</span>
+                        <span class="tag">Equipe</span>
+                        <span class="tag">Shift</span>
+                        <span class="tag">Sexe</span>
+                        <span class="tag">RU</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -62,13 +97,27 @@
     {% endif %}
 
     <!-- Formulaire d'importation -->
+    <!-- Formulaire d'importation -->
     <form method="post" enctype="multipart/form-data" class="import-form">
         {% csrf_token %}
-
-        <!-- Champ 1 : Unités -->
+    
+        <!-- Champ 1 : Départements -->
+        <div class="import-field">
+            <label for="{{ form.fichier_departement.id_for_label }}">
+                📂 Fichier Départements
+            </label>
+            <div class="file-input-wrapper">
+                {{ form.fichier_departement }}
+            </div>
+            {% for error in form.fichier_departement.errors %}
+            <small class="import-error">{{ error }}</small>
+            {% endfor %}
+        </div>
+    
+        <!-- Champ 2 : Unités -->
         <div class="import-field">
             <label for="{{ form.fichier_unite.id_for_label }}">
-                🏢 Fichier Unités
+                📊 Fichier Unités
             </label>
             <div class="file-input-wrapper">
                 {{ form.fichier_unite }}
@@ -77,8 +126,8 @@
             <small class="import-error">{{ error }}</small>
             {% endfor %}
         </div>
-
-        <!-- Champ 2 : Collaborateurs -->
+    
+        <!-- Champ 3 : Collaborateurs -->
         <div class="import-field">
             <label for="{{ form.fichier_collaborateur.id_for_label }}">
                 👤 Fichier Collaborateurs
@@ -90,187 +139,10 @@
             <small class="import-error">{{ error }}</small>
             {% endfor %}
         </div>
-
-        <button type="submit" class="import-submit">Lancer l'importation</button>
+    
+        <button type="submit" class="import-submit">
+            <i class="fas fa-file-import me-2"></i>Lancer l'importation
+        </button>
     </form>
 </div>
-
-<style>
-    /* CONTENEUR PRINCIPAL */
-    .import-container {
-        max-width: 640px;
-        margin: 40px auto;
-        padding: 32px;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        background: #ffffff;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
-    .import-title {
-        margin: 0 0 6px;
-        font-size: 24px;
-        color: #1e293b;
-    }
-
-    .import-subtitle {
-        margin: 0 0 24px;
-        color: #64748b;
-        font-size: 14px;
-    }
-
-    /* SECTION D'AIDE ET INDICATIONS COLONNES */
-    .import-guide {
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 24px;
-    }
-
-    .guide-title {
-        font-size: 14px;
-        color: #334155;
-        margin: 0 0 12px 0;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .guide-card {
-        background: #ffffff;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 12px;
-        margin-bottom: 10px;
-    }
-
-    .guide-card:last-child {
-        margin-bottom: 0;
-    }
-
-    .guide-card-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 14px;
-        color: #0f172a;
-        margin-bottom: 4px;
-    }
-
-    .guide-text {
-        font-size: 12px;
-        color: #64748b;
-        margin: 0 0 8px 0;
-    }
-
-    .column-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    .tag {
-        font-size: 11px;
-        padding: 3px 8px;
-        background-color: #f1f5f9;
-        color: #475569;
-        border-radius: 4px;
-        border: 1px solid #cbd5e1;
-        font-family: monospace;
-    }
-
-    .tag-required {
-        background-color: #eff6ff;
-        color: #1d4ed8;
-        border-color: #bfdbfe;
-        font-weight: bold;
-    }
-
-    /* MESSAGES DJANGO */
-    .import-messages {
-        list-style: none;
-        margin: 0 0 20px;
-        padding: 0;
-    }
-
-    .import-message {
-        padding: 10px 14px;
-        border-radius: 6px;
-        margin-bottom: 8px;
-        font-size: 13px;
-    }
-
-    .import-message--success {
-        background: #f0fdf4;
-        color: #15803d;
-        border: 1px solid #bbf7d0;
-    }
-
-    .import-message--error {
-        background: #fef2f2;
-        color: #b91c1c;
-        border: 1px solid #fecaca;
-    }
-
-    /* CHAMPS DE FORMULAIRE & INPUTS FICHIERS */
-    .import-field {
-        margin-bottom: 20px;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .import-field label {
-        font-weight: 600;
-        margin-bottom: 8px;
-        color: #1e293b;
-        font-size: 14px;
-    }
-
-    .file-input-wrapper input[type="file"] {
-        width: 100%;
-        padding: 10px;
-        background-color: #f8fafc;
-        border: 1px dashed #cbd5e1;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 13px;
-        color: #334155;
-        box-sizing: border-box;
-    }
-
-    .file-input-wrapper input[type="file"]:hover {
-        border-color: #2b5895;
-        background-color: #f1f5f9;
-    }
-
-    .import-help {
-        margin-top: 4px;
-        color: #64748b;
-        font-size: 12px;
-    }
-
-    .import-error {
-        margin-top: 4px;
-        color: #dc2626;
-        font-size: 12px;
-    }
-
-    .import-submit {
-        width: 100%;
-        padding: 12px;
-        border: none;
-        border-radius: 6px;
-        background: #2b5895;
-        color: #ffffff;
-        font-size: 15px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.2s ease;
-        margin-top: 8px;
-    }
-
-    .import-submit:hover {
-        background: #1e3e6b;
-    }
-</style>
+{% endblock %}

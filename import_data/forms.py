@@ -1,11 +1,15 @@
 from django import forms
 
 class MultipleImportForm(forms.Form):
-    fichier_unite = forms.FileField(
-        label="Fichier Unités",
-        widget=forms.FileInput(attrs={'class': 'input-file-custom'})
+    fichier_departement = forms.FileField(required=False,
+        label="Fichier Départements",
+        widget=forms.FileInput(attrs={'class': 'form-control'})
     )
-    fichier_collaborateur = forms.FileField(
+    fichier_unite = forms.FileField(required=False,
+        label="Fichier Unités",
+        widget=forms.FileInput(attrs={'class': 'form-control'})
+    )
+    fichier_collaborateur = forms.FileField(required=False,
         label="Fichier Collaborateurs",
-        widget=forms.FileInput(attrs={'class': 'input-file-custom'})
+        widget=forms.FileInput(attrs={'class': 'form-control'})
     )

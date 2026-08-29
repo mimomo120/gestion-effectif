@@ -1,0 +1,303 @@
+/* ==========================================
+   MODULA ENTERPRISE - GESTION DES AFFECTATIONS
+   ========================================== */
+
+:root {
+    --bg-main: #eef2f5;
+    --card-bg: #ffffff;
+    --border-color: #e2e8f0;
+    --text-heading: #0f172a;
+    --text-body: #334155;
+    --text-muted: #64748b;
+    --accent-blue: #2563eb;
+
+    /* Status Badges Colors */
+    --badge-valide-bg: #dcfce7;
+    --badge-valide-text: #15803d;
+    --badge-refuse-bg: #fee2e2;
+    --badge-refuse-text: #b91c1c;
+    --badge-warning-bg: #fef3c7;
+    --badge-warning-text: #b45309;
+    --badge-default-bg: #f1f5f9;
+    --badge-default-text: #475569;
+
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    --border-radius: 16px;
+}
+
+body {
+    background-color: var(--bg-main) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-body);
+}
+
+.affectations-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Header */
+.header {
+    margin-bottom: 1.5rem;
+}
+
+.header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    margin: 0;
+}
+
+/* Tabs Navigation */
+.tabs-switch {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+}
+
+.tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    background-color: transparent;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    background-color: rgba(255, 255, 255, 0.6);
+    color: var(--text-heading);
+}
+
+.tab-btn.active {
+    background-color: var(--card-bg);
+    color: var(--accent-blue);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.count-badge {
+    background-color: #e0e7ff;
+    color: var(--accent-blue);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+}
+
+.tab-btn.active .count-badge {
+    background-color: var(--accent-blue);
+    color: #ffffff;
+}
+
+/* Filters Bar */
+.filter-bar {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--card-shadow);
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.filter-group,
+.filter-box {
+    display: flex;
+    align-items: center;
+}
+
+.filter-group {
+    flex: 1 1 300px;
+}
+
+.filter-input,
+.filter-select {
+    width: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.875rem;
+    color: var(--text-heading);
+    background-color: #ffffff;
+    outline: none;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.filter-input:focus,
+.filter-select:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.filter-select {
+    min-width: 180px;
+    cursor: pointer;
+}
+
+/* Main Section Card & Table */
+.sections-wrapper {
+    width: 100%;
+}
+
+.section-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--card-shadow);
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+.table-affectations {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-affectations th {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #475569;
+    letter-spacing: 0.5px;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #cbd5e1;
+    text-transform: uppercase;
+    text-align: left;
+}
+
+.table-affectations td {
+    font-size: 0.875rem;
+    color: var(--text-body);
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.table-affectations tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.table-affectations tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.cell-primary {
+    font-weight: 700;
+    color: var(--text-heading);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+/* Badges d'état dynamiques (via filter slugify) */
+.badge {
+    display: inline-block;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.badge-valide {
+    background-color: var(--badge-valide-bg);
+    color: var(--badge-valide-text);
+}
+
+.badge-refuse {
+    background-color: var(--badge-refuse-bg);
+    color: var(--badge-refuse-text);
+}
+
+.badge-non_demarrer,
+.badge-non-demarre,
+.badge-en-attente {
+    background-color: var(--badge-warning-bg);
+    color: var(--badge-warning-text);
+}
+
+/* Fallback badge */
+.badge:not([class*="badge-"]) {
+    background-color: var(--badge-default-bg);
+    color: var(--badge-default-text);
+}
+
+.empty-row {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2.5rem !important;
+    font-style: italic;
+}
+
+/* Pagination Styles */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.page-btn {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.15s ease-in-out;
+}
+
+.page-btn:hover:not(.active) {
+    background-color: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.page-btn.active {
+    background-color: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .affectations-container {
+        padding: 1rem;
+    }
+
+    .tabs-switch {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-group,
+    .filter-select {
+        width: 100%;
+    }
+}

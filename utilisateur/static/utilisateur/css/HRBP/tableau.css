@@ -1,0 +1,241 @@
+:root {
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --border-color: #e2e8f0;
+    --accent-blue: #2563eb;
+    --accent-green: #10b981;
+    --accent-red: #ef4444;
+    --page-bg: #f8fafc;
+    --card-bg: #ffffff;
+    --text-title: #1e293b;
+
+    /* Couleurs de badges */
+    --badge-pos-bg: #dcfce7;
+    --badge-pos-text: #166534;
+    --badge-neg-bg: #fee2e2;
+    --badge-neg-text: #991b1b;
+    --badge-alert-bg: #fef3c7;
+    --badge-alert-text: #92400e;
+}
+
+body {
+    background-color: var(--page-bg) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-title);
+    margin: 0;
+}
+
+.dashboard-wrapper {
+    padding: 2rem;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+/* En-tête */
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.filter-dropdown,
+.date-badge {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+/* KPIs Top Row */
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+}
+
+.kpi-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.kpi-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.icon-blue {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.icon-purple {
+    background: #f3e8ff;
+    color: #9333ea;
+}
+
+.icon-orange {
+    background: #ffedd5;
+    color: #ea580c;
+}
+
+.icon-red {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.kpi-title {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    display: block;
+}
+
+.kpi-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.kpi-val-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.status-badge.negative {
+    background: var(--badge-neg-bg);
+    color: var(--badge-neg-text);
+}
+
+.status-badge.positive {
+    background: var(--badge-pos-bg);
+    color: var(--badge-pos-text);
+}
+
+.status-badge.neutral {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.status-badge.alert {
+    background: var(--badge-alert-bg);
+    color: var(--badge-alert-text);
+}
+
+/* Main Grid */
+.main-grid {
+    display: grid;
+    grid-template-columns: 1.8fr 1.2fr;
+    gap: 1.25rem;
+}
+
+.card-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem;
+}
+
+.panel-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.chart-box {
+    position: relative;
+    height: 380px;
+}
+
+/* Nouveau Tableau Moderne des Départements */
+.dept-panel {
+    padding: 1.25rem;
+}
+
+.table-dept {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 0.35rem;
+    font-size: 0.85rem;
+}
+
+.table-dept th {
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.5rem 0.6rem;
+    border-bottom: 2px solid var(--border-color);
+    text-align: center;
+}
+
+.table-dept th:first-child,
+.table-dept td:first-child {
+    text-align: left;
+}
+
+.table-dept tbody tr {
+    background-color: #f8fafc;
+    transition: background-color 0.15s ease;
+}
+
+.table-dept tbody tr:hover {
+    background-color: #f1f5f9;
+}
+
+.table-dept td {
+    padding: 0.55rem 0.6rem;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.table-dept td:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+.table-dept td:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.dept-name {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.dept-values {
+    white-space: nowrap;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .main-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1024px) {
+    .kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

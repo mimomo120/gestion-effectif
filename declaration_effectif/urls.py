@@ -11,15 +11,18 @@ urlpatterns=[
     path("valider_operateurs/",views.valider,name="valider_operateurs"),
     path("supprimer/",views.supprimer,name="supprimer"),
     path("afficher_modifier",views.afficher_modifier),
-    path("validation_rg/",views.liste_ru_non_valides_Rg,name="liste_ru_non_valides_rg"),
-    path("affectation_Ru/",views.affectation_Ru,name="liste_affectation"),
+    path("validation_N2/",views.liste_N1_non_valides_N2,name="liste_N1_non_valides_N2"),
+    path("affectation_N1/",views.affectation_N1,name="affectation_N2"),
     path("alerter_ru/", views.envoyer_alert, name="envoyer_alert"),
-    path("Dashboard_DUR/",views.dashboard_Dur,name="DUR"),
-    path("affectation_DUR/",views.affectation_N3,name="affectation_N3"),
-    path("validation_liste",views.liste_N1_non_valides_N3,name="liste_ru_non_valides_dur"),
+    path("Dashboard_N3/",views.dashboard_N3,name="Dashboard_N3"),
+    path("affectation_N3/",views.affectation_N3,name="affectation_N3"),
+    path("validation_liste",views.liste_N1_non_valides_N3,name="liste_N1_non_valides_N3"),
     path("Dashboard_N4/",views.page_N4,name="page_N4"),
     path("affectation_N4/",views.affectation_N4,name="affectation_N4"),
     path("validation_N4/",views.validation_N4,name="validation_N4"),
     path("filter_date/",views.validation_date_N2,name="validation_date"),
     path("filter_date_N3/",views.validation_date_N3,name="validation_date_N3"),
+    path("affectation departements/",views.affectation_HRBP,name="affectation_HRBP"),
+    path("declaration departements/",views.responsables_ru_sans_declaration_du_jour,name="declaration_HRBP")
+    
 ]

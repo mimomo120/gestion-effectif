@@ -10,7 +10,7 @@
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{% static 'utilisateur/css/RU/navbar.css' %}">
+    <link rel="stylesheet" href="{% static 'utilisateur/css/N1/navbar.css' %}">
     {% block css %}{% endblock %}
     <title>{% block title %}{% endblock %}</title>
 </head>
@@ -22,7 +22,7 @@
         <div class="container-fluid px-4">
 
             <!-- Brand/Logo (Position Fixée & Encapuchonnée) -->
-            <a class="navbar-brand d-flex align-items-center gap-3 pe-5  me-4" href="{% url 'DUR' %}">
+            <a class="navbar-brand d-flex align-items-center gap-3 pe-5  me-4" href="{% url 'page_N4' %}">
                 <!-- SVG de l'icône "M" Stellantis -->
                 <svg width="34" height="34" viewBox="0 0 70 55" fill="none" class="flex-shrink-0">
                     <rect x="0" y="40" width="8" height="8" fill="#fbf8f2" rx="1" />
@@ -82,7 +82,7 @@
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N4' %}active fw-bold{% endif %}"
                             href="{% url 'affectation_N4' %}">
-                            <i class="fas fa-history me-2"></i>Historique
+                            <i class="fas fa-history me-2"></i>Affectations
                         </a>
                     </li>
                 </ul>

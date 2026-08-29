@@ -1,0 +1,314 @@
+/* ==========================================
+   MODULA ENTERPRISE - VALIDATION OPERATEURS
+   ========================================== */
+
+:root {
+    --bg-main: #eef2f5;
+    --card-bg: #ffffff;
+    --border-color: #e2e8f0;
+    --text-heading: #0f172a;
+    --text-body: #334155;
+    --text-muted: #64748b;
+    --accent-blue: #2563eb;
+    --accent-blue-hover: #1d4ed8;
+    --accent-green: #10b981;
+    --accent-green-hover: #059669;
+    --accent-red: #ef4444;
+    --accent-red-hover: #dc2626;
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    --border-radius: 16px;
+}
+
+body {
+    background-color: var(--bg-main) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-body);
+}
+
+.contenu {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem 0 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    margin: 0;
+}
+
+.header .time #time {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--accent-blue);
+    padding: 0.4rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    margin: 0;
+}
+
+/* Container principal */
+.table-container {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--card-shadow);
+    overflow-x: auto;
+}
+
+/* Barre de Recherche & Actions */
+.chercher {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.chercher .operateur,
+.chercher .choix {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.875rem;
+    color: var(--text-heading);
+    background-color: #ffffff;
+    outline: none;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.chercher .operateur {
+    flex: 1 1 250px;
+}
+
+.chercher .choix {
+    min-width: 160px;
+}
+
+.chercher .operateur:focus,
+.chercher .choix:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+#ajouter {
+    background-color: var(--accent-blue);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    width: 38px;
+    height: 38px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#ajouter:hover {
+    background-color: var(--accent-blue-hover);
+}
+
+/* Tableau */
+.table-operateurs {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-operateurs th {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #475569;
+    letter-spacing: 0.5px;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #cbd5e1;
+    text-transform: uppercase;
+    text-align: left;
+}
+
+.table-operateurs td {
+    font-size: 0.875rem;
+    color: var(--text-body);
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.table-operateurs tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.table-operateurs tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.cell-mono {
+    font-weight: 700;
+    font-family: monospace;
+    color: var(--text-heading);
+}
+
+/* Badges / Chips */
+.chip-lot {
+    background-color: #eff6ff;
+    color: var(--accent-blue);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+/* Boutons d'action individuels */
+.action-buttons {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.btn-valider,
+.btn-refuser,
+.btn-modifier {
+    border: none;
+    border-radius: 6px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-valider {
+    background-color: #d1fae5;
+    color: var(--accent-green);
+}
+
+.btn-valider:hover {
+    background-color: var(--accent-green);
+    color: #ffffff;
+}
+
+.btn-refuser {
+    background-color: #fee2e2 !important;
+    color: var(--accent-red) !important;
+}
+
+.btn-refuser:hover {
+    background-color: var(--accent-red) !important;
+    color: #ffffff !important;
+}
+
+.btn-modifier {
+    background-color: #f1f5f9;
+    color: var(--text-body);
+}
+
+.btn-modifier:hover {
+    background-color: #cbd5e1;
+    color: var(--text-heading);
+}
+
+/* Boutons globaux en bas de page */
+.alert_btn {
+    background-color: var(--accent-blue);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.alert_btn:hover {
+    background-color: var(--accent-blue-hover);
+}
+
+#btnModifierTout {
+    background-color: var(--accent-red);
+}
+
+#btnModifierTout:hover {
+    background-color: var(--accent-red-hover);
+}
+
+.empty-row {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem !important;
+}
+
+/* Modals */
+.modal-content {
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.25rem 1.5rem;
+}
+
+.modal-title {
+    font-weight: 700;
+    color: var(--text-heading);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-body label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-heading);
+    margin-bottom: 0.4rem;
+    display: block;
+}
+
+.modal-body input,
+.modal-body select {
+    width: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.875rem;
+    outline: none;
+}
+
+.modal-body input:focus,
+.modal-body select:focus {
+    border-color: var(--accent-blue);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-color);
+    padding: 1rem 1.5rem;
+}
+
+/* Checkboxes */
+input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-blue);
+    cursor: pointer;
+}

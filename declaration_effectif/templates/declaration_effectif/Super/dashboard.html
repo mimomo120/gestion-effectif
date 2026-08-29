@@ -1,0 +1,541 @@
+{% extends 'declaration_effectif/Super/navbar.html' %}
+{% load static %}
+
+{% block title %}Gestion des Utilisateurs{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'utilisateur/css/Super/dashboard.css' %}">
+{% endblock %}
+<!-- NOTE: le JS de Bootstrap doit être chargé UNE SEULE FOIS, dans navbar.html avant </body> -->
+
+{% block content %}
+<div class="operateurs-container">
+    <!-- Header -->
+    <header class="header d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>Gestion des Utilisateurs</h1>
+            <div class="time mt-2">
+                <span id="counter" aria-live="polite">Total : {{ total }}</span>
+            </div>
+        </div>
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-ajouter"
+            title="Ajouter un utilisateur">
+            <i class="fas fa-user-plus"></i>
+        </button>
+    </header>
+
+    <!-- Filters Section -->
+    <div class="filters-section mb-4">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <input type="text" placeholder="Rechercher par matricule, IT ou nom..." class="form-control"
+                    id="search">
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="choix">
+                    <option value="">Tous les lots</option>
+                    <option value="A">Lot A</option>
+                    <option value="O">Lot O</option>
+                    <option value="P">Lot P</option>
+                    <option value="E">Lot E</option>
+                    <option value="C">Lot C</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="dpt">
+                    <option value="">Tous les départements</option>
+                    {% for dep in departements %}
+                    <option value="{{ dep.abreviation }}">{{ dep.abreviation }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="role">
+                    <option value="">Tous les rôles</option>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="HRBP">HRBP</option>
+                    <option value="N+1">N+1</option>
+                    <option value="N+2">N+2</option>
+                    <option value="N+3">N+3</option>
+                    <option value="N+4">N+4</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex">
+                <button type="button" class="btn btn-outline-secondary w-100" id="resetBtn">
+                    <i class="fas fa-undo me-1"></i> Effacer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Section -->
+    <div class="table-container">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Utilisateur (IT)</th>
+                        <th>Nom & Prénom</th>
+                        <th>Lot</th>
+                        <th>DPT</th>
+                        <th>Rôle</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="result">
+                    {% for u in utilisateurs %}
+                    <tr data-id="{{ u.pk }}" data-matricule="{{ u.it.matricule|lower }}" data-it="{{ u.it.it|lower }}"
+                        data-nom="{{ u.it.nom_complete|lower }}" data-lot="{{ u.it.lot|default:'' }}"
+                        data-dpt="{{ u.it.departement.abreviation|default:'' }}" data-role="{{ u.role }}">
+                        <td class="cell-matricule">{{ u.it.matricule }}</td>
+                        <td class="cell-utilisateur">{{ u.it.it }}</td>
+                        <td class="cell-nom">{{ u.it.nom_complete }}</td>
+                        <td class="cell-lot"><span>{{ u.it.lot }}</span></td>
+                        <td class="cell-dpt">{{ u.it.departement.abreviation|default:"-" }}</td>
+                        <td class="cell-role"><span>{{ u.role }}</span></td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-modifier" title="Modifier"
+                                data-id="{{ u.pk }}" data-role="{{ u.role }}" data-nom="{{ u.it.nom_complete }}"
+                                data-it="{{ u.it.it }}">
+                                <i class="fas fa-pen"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-supprimer" title="Supprimer"
+                                data-id="{{ u.pk }}" data-nom="{{ u.it.nom_complete }}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2 d-block"></i> Aucun utilisateur trouvé
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-container" id="pagination"></div>
+</div>
+
+<!-- Modal Ajouter Utilisateur (sans départements) -->
+<div class="modal fade" id="modal-ajouter" tabindex="-1" aria-labelledby="modalAjouterLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalAjouterLabel">Ajouter un utilisateur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="nouveau-op-input" class="form-label font-weight-bold">Identifiant (IT)</label>
+                    <input type="text" id="nouveau-op-input" placeholder="Ex: M13-87424" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label for="nouveau-op-role" class="form-label">Rôle <span class="text-muted">(optionnel — calculé
+                            automatiquement si non renseigné)</span></label>
+                    <select class="form-select" id="nouveau-op-role">
+                        <option value="">Déterminer automatiquement</option>
+                        <option value="ADMIN">ADMIN</option>
+                        <option value="HRBP">HRBP</option>
+                    </select>
+                </div>
+
+                <div class="alert2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-success" id="btn-submit-user">
+                    <span id="btn-spinner" class="spinner-border spinner-border-sm d-none" role="status"
+                        aria-hidden="true"></span>
+                    Confirmer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmation Suppression -->
+<div class="modal fade" id="modal-supprimer" tabindex="-1" aria-labelledby="modalSupprimerLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalSupprimerLabel">Confirmer la suppression</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Voulez-vous vraiment supprimer l'utilisateur
+                    <strong id="supprimer-nom-cible"></strong> ? Cette action est irréversible.
+                </p>
+                <div class="alert3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-danger" id="btn-confirmer-suppression">
+                    <span id="btn-spinner-suppr" class="spinner-border spinner-border-sm d-none" role="status"
+                        aria-hidden="true"></span>
+                    Supprimer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Modifier Utilisateur -->
+<div class="modal fade" id="modal-modifier" tabindex="-1" aria-labelledby="modalModifierLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalModifierLabel">Modifier un utilisateur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label text-muted">Identifiant (IT)</label>
+                    <input type="text" class="form-control" id="modifier-it-affiche" disabled>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Nom & Prénom</label>
+                    <input type="text" class="form-control" id="modifier-nom-affiche" disabled>
+                </div>
+                <div class="mb-3">
+                    <label for="modifier-role" class="form-label">Rôle</label>
+                    <select class="form-select" id="modifier-role">
+                        <option value="">Déterminer automatiquement</option>
+                        <option value="ADMIN">ADMIN</option>
+                        <option value="HRBP">HRBP</option>
+                    </select>
+                </div>
+
+                <div class="alert4"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-success" id="btn-confirmer-modification">
+                    <span id="btn-spinner-modif" class="spinner-border spinner-border-sm d-none" role="status"
+                        aria-hidden="true"></span>
+                    Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+{{ block.super }}
+<script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        /* ============================================================
+           FILTRAGE
+           ============================================================ */
+        const searchInput = document.getElementById("search");
+        const lotSelect = document.getElementById("choix");
+        const dptSelect = document.getElementById("dpt");
+        const roleSelect = document.getElementById("role");
+        const resetBtn = document.getElementById("resetBtn");
+        const resultBody = document.getElementById("result");
+
+        function applyFilters() {
+            const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : "";
+            const lotVal = lotSelect ? lotSelect.value : "";
+            const dptVal = dptSelect ? dptSelect.value : "";
+            const roleVal = roleSelect ? roleSelect.value : "";
+
+            const rows = Array.from(resultBody.querySelectorAll("tr[data-id]"));
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const matchesSearch = !searchVal ||
+                    row.dataset.matricule.includes(searchVal) ||
+                    row.dataset.it.includes(searchVal) ||
+                    row.dataset.nom.includes(searchVal);
+                const matchesLot = !lotVal || row.dataset.lot === lotVal;
+                const matchesDpt = !dptVal || row.dataset.dpt === dptVal;
+                const matchesRole = !roleVal || row.dataset.role === roleVal;
+
+                const visible = matchesSearch && matchesLot && matchesDpt && matchesRole;
+                row.style.display = visible ? "" : "none";
+                if (visible) visibleCount++;
+            });
+
+            // Message "aucun résultat" dynamique lié au filtrage
+            let noResultRow = document.getElementById("no-filter-result-row");
+            if (visibleCount === 0 && rows.length > 0) {
+                if (!noResultRow) {
+                    noResultRow = document.createElement("tr");
+                    noResultRow.id = "no-filter-result-row";
+                    noResultRow.innerHTML = `<td colspan="7" class="text-center py-4 text-muted">
+                        <i class="fas fa-filter fa-2x mb-2 d-block"></i> Aucun utilisateur ne correspond aux filtres
+                    </td>`;
+                    resultBody.appendChild(noResultRow);
+                }
+                noResultRow.style.display = "";
+            } else if (noResultRow) {
+                noResultRow.style.display = "none";
+            }
+        }
+
+        [searchInput, lotSelect, dptSelect, roleSelect].forEach(el => {
+            if (!el) return;
+            el.addEventListener("input", applyFilters);
+            el.addEventListener("change", applyFilters);
+        });
+
+        if (resetBtn) {
+            resetBtn.addEventListener("click", () => {
+                if (searchInput) searchInput.value = "";
+                if (lotSelect) lotSelect.value = "";
+                if (dptSelect) dptSelect.value = "";
+                if (roleSelect) roleSelect.value = "";
+                applyFilters();
+            });
+        }
+
+        /* ============================================================
+           AJOUT UTILISATEUR
+           ============================================================ */
+        const roleAjoutSelect = document.getElementById("nouveau-op-role");
+        const btnConfirmer = document.getElementById("btn-submit-user");
+        const alertBox = document.querySelector(".alert2");
+        const spinner = document.getElementById("btn-spinner");
+
+        if (btnConfirmer) {
+            btnConfirmer.addEventListener("click", async () => {
+                const inputIt = document.getElementById("nouveau-op-input").value.trim();
+                const roleVal = roleAjoutSelect ? roleAjoutSelect.value : "";
+
+                if (!inputIt) {
+                    alertBox.innerHTML = `<div class="alert alert-warning py-2 mb-0 mt-2">Veuillez renseigner l'identifiant (IT).</div>`;
+                    return;
+                }
+
+                btnConfirmer.disabled = true;
+                if (spinner) spinner.classList.remove("d-none");
+                alertBox.innerHTML = "";
+
+                try {
+                    const response = await fetch('/utilisateurs/ajouter/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        body: JSON.stringify({
+                            it: inputIt,
+                            role: roleVal
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        alertBox.innerHTML = `
+                            <div class="alert alert-success mt-3 mb-0">
+                                <i class="fas fa-check-circle me-1"></i> <strong>Compte créé avec succès !</strong><br>
+                                Mot de passe temporaire : 
+                                <div class="input-group mt-2">
+                                    <input type="text" class="form-control fw-bold text-center" value="${result.mdp_temporaire}" readonly id="temp-password-input">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('${result.mdp_temporaire}')" title="Copier">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+
+                        document.getElementById("nouveau-op-input").value = "";
+                        if (roleAjoutSelect) roleAjoutSelect.value = "";
+                    } else {
+                        alertBox.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur lors de la création.'}</div>`;
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alertBox.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau ou serveur.</div>`;
+                } finally {
+                    btnConfirmer.disabled = false;
+                    if (spinner) spinner.classList.add("d-none");
+                }
+            });
+        }
+
+        const modalAjouterEl = document.getElementById("modal-ajouter");
+        if (modalAjouterEl) {
+            modalAjouterEl.addEventListener("hidden.bs.modal", () => {
+                if (alertBox) alertBox.innerHTML = "";
+                document.getElementById("nouveau-op-input").value = "";
+                if (roleAjoutSelect) roleAjoutSelect.value = "";
+                if (spinner) spinner.classList.add("d-none");
+            });
+        }
+
+        /* ============================================================
+           SUPPRESSION UTILISATEUR
+           ============================================================ */
+        let idASupprimer = null;
+        const modalSupprimerEl = document.getElementById("modal-supprimer");
+        const modalSupprimer = (typeof bootstrap !== "undefined" && modalSupprimerEl)
+            ? new bootstrap.Modal(modalSupprimerEl) : null;
+        const nomCibleSpan = document.getElementById("supprimer-nom-cible");
+        const alertSuppr = document.querySelector(".alert3");
+        const btnConfirmerSuppression = document.getElementById("btn-confirmer-suppression");
+        const spinnerSuppr = document.getElementById("btn-spinner-suppr");
+
+        resultBody.addEventListener("click", (e) => {
+            const btn = e.target.closest(".btn-supprimer");
+            if (!btn) return;
+            idASupprimer = btn.dataset.id;
+            if (nomCibleSpan) nomCibleSpan.textContent = btn.dataset.nom || "";
+            if (alertSuppr) alertSuppr.innerHTML = "";
+            if (modalSupprimer) modalSupprimer.show();
+        });
+
+        if (btnConfirmerSuppression) {
+            btnConfirmerSuppression.addEventListener("click", async () => {
+                if (!idASupprimer) return;
+
+                btnConfirmerSuppression.disabled = true;
+                if (spinnerSuppr) spinnerSuppr.classList.remove("d-none");
+                if (alertSuppr) alertSuppr.innerHTML = "";
+
+                try {
+                    const response = await fetch(`/utilisateurs/supprimer/${encodeURIComponent(idASupprimer)}/`, {
+                        method: "POST",
+                        headers: { "X-CSRFToken": getCookie("csrftoken") }
+                    });
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        const row = resultBody.querySelector(`tr[data-id="${CSS.escape(idASupprimer)}"]`);
+                        if (row) row.remove();
+
+                        const counterEl = document.getElementById("counter");
+                        if (counterEl) {
+                            const match = counterEl.textContent.match(/\d+/);
+                            if (match) {
+                                counterEl.textContent = `Total : ${Math.max(0, parseInt(match[0], 10) - 1)}`;
+                            }
+                        }
+
+                        applyFilters();
+                        if (modalSupprimer) modalSupprimer.hide();
+                    } else {
+                        alertSuppr.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur lors de la suppression.'}</div>`;
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alertSuppr.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau ou serveur.</div>`;
+                } finally {
+                    btnConfirmerSuppression.disabled = false;
+                    if (spinnerSuppr) spinnerSuppr.classList.add("d-none");
+                }
+            });
+        }
+
+        if (modalSupprimerEl) {
+            modalSupprimerEl.addEventListener("hidden.bs.modal", () => {
+                idASupprimer = null;
+                if (alertSuppr) alertSuppr.innerHTML = "";
+            });
+        }
+
+        /* ============================================================
+           MODIFICATION UTILISATEUR
+           ============================================================ */
+        let idAModifier = null;
+        const modalModifierEl = document.getElementById("modal-modifier");
+        const modalModifier = (typeof bootstrap !== "undefined" && modalModifierEl)
+            ? new bootstrap.Modal(modalModifierEl) : null;
+        const itAfficheInput = document.getElementById("modifier-it-affiche");
+        const nomAfficheInput = document.getElementById("modifier-nom-affiche");
+        const roleModifierSelect = document.getElementById("modifier-role");
+        const alertModif = document.querySelector(".alert4");
+        const btnConfirmerModification = document.getElementById("btn-confirmer-modification");
+        const spinnerModif = document.getElementById("btn-spinner-modif");
+
+        resultBody.addEventListener("click", (e) => {
+            const btn = e.target.closest(".btn-modifier");
+            if (!btn) return;
+            idAModifier = btn.dataset.id;
+            if (itAfficheInput) itAfficheInput.value = btn.dataset.it || "";
+            if (nomAfficheInput) nomAfficheInput.value = btn.dataset.nom || "";
+            if (roleModifierSelect) {
+                const currentRole = btn.dataset.role || "";
+                // Présélectionne ADMIN/HRBP si applicable, sinon "automatique" (cas N+1..N+4)
+                roleModifierSelect.value = (currentRole === "ADMIN" || currentRole === "HRBP") ? currentRole : "";
+            }
+            if (alertModif) alertModif.innerHTML = "";
+            if (modalModifier) modalModifier.show();
+        });
+
+        if (btnConfirmerModification) {
+            btnConfirmerModification.addEventListener("click", async () => {
+                if (!idAModifier) return;
+
+                btnConfirmerModification.disabled = true;
+                if (spinnerModif) spinnerModif.classList.remove("d-none");
+                if (alertModif) alertModif.innerHTML = "";
+
+                try {
+                    const response = await fetch(`/utilisateurs/modifier/${encodeURIComponent(idAModifier)}/`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": getCookie("csrftoken")
+                        },
+                        body: JSON.stringify({
+                            role: roleModifierSelect ? roleModifierSelect.value : ""
+                        })
+                    });
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        const row = resultBody.querySelector(`tr[data-id="${CSS.escape(idAModifier)}"]`);
+                        if (row) {
+                            row.dataset.role = result.role;
+                            const roleSpan = row.querySelector(".cell-role span");
+                            if (roleSpan) roleSpan.textContent = result.role;
+                        }
+                        applyFilters();
+                        if (modalModifier) modalModifier.hide();
+                    } else {
+                        alertModif.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur lors de la modification.'}</div>`;
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alertModif.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau ou serveur.</div>`;
+                } finally {
+                    btnConfirmerModification.disabled = false;
+                    if (spinnerModif) spinnerModif.classList.add("d-none");
+                }
+            });
+        }
+
+        if (modalModifierEl) {
+            modalModifierEl.addEventListener("hidden.bs.modal", () => {
+                idAModifier = null;
+                if (alertModif) alertModif.innerHTML = "";
+            });
+        }
+    });
+</script>
+{% endblock %}

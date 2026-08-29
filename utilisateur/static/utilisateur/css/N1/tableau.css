@@ -1,0 +1,236 @@
+/* ==========================================
+   MODULA DASHBOARD EXACT MATCH STYLING
+   ========================================== */
+
+:root {
+    --page-bg: #eef2f5;
+    --card-bg: #ffffff;
+    --card-kpi-bg: #e5e9f0;
+    --text-title: #1e293b;
+    --text-sub: #64748b;
+    --border-light: #e2e8f0;
+
+    /* Dynamic status colors */
+    --green-badge-bg: #cbf2d6;
+    --green-badge-text: #1b7a37;
+    --blue-badge-bg: #cfe2ff;
+    --blue-badge-text: #084298;
+
+    --success-bg: #cbf2d6;
+    --success: #1b7a37;
+    --danger-bg: #fbdada;
+    --danger: #c0292c;
+}
+body {
+    background-color: var(--page-bg) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-title);
+}
+
+.page-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Header & Date Badge */
+.dashboard-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.date-picker-badge {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4b5563;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* KPI Cards Section */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+}
+
+.kpi-card {
+    background-color: var(--card-kpi-bg);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.kpi-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.kpi-icon {
+    font-size: 1rem;
+}
+
+.icon-reel {
+    color: #2bb24c;
+}
+
+.icon-systeme {
+    color: #2070e0;
+}
+
+.icon-maquette {
+    color: #d9383a;
+}
+
+.kpi-label {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.kpi-value {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0.4rem 0;
+}
+
+.kpi-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+/* ✅ Base de style commune pour tous les badges de variation */
+.badge-vs {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.badge-vs.positive {
+    background-color: var(--success-bg);
+    color: var(--success);
+}
+
+.badge-vs.negative {
+    background-color: var(--danger-bg);
+    color: var(--danger);
+}
+
+.badge-reel {
+    background-color: var(--green-badge-bg);
+    color: var(--green-badge-text);
+}
+
+.badge-systeme {
+    background-color: var(--blue-badge-bg);
+    color: var(--blue-badge-text);
+}
+
+
+/* Charts Section */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+}
+
+.chart-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.chart-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 1rem;
+}
+
+.chart-container {
+    position: relative;
+    height: 250px;
+    width: 100%;
+}
+
+/* Tables Section */
+.table-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.table-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 1rem;
+}
+
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.custom-table th {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #475569;
+    letter-spacing: 0.5px;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #cbd5e1;
+    text-align: left;
+}
+
+.custom-table td {
+    font-size: 0.85rem;
+    color: #334155;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.custom-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.action-btns .btn-icon {
+    background: transparent;
+    border: none;
+    color: #64748b;
+    margin-left: 0.4rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: color 0.15s ease;
+}
+
+.action-btns .btn-icon:hover {
+    color: #0f172a;
+}
+
+/* Responsive adjustment */
+@media (max-width: 992px) {
+
+    .kpi-grid,
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}

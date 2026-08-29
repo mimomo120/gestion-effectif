@@ -1,81 +1,63 @@
-{% extends "utilisateur/navbarN4.html" %}
+{% extends "utilisateur/navbar_N2.html" %}
 {% load static %}
 
-{% block title %}Responsables d'Unité{% endblock %}
+{% block title %}Responsables{% endblock %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'utilisateur/css/RG/liste.css' %}">
+<link rel="stylesheet" href="{% static 'utilisateur/css/N1/liste.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="page-container">
-
-    <!-- En-tête de la page -->
-    <div class="page-header">
-        <div class="header-title">
-            <h1>Responsables</h1>
-            <p>Liste et gestion des responsables sous votre supervision</p>
+<div class="operateurs-container">
+    <header class="header">
+        <h1>Responsables :</h1>
+        <div class="time">
+            <span id="counter" aria-live="polite">{{ operateurs|length }}</span>
         </div>
-        <div class="header-badge">
-            <span class="badge-count">{{ nbr }}</span>
-            <span class="badge-label">Responsable(s)</span>
+    </header>
+
+    <!-- Section Filtres & Recherche -->
+    <div class="filters-section">
+        <div class="filter-group">
+            <input type="text" id="recherche-input" class="filter-input search-input"
+                placeholder="Rechercher par nom, matricule, lot...">
         </div>
     </div>
 
-    <!-- Carte principale contenante -->
-    <div class="card-table">
-
-        <!-- Barre d'outils (Recherche + Filtres) -->
-        <div class="table-toolbar">
-            <div class="search-box">
-                <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="7"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input type="text" id="recherche-input" placeholder="Rechercher par nom, matricule, lot...">
-            </div>
-        </div>
-
-        <!-- Tableau des données -->
-        <div class="table-wrapper">
-            <table class="table-operateurs">
-                <thead>
-                    <tr>
-                        <th>Matricule</th>
-                        <th>Utilisateur</th>
-                        <th>Nom & Prénom</th>
-                        <th>Lot</th>
-                    </tr>
-                </thead>
-                <tbody id="result-operateurs">
-                    {% for operateur in N3 %}
-                    <tr data-matricule="{{ operateur.matricule }}" data-nom="{{ operateur.nom_complete }}"
-                        data-lot="{{ operateur.lot }}">
-                        <td class="col-code">{{ operateur.matricule|default:"-" }}</td>
-                        <td class="col-code">{{ operateur.it|default:"-" }}</td>
-                        <td class="col-name">{{ operateur.nom_complete|default:"-" }}</td>
-                        <td><span class="tag-lot">{{ operateur.lot|default:"-" }}</span></td>
-
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="4" class="empty-row">Aucun responsable d'unité trouvé.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <!-- Section Tableau -->
+    <div class="table-container">
+        <table class="table-operateurs">
+            <thead>
+                <tr>
+                    <th>Matricule</th>
+                    <th>Utilisateur</th>
+                    <th>Nom & Prénom</th>
+                    <th>Lot</th>
+                </tr>
+            </thead>
+            <tbody id="result-operateurs">
+                {% for operateur in N3 %}
+                <tr data-matricule="{{ operateur.matricule }}" data-nom="{{ operateur.nom_complete }}"
+                    data-lot="{{ operateur.lot }}">
+                    <td class="cell-matricule">{{ operateur.matricule|default:"-" }}</td>
+                    <td>{{ operateur.it|default:"-" }}</td>
+                    <td>{{ operateur.nom_complete|default:"-" }}</td>
+                    <td class="cell-lot">{{ operateur.lot|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="empty-row">Aucun responsable d'unité trouvé.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
         <!-- Pagination -->
         <div class="pagination-container">
-            <span class="pagination-info" id="pagination-info">Affichage des éléments</span>
-            <div class="pagination-controls">
-                <button type="button" class="page-btn" id="btn-prev">&laquo; Précédent</button>
-                <span class="pagination-pages" id="pagination-pages">Page 1</span>
-                <button type="button" id="btn-next" class="page-btn">Suivant &raquo;</button>
-            </div>
+            <button type="button" class="page-btn" id="btn-prev" disabled>&laquo; Précédent</button>
+            <span class="page-ellipsis" id="pagination-pages">Page 1</span>
+            <button type="button" class="page-btn" id="btn-next">Suivant &raquo;</button>
         </div>
-
     </div>
 </div>
 {% endblock %}
