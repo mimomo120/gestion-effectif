@@ -69,7 +69,7 @@
                             </td>
                             <td class="text-center">
                                 {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                                <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat|slugify }}"></span>
+                                <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat|slugify }}">
                                     {{ affectation.etat }}
                                 </span>
                                 {% else %}
@@ -130,7 +130,7 @@
                             </td>
                         <td class="text-center">
                             {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                            <span class="badge badge-{{ affectation.badge_class|slugify }}">
+                            <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat|slugify }}">
                                 {{ affectation.etat }}
                             </span>
                             {% else %}
