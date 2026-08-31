@@ -232,3 +232,42 @@ body {
 .text-end {
     text-align: right;
 }
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.page-btn {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.15s ease-in-out;
+    display: inline-block;
+}
+
+.page-btn:hover:not([aria-disabled="true"]) {
+    background-color: #f1f5f9;
+    border-color: #cbd5e1;
+    color: var(--text-heading);
+}
+
+.page-btn.active {
+    background-color: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+}
+
+.page-btn[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

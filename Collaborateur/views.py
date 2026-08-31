@@ -18,21 +18,32 @@ from django.core.paginator import Paginator
 def rec(request):
     it = request.session.get("it")
     der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
-    operateurs =SystEff(it)
+    operateurs = SystEff(it)
 
     if der:
         derniere = der.date
-        changements = declaration_effectif.objects.filter(
-            nature__in=["C", "D"], Ru_id=it, date=derniere
+        historique = (
+            declaration_effectif.objects
+            .filter(Ru_id=it, date__lte=derniere, nature__in=["C", "D", "A", "V"])
+            .order_by("collaborateur_it_id", "-date", "-id")
         )
-        ajouters_valider = declaration_effectif.objects.filter(
-            nature__in=["A","V"], Ru_id=it, date=derniere
-        )
-        liste_ch = set(changements.values_list("collaborateur_it_id", flat=True))
-        liste_a = set(ajouters_valider.values_list("collaborateur_it_id", flat=True))
+
+        dernier_etat_par_collab = {}
+        for decl in historique:
+            if decl.collaborateur_it_id not in dernier_etat_par_collab:
+                dernier_etat_par_collab[decl.collaborateur_it_id] = decl.nature
+
+        liste_exclure = {
+            c for c, nature in dernier_etat_par_collab.items()
+            if nature in ("C", "D")
+        }
+        liste_inclure = {
+            c for c, nature in dernier_etat_par_collab.items()
+            if nature in ("A", "V")
+        }
 
         operateurs_finaux = Collaborateur.objects.filter(
-            (Q(ru_it_id=it) & ~Q(it__in=liste_ch)) | Q(it__in=liste_a)
+            (Q(ru_it_id=it) & ~Q(it__in=liste_exclure)) | Q(it__in=liste_inclure)
         ).exclude(it=it)
     else:
         operateurs_finaux = operateurs
