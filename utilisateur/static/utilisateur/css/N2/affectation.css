@@ -12,9 +12,9 @@
     --accent-blue: #2563eb;
 
     /* Status Badges Colors */
-    --badge-valide-bg: #dcfce7;
+    --badge-valide-bg: #82d7a1c6;
     --badge-valide-text: #15803d;
-    --badge-refuse-bg: #fee2e2;
+    --badge-refuse-bg: #ebb2b2;
     --badge-refuse-text: #b91c1c;
     --badge-warning-bg: #fef3c7;
     --badge-warning-text: #b45309;
@@ -234,9 +234,35 @@ body {
 }
 
 /* Fallback badge */
-.badge:not([class*="badge-"]) {
+/* Badges d'état dynamiques (via filter slugify) */
+.badge {
+    display: inline-block;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    /* Style par défaut appliqué à TOUS les états, y compris ceux non
+       listés explicitement (ex: en_cours, annule, transfert, etc.) */
     background-color: var(--badge-default-bg);
     color: var(--badge-default-text);
+}
+
+.badge-valide {
+    background-color: var(--badge-valide-bg);
+    color: var(--badge-valide-text);
+}
+
+.badge-refuse {
+    background-color: var(--badge-refuse-bg);
+    color: var(--badge-refuse-text);
+}
+
+.badge-non_demarrer,
+.badge-non-demarre,
+.badge-en-attente {
+    background-color: var(--badge-warning-bg);
+    color: var(--badge-warning-text);
 }
 
 .empty-row {

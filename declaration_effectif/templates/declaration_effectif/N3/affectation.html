@@ -128,15 +128,15 @@
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td class="text-center">
-                                {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                                <span class="badge badge-{{ affectation.etat|slugify }}">
-                                    {{ affectation.etat }}
-                                </span>
-                                {% else %}
-                                <span class="badge badge-en-attente">En attente</span>
-                                {% endif %}
-                            </td>
+                        <td class="text-center">
+                            {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
+                            <span class="badge badge-{{ affectation.badge_class|slugify }}">
+                                {{ affectation.etat }}
+                            </span>
+                            {% else %}
+                            <span class="badge badge-en-attente">En attente</span>
+                            {% endif %}
+                        </td>
                         </tr>
                         {% empty %}
                         <tr>

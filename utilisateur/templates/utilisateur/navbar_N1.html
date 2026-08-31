@@ -185,29 +185,29 @@
         {% if request.session.role == "N+3" %}
         <nav class="sub-navbar border-top">
             <div class="container-fluid px-4">
-                <ul class="navbar-nav me-auto align-items-lg-center">
+                <ul class="nav nav-tabs border-0">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'Dashboard_N3' %}active fw-bold{% endif %}"
+                        <a class="nav-link {% if request.resolver_match.url_name == 'Dashboard_N3' %}active{% endif %}"
                             href="{% url 'Dashboard_N3' %}">
                             <i class="fas fa-home me-2"></i>Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N2_par_N3' %}active fw-bold{% endif %}"
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N2_par_N3' %}active{% endif %}"
                             href="{% url 'liste_N2_par_N3' %}">
                             <i class="fas fa-users me-2"></i>Responsables
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N1_non_valides_N3' %}active fw-bold{% endif %}"
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N1_non_valides_N3' %}active{% endif %}"
                             href="{% url 'liste_N1_non_valides_N3' %}">
-                            <i class="fas fa-check-circle me-2"></i>Validation du jour
+                            <i class="fas fa-calendar-check me-2"></i>Validation du jour
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N3' %}active fw-bold{% endif %}"
+                        <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N3' %}active{% endif %}"
                             href="{% url 'affectation_N3' %}">
-                            <i class="fas fa-history me-2"></i>Affectations
+                            <i class="fas fa-link me-2"></i>Affectation
                         </a>
                     </li>
                 </ul>

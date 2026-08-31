@@ -13,34 +13,48 @@ from datetime import date , datetime
 from django.core.paginator import Paginator
 
 #-------------------------------------------------------#
-#Cette fct return les operateurs d'un responsable N+1 
+#Cette fct return les operateurs d'un responsable N+1
 #-------------------------------------------------------#
 def rec(request):
     it = request.session.get("it")
-    der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
+
+    der = (
+        declaration_effectif.objects
+        .filter(Q(Ru_id=it) | Q(nv_Ru_id=it, nature="C"))
+        .order_by("-date")
+        .first()
+    )
     operateurs = SystEff(it)
 
     if der:
         derniere = der.date
+
         historique = (
             declaration_effectif.objects
-            .filter(Ru_id=it, date__lte=derniere, nature__in=["C", "D", "A", "V"])
+            .filter(
+                Q(Ru_id=it, nature__in=["C", "D", "A", "V"]) |
+                Q(nv_Ru_id=it, nature="C"),
+                date__lte=derniere,
+            )
             .order_by("collaborateur_it_id", "-date", "-id")
         )
 
         dernier_etat_par_collab = {}
         for decl in historique:
-            if decl.collaborateur_it_id not in dernier_etat_par_collab:
-                dernier_etat_par_collab[decl.collaborateur_it_id] = decl.nature
+            cid = decl.collaborateur_it_id
+            if cid in dernier_etat_par_collab:
+                continue
+            if decl.nature == "C":
+                etat = "inclure" if decl.nv_Ru_id == it else "exclure"
+            elif decl.nature == "D":
+                etat = "exclure"
+            else:
+                etat = "inclure"
 
-        liste_exclure = {
-            c for c, nature in dernier_etat_par_collab.items()
-            if nature in ("C", "D")
-        }
-        liste_inclure = {
-            c for c, nature in dernier_etat_par_collab.items()
-            if nature in ("A", "V")
-        }
+            dernier_etat_par_collab[cid] = etat
+
+        liste_exclure = {c for c, etat in dernier_etat_par_collab.items() if etat == "exclure"}
+        liste_inclure = {c for c, etat in dernier_etat_par_collab.items() if etat == "inclure"}
 
         operateurs_finaux = Collaborateur.objects.filter(
             (Q(ru_it_id=it) & ~Q(it__in=liste_exclure)) | Q(it__in=liste_inclure)
@@ -50,9 +64,9 @@ def rec(request):
 
     return operateurs_finaux
 
-#-------------------------------------------------------#
+#----------------------------------------------------------------------#
 #Cette fct return les operateurs reel d'un responsable N+1  ds un jour
-#-------------------------------------------------------#
+#----------------------------------------------------------------------#
 def reelEff(it, date_reference=None):
     if not it:
         return Collaborateur.objects.none()
