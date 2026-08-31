@@ -113,18 +113,14 @@ def validation_view(request):
         status = True
         operateurs_finaux = operateurs_finaux_qs
     else:
-        # rec(request) retourne probablement un QuerySet de Collaborateur ou une liste d'objets
         candidats = rec(request)
 
-        # si c'est un QuerySet de Collaborateur, on peut exclure côté DB
         if hasattr(candidats, 'exclude'):
             operateurs_finaux = candidats.exclude(it__in=manager_direct_its)
         else:
-            # sinon c'est une liste -> filtrer en python
+            
             operateurs_finaux = [c for c in candidats if getattr(c, 'it', None) not in manager_direct_its]
         status = False
-
-    # nombre (gérer QuerySet vs liste)
     if hasattr(operateurs_finaux, 'count'):
         nbr = operateurs_finaux.count()
     else:
@@ -855,7 +851,6 @@ def validation_N4(request):
     )
 
     # 3. Récupérer les collaborateurs N1 qui n'ont PAS ENCORE déclaré aujourd'hui
-    # On utilise select_related pour précharger leur département / unité si vous l'affichez dans le template
     non_valides = Collaborateur.objects.filter(
         it__in=n1_its
     ).exclude(
@@ -924,7 +919,7 @@ def validation_date_N3(request):
     is_today = (query_date == timezone.localdate()) if query_date else False
     status = not is_today
 
-    # 1. Récupération des N+1 gérés (CORRIGÉ : liste_N1_pr_N3 au lieu de Ru_Rg)
+    # 1. Récupération des N+1 gérés
     liste_n1 = liste_N1_pr_N3(it)
 
     # 2. Récupération des RU ayant déjà fait leur déclaration
@@ -937,7 +932,7 @@ def validation_date_N3(request):
             ).values_list("Ru_id", flat=True)
         )
 
-    # 3. Soustraction entre les 2 sets Python (les IT non encore déclarés)
+    # 3. Soustraction entre les 2 sets Python
     liste_it_manquants = liste_n1 - declarations_faites
 
     # 4. Filtrage des collaborateurs correspondants
@@ -966,7 +961,7 @@ def get_badge_class(etat):
     else:
         return "badge-en-attente"
 
-
+@role_required(['HRBP', 'ADMIN'])
 def affectation_HRBP(request):
     it = request.session.get("it")
     status = request.GET.get("status", "all")
@@ -1016,6 +1011,7 @@ def affectation_HRBP(request):
 
 
 @never_cache
+@role_required('HRBP')
 def responsables_ru_sans_declaration_du_jour(request):
     today = timezone.now().date()
     it = request.session.get("it")

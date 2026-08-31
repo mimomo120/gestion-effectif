@@ -38,6 +38,10 @@
                 <label for="date">Date de déclaration :</label>
                 <input type="date" class="date-input" id="date">
             </div>
+            <div class="name-filter-group">
+                <label for="filtre-nom">Rechercher :</label>
+                <input type="text" class="name-input" id="filtre-nom" placeholder="Nom, matricule ou utilisateur...">
+            </div>
         </div>
 
         <!-- Tableau des données -->
@@ -75,6 +79,9 @@
                     {% endfor %}
                 </tbody>
             </table>
+            <p id="empty-search-row" class="empty-row text-center" style="display:none; padding: 1rem;">
+                Aucun résultat pour cette recherche.
+            </p>
             {% if page_obj.paginator.num_pages > 1 %}
             <div class="pagination-container">
                 {% if page_obj.has_previous %}
@@ -84,7 +91,7 @@
                 {% else %}
                 <span class="page-btn" aria-disabled="true">&laquo; Précédent</span>
                 {% endif %}
-            
+
                 {% for num in page_obj.paginator.page_range %}
                 {% if num == page_obj.number %}
                 <span class="page-btn active">{{ num }}</span>
@@ -93,7 +100,7 @@
                     {{ num }}</a>
                     {% endif %}
                     {% endfor %}
-            
+
                     {% if page_obj.has_next %}
                     <a class="page-btn"
                         href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">Suivant
@@ -119,9 +126,11 @@
 
     const csrftoken = getCookie('csrftoken');
     const dateInput = document.getElementById("date");
+    const nameInput = document.getElementById("filtre-nom");
     const resultContainer = document.getElementById("result");
     const head = document.getElementById("titre");
     const countRu = document.getElementById("count-ru");
+    const emptySearchRow = document.getElementById("empty-search-row");
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -131,6 +140,16 @@
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+
+    // Enlève les accents pour une recherche plus tolérante
+    // (ex: "eleve" retrouve "Élève")
+    function normaliser(str) {
+        return String(str)
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim();
     }
 
     document.addEventListener("DOMContentLoaded", function () {
@@ -145,6 +164,45 @@
 
     if (dateInput) {
         dateInput.addEventListener("change", filterByDate);
+    }
+
+    if (nameInput) {
+        nameInput.addEventListener("input", filterByName);
+    }
+
+    // --------------------------------------------------------------
+    // Filtre par nom / matricule / utilisateur : purement côté client,
+    // s'applique sur les lignes déjà affichées (rendu initial ou après
+    // un rechargement AJAX suite à un changement de date).
+    // --------------------------------------------------------------
+    function filterByName() {
+        const terme = normaliser(nameInput.value);
+        const lignes = resultContainer.querySelectorAll("tr");
+        let visibles = 0;
+
+        lignes.forEach(function (ligne) {
+            // Ignore les lignes "vide" (colspan) qui n'ont pas de vraies cellules de données
+            if (ligne.querySelector("td.empty-row") || ligne.cells.length < 3) {
+                return;
+            }
+
+            const matricule = ligne.cells[0] ? ligne.cells[0].textContent : "";
+            const utilisateur = ligne.cells[1] ? ligne.cells[1].textContent : "";
+            const nom = ligne.cells[2] ? ligne.cells[2].textContent : "";
+
+            const correspond =
+                terme === "" ||
+                normaliser(matricule).includes(terme) ||
+                normaliser(utilisateur).includes(terme) ||
+                normaliser(nom).includes(terme);
+
+            ligne.style.display = correspond ? "" : "none";
+            if (correspond) visibles++;
+        });
+
+        if (emptySearchRow) {
+            emptySearchRow.style.display = (terme !== "" && visibles === 0) ? "block" : "none";
+        }
     }
 
     async function filterByDate() {
@@ -238,6 +296,8 @@
                 <td colspan="6" class="empty-row text-center" style="color: #ef4444;">Erreur lors du chargement des données.</td>
             </tr>
         `;
+        } finally {
+            filterByName();
         }
     }
 

@@ -150,9 +150,7 @@ def register_view(request):
     }
 )
 
-        return render(request, "utilisateur/login.html", {
-            'success': "Compte créé avec succès. Vous pouvez vous connecter."
-        })
+        return render(request, "utilisateur/login.html")
 
     return render(request, "utilisateur/register.html")
 
@@ -275,8 +273,8 @@ def tableau(request):
     Cs = counts_lot_ls.get("C", 0)
 
     # Écarts vs Maquette
-    diff_r_m = maquette - reel
-    diff_s_m = maquette - syste
+    diff_r_m = reel - maquette
+    diff_s_m =  syste - maquette
 
     der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
     date_declaration = der.date if der else timezone.localdate()
@@ -319,7 +317,7 @@ def tableau(request):
     }
     return render(request, "declaration_effectif/N1/dashboard_N1.html", context)
 
-#verifier que Ru existe
+
 # ============================================================
 # verifier : endpoint AJAX qui vérifie si un IT donné correspond
 # bien à un utilisateur ayant le rôle N+1 (utilisé typiquement pour
@@ -338,7 +336,6 @@ def deconnecter(request):
     request.session.flush()
     return redirect("login")
 
-#rederiger vers la page dashboard du Rg
 # ============================================================
 # dashboard_rg : tableau de bord consolidé d'un N+2 (RG) — agrège
 # les effectifs système/réel/maquette de tous les RU (N+1) sous sa
@@ -539,7 +536,7 @@ def notifications(request):
         "notifications": alert,
         "nb_notifications": nv,
     }
-
+@role_required('SUPER')
 def SUPER_dashboard(request):
         it=request.session.get("it")
         util = utilisateur.objects.all().exclude(it_id=it)
@@ -551,6 +548,7 @@ def generer_mot_de_passe_temporaire(longueur=12):
     alphabet = string.ascii_letters + string.digits + "!@#$%"
     return ''.join(secrets.choice(alphabet) for _ in range(longueur))
 
+@role_required('SUPER')
 def ajouter_user(request):
     if request.method != "POST":
         return JsonResponse({"error": "Méthode non autorisée."}, status=405)
@@ -605,7 +603,7 @@ def ajouter_user(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
+@role_required('SUPER')
 def supprimer_user(request, id):
     if request.method != "POST":
         return JsonResponse({"error": "Méthode non autorisée."}, status=405)
@@ -621,7 +619,7 @@ def supprimer_user(request, id):
 
     util.delete()
     return JsonResponse({"message": "Utilisateur supprimé avec succès."}, status=200)
-
+@role_required('SUPER')
 def modifier_user(request, id):
     if request.method != "POST":
         return JsonResponse({"error": "Méthode non autorisée."}, status=405)
@@ -702,7 +700,7 @@ def calculer_evolution_effectif_reel(departements, jours=30):
         date_courante += timedelta(days=1)
 
     return {"labels": labels, "valeurs": valeurs}
-
+@role_required(["HRBP", "DRH", "ADMIN"])
 def dashboard_rh(request):
     it = request.session.get("it")
     role = request.session.get("role")
@@ -716,9 +714,9 @@ def dashboard_rh(request):
         y_max = 6800
         departements_qs = Departement.objects.filter(DRH_id=it)
     elif role == "ADMIN":
-                y_min = 3530
-                y_max = 3500
-                departements_qs = Departement.objects.filter(ADMIN_id=it)
+        y_min = 3500
+        y_max = 3530
+        departements_qs = Departement.objects.filter(ADMIN_id=it)
     else:
         # rôle absent ou inconnu : valeurs par défaut sûres, pas de crash
         y_min = 0
@@ -730,19 +728,25 @@ def dashboard_rh(request):
     # --- Totaux globaux ---
     colSyst = Collaborateur.objects.filter(departement_id__in=departements).count()
 
-    depart = declaration_effectif.objects.filter(
-        collaborateur_it__departement_id__in=departements,
-        nature="D"
+    declarations_activite = (
+        declaration_effectif.objects
+        .filter(collaborateur_it__departement_id__in=departements, nature__in=["D", "A"])
+        .order_by("collaborateur_it_id", "-date", "-id")
     )
-    liste_D = set(depart.values_list("collaborateur_it_id", flat=True))
+
+    dernier_etat_activite = {}
+    for decl in declarations_activite:
+
+        if decl.collaborateur_it_id not in dernier_etat_activite:
+            dernier_etat_activite[decl.collaborateur_it_id] = decl.nature
+
+    liste_D = {c for c, nature in dernier_etat_activite.items() if nature == "D"}
 
     colReel = Collaborateur.objects.filter(
         departement_id__in=departements
     ).exclude(it__in=liste_D).count()
 
     maquette = departements_qs.aggregate(total=Sum("maquette"))["total"] or 0
-
-    # --- Détail PAR département (optimisé : 4 requêtes au total, peu importe le nb de dpts) ---
 
     # Système par département
     syst_par_dept = dict(
@@ -752,7 +756,7 @@ def dashboard_rh(request):
         .values_list("departement_id", "total")
     )
 
-    # Réel par département
+    # Réel par département (mêmes liste_D corrigée)
     reel_par_dept = dict(
         Collaborateur.objects.filter(departement_id__in=departements)
         .exclude(it__in=liste_D)
@@ -761,7 +765,7 @@ def dashboard_rh(request):
         .values_list("departement_id", "total")
     )
 
-    # Nombre de départs ("D") par département
+    # Nombre de départs ("D" en dernier état) par département
     depart_par_dept = dict(
         Collaborateur.objects.filter(departement_id__in=departements, it__in=liste_D)
         .values("departement_id")
@@ -790,20 +794,17 @@ def dashboard_rh(request):
 
     graphe = calculer_evolution_effectif_reel(departements)
 
-    # --------------------------------------------------------------
-    # Liste des personnes en départ (10 plus récentes) — nature = "D"
-    # --------------------------------------------------------------
     liste_departs = (
-        depart
+        declaration_effectif.objects
+        .filter(
+            collaborateur_it__departement_id__in=departements,
+            nature="D",
+            collaborateur_it_id__in=liste_D,
+        )
         .select_related("collaborateur_it", "collaborateur_it__departement", "Ru")
         .order_by("-date")[:10]
     )
 
-    # --------------------------------------------------------------
-    # Liste des changements d'affectation (10 plus récents) — nature = "C"
-    # (même modèle declaration_effectif, Ru = ancien responsable,
-    #  nv_Ru = nouveau responsable)
-    # --------------------------------------------------------------
     liste_changements = (
         declaration_effectif.objects.filter(
             collaborateur_it__departement_id__in=departements,

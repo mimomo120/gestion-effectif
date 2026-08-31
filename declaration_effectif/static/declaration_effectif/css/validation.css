@@ -271,3 +271,72 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
 }
+/* --------------------------------------------------------------
+   Barre d'outils : alignement des deux groupes de filtres
+   -------------------------------------------------------------- */
+.table-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.date-filter-group,
+.name-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.date-filter-group label,
+.name-filter-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+/* --------------------------------------------------------------
+   Champ de recherche par nom / matricule / utilisateur
+   -------------------------------------------------------------- */
+.name-filter-group {
+    position: relative;
+    flex: 1;
+    max-width: 320px;
+}
+
+.name-input {
+    width: 100%;
+    padding: 0.5rem 0.875rem 0.5rem 2.25rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    color: #0f172a;
+    background-color: #ffffff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%3E%3C/line%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 0.75rem center;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.name-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.name-input::placeholder {
+    color: #94a3b8;
+}
+
+/* Responsive : la recherche passe en pleine largeur sur petit écran */
+@media (max-width: 640px) {
+    .table-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .name-filter-group {
+        max-width: none;
+    }
+}

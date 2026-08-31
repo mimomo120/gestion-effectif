@@ -33,12 +33,12 @@
                 <span class="kpi-label">Effectif Réel</span>
             </div>
             <div class="kpi-value">{{ reel|default:"0" }}</div>
-            {% if diff_r_m < 0 %} <div class="badge-vs positive">
-                <i class="fas fa-arrow-up me-1"></i>+{{ diff_r_m|add:"-1"|stringformat:"d"|slice:"1:" }} vs Maquette
+            {% if diff_r_m > 0 %} <div class="badge-vs positive">
+                <i class="fas fa-arrow-up me-1"></i> +{{ diff_r_m|default:"0" }} vs Maquette
         </div>
         {% else %}
         <div class="badge-vs negative">
-            <i class="fas fa-arrow-down me-1"></i>-{{ diff_r_m }} vs Maquette
+            <i class="fas fa-arrow-down me-1"></i>{{ diff_r_m|default:"0" }} vs Maquette
         </div>
         {% endif %}
     </div>
@@ -50,12 +50,12 @@
             <span class="kpi-label">Effectif Système</span>
         </div>
         <div class="kpi-value">{{ syste|default:"0" }}</div>
-        {% if diff_s_m < 0 %} <div class="badge-vs positive">
-            <i class="fas fa-arrow-up me-1"></i>+{{ diff_s_m|add:"-1"|stringformat:"d"|slice:"1:" }} vs Maquette
+        {% if diff_s_m > 0 %} <div class="badge-vs positive">
+            <i class="fas fa-arrow-up me-1"></i>+{{ diff_s_m|default:"0" }} vs Maquette
     </div>
     {% else %}
     <div class="badge-vs negative">
-        <i class="fas fa-arrow-down me-1"></i>-{{ diff_s_m }} vs Maquette
+        <i class="fas fa-arrow-down me-1"></i>{{ diff_s_m }} vs Maquette
     </div>
     {% endif %}
 </div>

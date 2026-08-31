@@ -5,6 +5,7 @@ from django.db import transaction
 from .forms import MultipleImportForm
 from Collaborateur.models import Collaborateur, Departement, Unite
 from declaration_effectif.models import historique
+from utilisateur.decorators import role_required
 # ------------------------------------------------------------------
 # FONCTIONS AUXILIAIRES SIMPLIFIÉES
 # ------------------------------------------------------------------
@@ -338,8 +339,9 @@ def importer_changements(df_chg, erreurs):
 # ------------------------------------------------------------------
 # VUE PRINCIPALE
 # ------------------------------------------------------------------
-
+@role_required(['HRBP', 'ADMIN','SUPER'])
 def importer_fichiers_combines(request):
+    list(messages.get_messages(request))
     role = request.session.get('role')
     template_de_base = {
         "HRBP":  "utilisateur/navbar_N1.html",
@@ -360,7 +362,7 @@ def importer_fichiers_combines(request):
     f_collab = request.FILES.get("fichier_collaborateur")
     f_unite = request.FILES.get("fichier_unite")
     f_dpt = request.FILES.get("fichier_departement")
-    f_chg = request.FILES.get("fichier_changement")  # <-- nouveau
+    f_chg = request.FILES.get("fichier_changement")  
 
     if not (f_collab or f_unite or f_dpt or f_chg):
         messages.error(request, "Veuillez fournir au moins un fichier à importer.")

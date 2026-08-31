@@ -79,10 +79,10 @@ def reelEff(it, date_reference=None):
         # Base : opérateurs déjà rattachés en BDD, hors ceux partis/changés
         operateurs_qs = base_qs.filter(~Q(it__in=liste_ch)).exclude(it=it)
 
-        # Ajoutés : peu importe leur ru_it_id actuel en base
+        # Ajoutés :
         ajout_qs = Collaborateur.objects.filter(it__in=liste_a).exclude(it=it)
 
-        # Validés : idem, peu importe leur ru_it_id actuel en base
+        # Validés :
         valide_qs = Collaborateur.objects.filter(it__in=liste_v).exclude(it=it)
 
         # Union des trois ensembles, dédupliquée
@@ -237,7 +237,6 @@ def filter_validation(request):
         .values_list('it', flat=True)
     )
     operateurs = operateurs.exclude(it__in=manager_direct_its)
-    # --- fin exclusion ---
 
     if ajoutes:
         extra = Collaborateur.objects.filter(it__in=ajoutes)
@@ -268,25 +267,40 @@ def filter_validation(request):
 
 def operateur(request):
     it = request.GET.get('q', '').strip()
-    utilisateur=request.session.get("it")
+    utilisateur = request.session.get("it")
+
     try:
         op = Collaborateur.objects.get(it=it)
     except Collaborateur.DoesNotExist:
         return JsonResponse({"error": "Opérateur introuvable."}, status=404)
     except Collaborateur.MultipleObjectsReturned:
         return JsonResponse({"error": "Plusieurs opérateurs trouvés."}, status=409)
-    if it == utilisateur :
+
+    if it == utilisateur:
         return JsonResponse({"error": "Vous ne pouvez pas utiliser votre utilisateur."}, status=404)
-    if op.ru_it and op.ru_it.it == request.session.get("it"):
+    derniere_decl = (
+        declaration_effectif.objects
+        .filter(collaborateur_it_id=it)
+        .order_by("-date", "-id")
+        .first()
+    )
+    a_declare_depart = derniere_decl is not None and derniere_decl.nature == "D"
+    if not a_declare_depart and op.ru_it_id == utilisateur:
         return JsonResponse({"error": "Cet opérateur appartient déjà à votre lot."}, status=400)
-    operateur=Collaborateur.objects.filter(ru_it_id=it).count()
-    if operateur > 0 :
-        return JsonResponse({"error": "C'est pas un operateur "}, status=400)
+
+    operateur_count = Collaborateur.objects.filter(ru_it_id=it).count()
+    if operateur_count > 0:
+        return JsonResponse(
+            {"error": "Ce n'est pas un opérateur (il est responsable d'autres collaborateurs)."},
+            status=400
+        )
+
     data = {
         "matricule": op.matricule,
-        "it":op.it,
+        "it": op.it,
         "nom_complete": op.nom_complete,
-        "lot": op.lot}
+        "lot": op.lot,
+    }
     return JsonResponse(data)
 
 #-------------------------------------------------------#

@@ -10,14 +10,14 @@ urlpatterns = [
     path('dashboard/',views.tableau,name='dashboard_N1'),
     path("verifier/",views.verifier,name="verifier"),
     path("deconnecter/",views.deconnecter,name="deconnecter"),
-    path("Dashboard/",views.dashboard_N2,name="dashboard_N2"),
+    path("Dashboard/N2/",views.dashboard_N2,name="dashboard_N2"),
     path('changer-role/<str:nouveau_role>/', views.changer_role, name='changer_role'),
     path("votre-url-alertes/",views.alerts,name="votre-url-alertes"),
-    path("Admin_Dashboard/",views.SUPER_dashboard,name="SUPER"),
+    path("Dashboard/Admin/",views.SUPER_dashboard,name="SUPER"),
     path("utilisateurs/ajouter/",views.ajouter_user,name="ajouter_user"),
     path("utilisateurs/supprimer/<str:id>/", views.supprimer_user, name="supprimer_user"),
     path("utilisateurs/modifier/<str:id>/", views.modifier_user, name="modifier_user"),
-    path("dashboard_rh/", views.dashboard_rh, name="dashboard"),
+    path("Dashboard/", views.dashboard_rh, name="dashboard"),
     path('utilisateurs/changer-mot-de-passe/', views.changer_mot_de_passe, name='changer_mot_de_passe'),
 ]
 
