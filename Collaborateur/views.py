@@ -369,6 +369,49 @@ def liste_N1_par_N2(request):
     col=Collaborateur.objects.filter(ru_it_id=it).exclude(it__in=n1)
     return render(request, "Collaborateur/N2/liste_N1.html", {"operateurs": operat,"col":col})
 
+def rechercher_N1_par_N2(request):
+    it = request.session.get("it")
+    q = request.GET.get("q", "").strip()
+    lot = request.GET.get("choix", "").strip()
+    page_number = request.GET.get("page", 1)
+
+    # Même logique que Ru_Rg, en queryset filtrable
+    collab = Collaborateur.objects.filter(ru_it_id=it).exclude(it=it)
+    liste = []
+    for c in collab:
+        if Collaborateur.objects.filter(Q(ru_it_id=c.it) & ~Q(it=it)).count() > 0:
+            liste.append(c.it)
+
+    resultat = Collaborateur.objects.filter(it__in=liste)
+
+    if q:
+        resultat = resultat.filter(
+            Q(matricule__icontains=q) | Q(nom_complete__icontains=q)
+        )
+    if lot:
+        resultat = resultat.filter(lot=lot)
+
+    paginator = Paginator(resultat, 15)
+    page_obj = paginator.get_page(page_number)
+
+    results = [
+        {
+            "matricule": op.matricule,
+            "it": op.it,
+            "nom_complete": op.nom_complete,
+            "lot": op.lot,
+        }
+        for op in page_obj
+    ]
+
+    return JsonResponse({
+        "results": results,
+        "count": paginator.count,
+        "page": page_obj.number,
+        "num_pages": paginator.num_pages,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+    })
 #-------------------------------------------------------#
 #Cette fct return la liste des N+2 d'un N+3
 #-------------------------------------------------------#
@@ -383,6 +426,53 @@ def Rg_Dur(it):
     resultat=Collaborateur.objects.filter(it__in=liste)
     return (resultat)
 
+from django.core.paginator import Paginator
+from django.http import JsonResponse
+from django.db.models import Q
+
+def rechercher_N2_par_N3(request):
+    it = request.session.get("it")
+    q = request.GET.get("q", "").strip()
+    lot = request.GET.get("choix", "").strip()
+    page_number = request.GET.get("page", 1)
+
+    # Même logique que Rg_Dur, mais en queryset filtrable
+    sous_it = Collaborateur.objects.filter(Q(ru_it_id=it) & ~Q(it=it))
+    liste = []
+    for c in sous_it:
+        if Ru_Rg(c.it).count() > 0:
+            liste.append(c.it)
+
+    resultat = Collaborateur.objects.filter(it__in=liste)
+
+    if q:
+        resultat = resultat.filter(
+            Q(matricule__icontains=q) | Q(nom_complete__icontains=q)
+        )
+    if lot:
+        resultat = resultat.filter(lot=lot)
+
+    paginator = Paginator(resultat, 15)
+    page_obj = paginator.get_page(page_number)
+
+    results = [
+        {
+            "matricule": op.matricule,
+            "it": op.it,
+            "nom_complete": op.nom_complete,
+            "lot": op.lot,
+        }
+        for op in page_obj
+    ]
+
+    return JsonResponse({
+        "results": results,
+        "count": paginator.count,
+        "page": page_obj.number,
+        "num_pages": paginator.num_pages,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+    })
 #-------------------------------------------------------#
 #Cette fct return la liste des N+1 pour N+3
 #-------------------------------------------------------#

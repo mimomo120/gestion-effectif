@@ -12,5 +12,7 @@ urlpatterns = [
             path("liste_N1_par_N2/",views.liste_N1_par_N2,name="liste_N1_par_N2"),
             path("liste_N2_par_N3/",views.liste_N2_par_N3,name="liste_N2_par_N3"),
             path("liste_N3/",views.respo_N4,name="liste_N3"),
-            path("verifier",views.verifier,name="verifier")
+            path("verifier",views.verifier,name="verifier"),
+            path("rechercher-responsables", views.rechercher_N2_par_N3, name="rechercher_N2_par_N3"),
+            path("rechercher-N1-par-N2", views.rechercher_N1_par_N2, name="rechercher_N1_par_N2"),
             ]

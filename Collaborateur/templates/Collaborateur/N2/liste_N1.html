@@ -4,6 +4,8 @@
 {% block title %}Responsables{% endblock %}
 
 {% block css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="{% static 'utilisateur/css/N1/liste.css' %}">
 {% endblock %}
 
@@ -12,19 +14,32 @@
     <header class="header">
         <h1>Responsables d'Unité</h1>
         <div class="time">
-            <span id="counter" aria-live="polite">{{ operateurs|length }}</span>
+            <span id="counter" aria-live="polite">Total : {{ operateurs|length }}</span>
         </div>
     </header>
 
-    <!-- Section Filtres & Recherche -->
+    <!-- Filters Section -->
     <div class="filters-section">
         <div class="filter-group">
-            <input type="text" id="recherche-input" class="filter-input search-input"
-                placeholder="Rechercher par nom, matricule, lot...">
+            <input type="text" placeholder="Rechercher par matricule ou nom" class="filter-input search-input"
+                id="search">
+
+            <select class="filter-select" id="choix">
+                <option value="">Tous les lots</option>
+                <option value="A">Lot A</option>
+                <option value="O">Lot O</option>
+                <option value="P">Lot P</option>
+                <option value="E">Lot E</option>
+                <option value="C">Lot C</option>
+            </select>
+
+            <button class="btn btn-reset" id="resetBtn">
+                <i class="fas fa-redo me-2"></i>Réinitialiser
+            </button>
         </div>
     </div>
 
-    <!-- Section Tableau -->
+    <!-- Table Section -->
     <div class="table-container">
         <table class="table-operateurs">
             <thead>
@@ -35,49 +50,169 @@
                     <th>Lot</th>
                 </tr>
             </thead>
-            <tbody id="result-operateurs">
+            <tbody id="result">
                 {% for operateur in operateurs %}
-                <tr data-matricule="{{ operateur.matricule }}" data-nom="{{ operateur.nom_complete }}"
-                    data-lot="{{ operateur.lot }}">
+                <tr class="table-row">
                     <td class="cell-matricule">{{ operateur.matricule|default:"-" }}</td>
-                    <td>{{ operateur.it|default:"-" }}</td>
-                    <td>{{ operateur.nom_complete|default:"-" }}</td>
+                    <td class="cell-utilisateur">{{ operateur.it|default:"-" }}</td>
+                    <td class="cell-nom">{{ operateur.nom_complete|default:"-" }}</td>
                     <td class="cell-lot">{{ operateur.lot|default:"-" }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="empty-row">Aucun responsable d'unité trouvé.</td>
+                    <td colspan="4" class="empty-row">
+                        <i class="fas fa-inbox"></i> Aucun responsable d'unité trouvé
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-
-        <!-- Pagination -->
-        <div class="pagination-container">
-            <button type="button" class="page-btn" id="btn-prev" disabled>&laquo; Précédent</button>
-            <span class="page-ellipsis" id="pagination-pages">Page 1</span>
-            <button type="button" class="page-btn" id="btn-next">Suivant &raquo;</button>
-        </div>
     </div>
+
+    <!-- Pagination -->
+    <div class="pagination-container" id="pagination"></div>
 </div>
 {% endblock %}
 
 {% block script %}
+{{ block.super }}
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const input = document.getElementById("recherche-input");
-        const tbody = document.getElementById("result-operateurs");
-        const rows = Array.from(tbody.querySelectorAll("tr[data-matricule]"));
+    document.addEventListener("DOMContentLoaded", () => {
+        const resultat = document.getElementById("result");
+        const counter = document.getElementById("counter");
+        const searchInput = document.getElementById("search");
+        const lotSelect = document.getElementById("choix");
+        const resetBtn = document.getElementById("resetBtn");
+        const pagination = document.getElementById("pagination");
 
-        if (!input || !tbody) return;
+        let currentPage = 1;
 
-        input.addEventListener("input", function () {
-            const query = input.value.toLowerCase().trim();
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(query) ? "" : "none";
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const map = {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;"
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function renderPagination(page, numPages, hasPrev, hasNext) {
+            if (numPages <= 1) {
+                pagination.innerHTML = "";
+                return;
+            }
+
+            let html = "";
+            html += `<button class="page-btn" data-page="${page - 1}" ${hasPrev ? "" : "disabled"}>&laquo; Précédent</button>`;
+
+            const start = Math.max(1, page - 2);
+            const end = Math.min(numPages, page + 2);
+
+            if (start > 1) {
+                html += `<button class="page-btn" data-page="1">1</button>`;
+                if (start > 2) html += `<span class="page-ellipsis">…</span>`;
+            }
+
+            for (let p = start; p <= end; p++) {
+                html += `<button class="page-btn ${p === page ? "active" : ""}" data-page="${p}">${p}</button>`;
+            }
+
+            if (end < numPages) {
+                if (end < numPages - 1) html += `<span class="page-ellipsis">…</span>`;
+                html += `<button class="page-btn" data-page="${numPages}">${numPages}</button>`;
+            }
+
+            html += `<button class="page-btn" data-page="${page + 1}" ${hasNext ? "" : "disabled"}>Suivant &raquo;</button>`;
+
+            pagination.innerHTML = html;
+
+            pagination.querySelectorAll(".page-btn:not([disabled])").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    currentPage = Number(btn.dataset.page);
+                    applyFilters();
+                });
             });
+        }
+
+        async function applyFilters() {
+            const query = searchInput.value.trim();
+            const lot = lotSelect.value;
+
+            const params = new URLSearchParams();
+            if (query) params.append("q", query);
+            if (lot) params.append("choix", lot);
+            params.append("page", currentPage);
+
+            try {
+                const response = await fetch(`/rechercher-N1-par-N2?${params.toString()}`);
+                if (!response.ok) throw new Error("Erreur lors de la récupération des données");
+
+                const data = await response.json();
+                const results = data.results || [];
+
+                if (counter) counter.textContent = data.count ?? results.length;
+
+                if (results.length > 0) {
+                    resultat.innerHTML = results.map(op => `
+                        <tr class="table-row">
+                            <td class="cell-matricule">${escapeHtml(op.matricule || '')}</td>
+                            <td class="cell-utilisateur">${escapeHtml(op.it || '')}</td>
+                            <td class="cell-nom">${escapeHtml(op.nom_complete || '')}</td>
+                            <td class="cell-lot">${escapeHtml(op.lot || '')}</td>
+                        </tr>
+                    `).join("");
+                } else {
+                    resultat.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="empty-row">
+                                <i class="fas fa-search"></i> Aucun responsable d'unité trouvé
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                renderPagination(
+                    data.page || 1,
+                    data.num_pages || 1,
+                    data.has_previous,
+                    data.has_next
+                );
+            } catch (error) {
+                console.error("Erreur de filtrage :", error);
+                resultat.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="empty-row error">
+                            <i class="fas fa-exclamation-circle"></i> Une erreur s'est produite lors du filtrage
+                        </td>
+                    </tr>
+                `;
+                pagination.innerHTML = "";
+            }
+        }
+
+        function resetFilters() {
+            searchInput.value = "";
+            lotSelect.value = "";
+            currentPage = 1;
+            applyFilters();
+        }
+
+        let searchTimeout;
+        searchInput.addEventListener("input", () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentPage = 1;
+                applyFilters();
+            }, 300);
         });
+
+        lotSelect.addEventListener("change", () => { currentPage = 1; applyFilters(); });
+        resetBtn.addEventListener("click", resetFilters);
+
+        applyFilters();
     });
 </script>
 {% endblock %}
