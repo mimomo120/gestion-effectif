@@ -217,7 +217,7 @@
                         <td>{{ operateur.departement_id }}</td>
                         <td>{{ operateur.unite_id }}</td>
                         <td><span class="badge bg-light text-dark border">{{ operateur.lot }}</span></td>
-                        <td>{{ operateur.declarations_concernees.last.nature|default:"-" }}</td>
+                        <td>{{ operateur.declarations_concernees.first.nature|default:"-" }}</td>
                     </tr>
                     {% empty %}
                     <tr>

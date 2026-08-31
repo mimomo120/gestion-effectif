@@ -141,6 +141,9 @@ body {
 /* ==========================================
    BADGES D'ÉTAT (FIXED & EXTENDED)
    ========================================== */
+/* ==========================================
+   BADGES D'ÉTAT (VERSION ROBUSTE)
+   ========================================== */
 
 .badge {
     display: inline-flex;
@@ -154,45 +157,46 @@ body {
     letter-spacing: 0.3px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     white-space: nowrap;
-}
-
-/* État : Validé */
-.badge-valide,
-.badge-valides,
-.badge-validee,
-.badge-validees {
-    background-color: #d1e7dd;
-    color: #0f5132;
-    border: 1px solid #badbcc;
-}
-
-/* État : Refusé */
-.badge-refuse,
-.badge-refuses,
-.badge-refusee,
-.badge-refusees {
-    background-color: #f8d7da;
-    color: #842029;
-    border: 1px solid #f5c2c7;
-}
-
-/* État : Non démarré / Non demarre */
-.badge-non_demarrer,
-.badge-non-demarre,
-.badge-non-demarrer,
-.badge-non_demarre {
+    /* Style par défaut si aucun état ne correspond, pour ne jamais avoir un badge "nu" */
     background-color: #e2e3e5;
     color: #41464b;
     border: 1px solid #d3d6d8;
 }
 
-/* État par défaut / En attente */
-.badge-en-attente,
-.badge-en_attente,
-.badge-attente {
+/* État : Validé(e)(s) — matche badge-valide, badge-validee, badge-valides, badge-validees... */
+.badge[class*="valide"] {
+    background-color: #d1e7dd;
+    color: #0f5132;
+    border: 1px solid #badbcc;
+}
+
+/* État : Refusé(e)(s) — matche badge-refuse, badge-refusee, badge-refuses... */
+.badge[class*="refuse"] {
+    background-color: #f8d7da;
+    color: #842029;
+    border: 1px solid #f5c2c7;
+}
+
+/* État : Non démarré — matche badge-non-demarre, badge-non-demarree, badge-non-demarrer... */
+.badge[class*="non-demarre"],
+.badge[class*="non-demarree"] {
+    background-color: #e2e3e5;
+    color: #41464b;
+    border: 1px solid #d3d6d8;
+}
+
+/* État : En attente — matche badge-en-attente */
+.badge[class*="attente"] {
     background-color: #fff3cd;
     color: #664d03;
     border: 1px solid #ffecb5;
+}
+
+/* État : En cours (au cas où ce statut existerait aussi) */
+.badge[class*="cours"] {
+    background-color: #cfe2ff;
+    color: #084298;
+    border: 1px solid #b6d4fe;
 }
 
 .empty-row {
