@@ -219,7 +219,7 @@
         }
 
         try {
-            const response = await fetch(`/filter_date_N3/?time=${encodeURIComponent(date)}`);
+            const response = await fetch(`/filter_date2/?time=${encodeURIComponent(date)}`);
             if (!response.ok) throw new Error("Erreur réseau");
 
             const data = await response.json();

@@ -1013,7 +1013,7 @@ def affectation_HRBP(request):
 @never_cache
 @role_required('HRBP')
 def responsables_ru_sans_declaration_du_jour(request):
-    today = timezone.now().date()
+    today = timezone.localdate()
     it = request.session.get("it")
 
     departements_qs = Departement.objects.filter(HRBP_id=it)
@@ -1060,6 +1060,7 @@ def responsables_ru_sans_declaration_du_jour(request):
         "non_valides": ru,          # total réel (non paginé) pour le KPI "Non Validés"
         "page_obj": page_obj,       # pour les contrôles de pagination dans le template
         "departements": departements_qs,  # <-- ajouté : queryset d'objets Departement pour le <select>
+        "date": today,
     })
 
 
