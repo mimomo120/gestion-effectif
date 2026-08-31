@@ -2,6 +2,9 @@
 
 Application Django de gestion des effectifs, des affectations et des validations par rôle (N+1, N+2, N+3, N+4).
 
+Version du projet : 2.0.0
+Date de version : 2026-08-31
+
 ## 1. Présentation
 
 Ce projet permet de :
@@ -14,11 +17,12 @@ Ce projet permet de :
 
 ## 2. Stack technique
 
-- Python
+- Python 3.14
 - Django 6.0.7
 - SQLite
 - HTML / CSS / JavaScript
-- Pandas pour l’import de fichiers Excel/CSV
+- Pandas 2.2.3 pour l’import de fichiers Excel/CSV
+- OpenPyXL 3.1.5
 
 ## 3. Structure du projet
 
