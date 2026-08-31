@@ -9,19 +9,36 @@
     --modula-text-muted: #64748b;
     --modula-blue: #2563eb;
     --modula-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    --page-bg: #eef2f5;
+    --card-bg: #ffffff;
+    --card-kpi-bg: #e5e9f0;
+    --text-title: #1e293b;
+    --text-sub: #64748b;
+    --border-light: #e2e8f0;
+
+    /* Dynamic status colors */
+    --green-badge-bg: #cbf2d6;
+    --green-badge-text: #1b7a37;
+    --blue-badge-bg: #cfe2ff;
+    --blue-badge-text: #084298;
+
+    --success-bg: #cbf2d6;
+    --success: #1b7a37;
+    --danger-bg: #fbdada;
+    --danger: #c0292c;
 }
+
 
 body {
-    background-color: var(--modula-bg-body);
-    color: var(--modula-text-dark);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--page-bg) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-title);
 }
 
-/* Conteneur principal */
 .operateurs-container {
-    max-width: 1280px;
-    margin: 1.5rem auto;
-    padding: 0 1rem;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 /* Header */

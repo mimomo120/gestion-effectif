@@ -20,6 +20,7 @@ from django.utils.dateparse import parse_date
 from django.core.paginator import Paginator
 import bisect
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.cache import never_cache
 
 @ensure_csrf_cookie
 
@@ -969,40 +970,52 @@ def get_badge_class(etat):
 def affectation_HRBP(request):
     it = request.session.get("it")
     status = request.GET.get("status", "all")
-
-    departements_qs = Departement.objects.filter(HRBP_id=it)
-    departements = departements_qs.values_list("abreviation", flat=True)
-
-    collab = Collaborateur.objects.filter(departement_id__in=departements)
-    noms = list(collab.values_list("nom_complete", flat=True))
+    dpt_filtre = request.GET.get("dpt", "all")
+    role=request.session.get("role")
+    if role == "HRBP" :
+        departements_qs = Departement.objects.filter(HRBP_id=it)
+    elif role == "ADMIN":
+        departements_qs = Departement.objects.filter(ADMIN_id=it)
+    departements = list(departements_qs.values_list("abreviation", flat=True))
 
     affectation = historique.objects.filter(
-        Q(collaborateur__in=noms) | Q(initial__in=noms) | Q(acceuil__in=noms)
+        Q(dpt_init__in=departements) | Q(dpt_acceuil__in=departements)
     ).exclude(etat="Terminé")
 
+    # Filtrage fait en base (queryset), pas en Python sur une liste déjà chargée,
+    # pour que la pagination reste efficace.
     if status == "valide":
-        affectation = [d for d in affectation if d.etat and "valid" in str(d.etat).lower()]
+        affectation = affectation.filter(etat__icontains="valid")
     elif status == "refuse":
-        affectation = [d for d in affectation if d.etat and "refus" in str(d.etat).lower()]
+        affectation = affectation.filter(etat__icontains="refus")
     elif status == "non_demarrer":
-        affectation = [d for d in affectation if d.etat and "non démarr" in str(d.etat).lower()]
+        affectation = affectation.filter(etat__icontains="non démarr")
 
-    # --- Ajout de la classe badge calculée pour chaque ligne ---
-    affectation_list = list(affectation)
-    for a in affectation_list:
-        a.badge_class = get_badge_class(a.etat)
+    # Filtrage par département (initial ou accueil) parmi le périmètre du HRBP
+    if dpt_filtre != "all" and dpt_filtre in departements:
+        affectation = affectation.filter(
+            Q(dpt_init__abreviation=dpt_filtre) | Q(dpt_acceuil__abreviation=dpt_filtre)
+        )
 
     # --- Pagination ---
-    paginator = Paginator(affectation_list, 20)
+    paginator = Paginator(affectation, 20)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
+
+    # --- Ajout de la classe badge calculée uniquement pour les lignes de la page affichée ---
+    for a in page_obj:
+        a.badge_class = get_badge_class(a.etat)
 
     return render(request, "declaration_effectif/HRBP/affectation.html", {
         "info": page_obj,
         "page_obj": page_obj,
         "status": status,
+        "dpt_filtre": dpt_filtre,
+        "departements": departements,
     })
 
+
+@never_cache
 def responsables_ru_sans_declaration_du_jour(request):
     today = timezone.now().date()
     it = request.session.get("it")
@@ -1010,42 +1023,36 @@ def responsables_ru_sans_declaration_du_jour(request):
     departements_qs = Departement.objects.filter(HRBP_id=it)
     departements = departements_qs.values_list("abreviation", flat=True)
     collaborateurs_base = Collaborateur.objects.filter(departement_id__in=departements)
-    print("collaborateurs_base :", collaborateurs_base)
     responsable = list(
         collaborateurs_base
         .exclude(ru_it_id__isnull=True)
         .values_list("ru_it_id", flat=True)
         .distinct()
     )
-    print("responsable (RU ids détectés) :", responsable)
+    
 
     operateur = Collaborateur.objects.filter(
         departement_id__in=departements
     ).exclude(it__in=responsable)
-    print("Nb opérateurs :", operateur.count())
-
+    
     ru_ids = list(
         operateur
         .exclude(ru_it_id__isnull=True)
         .values_list("ru_it_id", flat=True)
         .distinct()
     )
-    print("ru_ids (RU réels avec opérateurs) :", ru_ids)
 
     ru_avec_declaration = set(
         declaration_effectif.objects.filter(date=today)
         .values_list("Ru_id", flat=True)
         .distinct()
     )
-    print("ru_avec_declaration :", ru_avec_declaration)
 
     ru_ids_sans_declaration = [
         ru_id for ru_id in ru_ids if ru_id not in ru_avec_declaration
     ]
-    print("ru_ids_sans_declaration :", ru_ids_sans_declaration)
 
     ru = Collaborateur.objects.filter(it__in=ru_ids_sans_declaration)
-    print("Nb RU finaux :", ru.count())
 
     # --- Pagination ---
     paginator = Paginator(ru, 20)  # 20 RU par page, ajustable
@@ -1056,4 +1063,82 @@ def responsables_ru_sans_declaration_du_jour(request):
         "ru": page_obj,             # objet paginé, itérable dans le template comme avant
         "non_valides": ru,          # total réel (non paginé) pour le KPI "Non Validés"
         "page_obj": page_obj,       # pour les contrôles de pagination dans le template
+        "departements": departements_qs,  # <-- ajouté : queryset d'objets Departement pour le <select>
+    })
+
+
+def filter_date2(request):
+    it = request.session.get("it")
+    date_str = request.GET.get("time")
+    dept = request.GET.get("dept", "").strip()
+
+    if not date_str:
+        return JsonResponse({"resultats": [], "status": False})
+
+    try:
+        date_selectionnee = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"resultats": [], "status": False})
+    
+    is_today = (date_selectionnee == timezone.localdate()) if date_selectionnee else False
+    status = not is_today
+
+    departements_qs = Departement.objects.filter(HRBP_id=it)
+    departements = list(departements_qs.values_list("abreviation", flat=True))
+
+    # Si un département précis est demandé, on restreint dessus
+    if dept:
+        departements = [d for d in departements if d == dept]
+
+    collaborateurs_base = Collaborateur.objects.filter(departement_id__in=departements)
+
+    responsable = list(
+        collaborateurs_base
+        .exclude(ru_it_id__isnull=True)
+        .values_list("ru_it_id", flat=True)
+        .distinct()
+    )
+
+    operateur = Collaborateur.objects.filter(
+        departement_id__in=departements
+    ).exclude(it__in=responsable)
+
+    ru_ids = list(
+        operateur
+        .exclude(ru_it_id__isnull=True)
+        .values_list("ru_it_id", flat=True)
+        .distinct()
+    )
+
+    # Déclarations faites à LA DATE SÉLECTIONNÉE (pas today)
+    ru_avec_declaration = set(
+        declaration_effectif.objects.filter(date=date_selectionnee)
+        .values_list("Ru_id", flat=True)
+        .distinct()
+    )
+
+    ru_ids_sans_declaration = [
+        ru_id for ru_id in ru_ids if ru_id not in ru_avec_declaration
+    ]
+
+    ru_qs = Collaborateur.objects.filter(
+        it__in=ru_ids_sans_declaration
+    ).select_related("departement")
+
+    resultats = [
+        {
+            "matricule": r.matricule,
+            "it": r.it,
+            "nom_complete": r.nom_complete,
+            "lot": r.lot,
+            "departement": {
+                "abreviation": r.departement.abreviation if r.departement else ""
+            },
+        }
+        for r in ru_qs
+    ]
+
+    return JsonResponse({
+        "resultats": resultats,
+        "status": status
     })

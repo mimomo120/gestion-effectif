@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.db import transaction
 from .forms import MultipleImportForm
 from Collaborateur.models import Collaborateur, Departement, Unite
-
+from declaration_effectif.models import historique
 # ------------------------------------------------------------------
 # FONCTIONS AUXILIAIRES SIMPLIFIÉES
 # ------------------------------------------------------------------
@@ -80,7 +80,7 @@ def importer_departements(df_dpt, erreurs):
             data = dict(
                 nom_departement=nom_dpt,
                 HRBP=rh_obj,
-                ADNMIN=admin_obj,
+                ADMIN=admin_obj,
                 DRH=drh_obj,
                 maquette=clean_int(row.get("Maquette")),
             )
@@ -104,7 +104,7 @@ def importer_departements(df_dpt, erreurs):
             Departement.objects.bulk_create(a_creer, batch_size=500)
         if a_maj:
             Departement.objects.bulk_update(
-                a_maj, ["nom_departement", "HRBP", "ADNMIN", "DRH", "maquette"], batch_size=500
+                a_maj, ["nom_departement", "HRBP", "ADMIN", "DRH", "maquette"], batch_size=500
             )
 
     return crees
@@ -162,7 +162,7 @@ def importer_unites(df_unite, erreurs):
 
 
 # ------------------------------------------------------------------
-# IMPORT COLLABORATEURS (optimisé — le plus gros volume)
+# IMPORT COLLABORATEURS
 # ------------------------------------------------------------------
 
 def importer_collaborateurs(df_collab, erreurs):
@@ -181,7 +181,7 @@ def importer_collaborateurs(df_collab, erreurs):
 
     a_creer = []
     a_maj = []
-    ru_a_resoudre = []  # (it_du_collab, valeur_ru_brute_du_fichier) à résoudre après création/mise à jour
+    ru_a_resoudre = []
 
     for i, row in df_collab.iterrows():
         try:
@@ -284,7 +284,57 @@ def importer_collaborateurs(df_collab, erreurs):
 
     return crees
 
+# ------------------------------------------------------------------
+# IMPORT HISTORIQUE DES CHANGEMENTS D'AFFECTATION (optimisé)
+# ------------------------------------------------------------------
 
+def importer_changements(df_chg, erreurs):
+    """Traite le DataFrame des changements d'affectation (sharepoint) de façon optimisée."""
+    crees = 0
+
+    departements_map = {d.abreviation: d for d in Departement.objects.all()}
+    a_creer = []
+
+    for i, row in df_chg.iterrows():
+        try:
+            collaborateur = clean_val(row.get("Nom & prénom"))
+            if not collaborateur:
+                erreurs.append(f"Changements Ligne {i+2}: Nom du collaborateur manquant.")
+                continue
+
+            initial = clean_val(row.get("Ru (Initial)")) or ""
+            acceuil = clean_val(row.get("RU D'accueil")) or ""
+            etat = clean_val(row.get("Etat")) or ""
+
+            dpt_init_code = clean_val(row.get("DPT"))
+            dpt_acceuil_code = clean_val(row.get("DPT (accueil)"))
+
+            dpt_init_obj = departements_map.get(dpt_init_code) if dpt_init_code else None
+            dpt_acceuil_obj = departements_map.get(dpt_acceuil_code) if dpt_acceuil_code else None
+
+            if dpt_init_code and not dpt_init_obj:
+                erreurs.append(f"Changements Ligne {i+2}: Département initial '{dpt_init_code}' introuvable.")
+            if dpt_acceuil_code and not dpt_acceuil_obj:
+                erreurs.append(f"Changements Ligne {i+2}: Département d'accueil '{dpt_acceuil_code}' introuvable.")
+
+            obj = historique(
+                collaborateur=collaborateur[:30],
+                initial=initial[:30],
+                acceuil=acceuil[:30],
+                etat=etat[:30],
+                dpt_init=dpt_init_obj,
+                dpt_acceuil=dpt_acceuil_obj,
+            )
+            a_creer.append(obj)
+            crees += 1
+        except Exception as e:
+            erreurs.append(f"Changements Ligne {i+2}: {e}")
+
+    with transaction.atomic():
+        if a_creer:
+            historique.objects.bulk_create(a_creer, batch_size=500)
+
+    return crees
 # ------------------------------------------------------------------
 # VUE PRINCIPALE
 # ------------------------------------------------------------------
@@ -292,9 +342,10 @@ def importer_collaborateurs(df_collab, erreurs):
 def importer_fichiers_combines(request):
     role = request.session.get('role')
     template_de_base = {
-        "HRBP": "declaration_effectif/HRBP/navbar.html",
-        "ADMIN": "declaration_effectif/Admin/navbar.html",
-    }.get(role, "declaration_effectif/Super/navbar.html")
+        "HRBP":  "utilisateur/navbar_N1.html",
+        "ADMIN": "utilisateur/navbar_N1.html",
+        "SUPER": "utilisateur/navbar_N1.html",
+    }.get(role, "utilisateur/navbar_N1.html")
 
     if request.method != "POST":
         return render(request, "import_data/import.html", {
@@ -309,17 +360,15 @@ def importer_fichiers_combines(request):
     f_collab = request.FILES.get("fichier_collaborateur")
     f_unite = request.FILES.get("fichier_unite")
     f_dpt = request.FILES.get("fichier_departement")
+    f_chg = request.FILES.get("fichier_changement")  # <-- nouveau
 
-    if not (f_collab or f_unite or f_dpt):
+    if not (f_collab or f_unite or f_dpt or f_chg):
         messages.error(request, "Veuillez fournir au moins un fichier à importer.")
         return render(request, "import_data/import.html", {"form": form, "template_de_base": template_de_base})
 
     erreurs = []
-    crees_dpts = crees_unites = crees_collabs = 0
+    crees_dpts = crees_unites = crees_collabs = crees_chgs = 0
 
-    # --------------------------------------------------------------
-    # 1. IMPORT DES DÉPARTEMENTS (avant les collaborateurs : ils y font référence)
-    # --------------------------------------------------------------
     if f_dpt:
         try:
             df_dpt = read_uploaded_file(f_dpt)
@@ -327,9 +376,6 @@ def importer_fichiers_combines(request):
         except Exception as e:
             messages.error(request, f"Erreur de lecture du fichier Départements : {e}")
 
-    # --------------------------------------------------------------
-    # 2. IMPORT DES UNITÉS (avant les collaborateurs : ils y font référence)
-    # --------------------------------------------------------------
     if f_unite:
         try:
             df_unite = read_uploaded_file(f_unite)
@@ -337,9 +383,6 @@ def importer_fichiers_combines(request):
         except Exception as e:
             messages.error(request, f"Erreur de lecture du fichier Unités : {e}")
 
-    # --------------------------------------------------------------
-    # 3. IMPORT DES COLLABORATEURS
-    # --------------------------------------------------------------
     if f_collab:
         try:
             df_collab = read_uploaded_file(f_collab)
@@ -348,12 +391,20 @@ def importer_fichiers_combines(request):
             messages.error(request, f"Erreur de lecture du fichier Collaborateurs : {e}")
 
     # --------------------------------------------------------------
-    # MESSAGES DE RETOUR
+    # 4. IMPORT DES CHANGEMENTS D'AFFECTATION (historique)
     # --------------------------------------------------------------
+    if f_chg:
+        try:
+            df_chg = read_uploaded_file(f_chg)
+            crees_chgs = importer_changements(df_chg, erreurs)
+        except Exception as e:
+            messages.error(request, f"Erreur de lecture du fichier Changements : {e}")
+
     resume = []
     if f_dpt: resume.append(f"{crees_dpts} départements")
     if f_unite: resume.append(f"{crees_unites} unités")
     if f_collab: resume.append(f"{crees_collabs} collaborateurs")
+    if f_chg: resume.append(f"{crees_chgs} changements d'affectation")
 
     messages.success(request, f"Importation terminée : {', '.join(resume)} traité(s).")
     if erreurs:

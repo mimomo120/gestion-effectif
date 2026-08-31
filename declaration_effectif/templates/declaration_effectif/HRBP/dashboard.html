@@ -1,4 +1,4 @@
-{% extends 'declaration_effectif/HRBP/navbar.html' %}
+{% extends "utilisateur/navbar_N1.html" %}
 {% load static %}
 
 {% block title %}Tableau de bord - Modula{% endblock %}
@@ -10,9 +10,9 @@
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-wrapper">
+<div class="page-container">
 
-    <!-- En-tête avec Filtres -->
+    <!-- En-tête -->
     <div class="dashboard-header-bar d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="page-title">Tableau de bord</h1>
@@ -26,7 +26,7 @@
         </div>
     </div>
 
-    <!-- 1. KPIs sur toute la largeur (Top) -->
+    <!-- 1. KPIs (Cartes supérieures) -->
     <section class="kpi-row mb-4">
         <div class="kpi-card">
             <div class="kpi-icon-wrapper icon-blue">
@@ -35,12 +35,12 @@
             <div class="kpi-content">
                 <span class="kpi-title">Effectif Réel</span>
                 <div class="kpi-val-group">
-                    <span class="kpi-value">{{ colReel|default:"3491" }}</span>
-                    {% if MR < 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MR
-                        }}</span>
-                        {% else %}
+                    <span class="kpi-value">{{ colReel|default:0 }}</span>
+                    {% if MR < 0 %}
+                        <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MR }}</span>
+                    {% else %}
                         <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i>{{ MR }}</span>
-                        {% endif %}
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -53,11 +53,11 @@
                 <span class="kpi-title">Effectif Système</span>
                 <div class="kpi-val-group">
                     <span class="kpi-value">{{ colSyst|default:"3496" }}</span>
-                    {% if MS < 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MS
-                        }}</span>
-                        {% else %}
+                    {% if MS < 0 %}
+                        <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MS }}</span>
+                    {% else %}
                         <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i>{{ MS }}</span>
-                        {% endif %}
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -91,7 +91,7 @@
     <!-- 2. Zone Principale (Graphique + Détails Départements) -->
     <div class="main-grid">
 
-        <!-- Graphique d'évolution (Gauche) -->
+        <!-- Graphique d'évolution -->
         <div class="card-panel chart-panel">
             <div class="panel-header d-flex justify-content-between align-items-center mb-3">
                 <h2 class="panel-title">Évolution de l'Effectif Réel</h2>
@@ -104,7 +104,7 @@
             </div>
         </div>
 
-        <!-- Synthèse par Département (Droite) -->
+        <!-- Synthèse par Département -->
         <div class="card-panel dept-panel">
             <div class="panel-header mb-3">
                 <h2 class="panel-title">Détail par Département</h2>
@@ -129,27 +129,31 @@
                                 <span class="fw-bold">{{ d.reel }}</span> <span class="text-muted">/ {{ d.maquette }}</span>
                             </td>
                             <td>
-                                <!-- Exemple de badge selon l'état -->
                                 {% if d.mr > 0 %}
-                                <span class="badge-status badge-warning">-{{ d.mr }}</span>
+                                    <span class="badge-status badge-warning">-{{ d.mr }}</span>
                                 {% else %}
-                                <span class="badge-status badge-success">0</span>
+                                    <span class="badge-status badge-success">0</span>
                                 {% endif %}
                             </td>
                             <td class="text-muted">{{ d.syst }}</td>
                             <td>
                                 {% if d.nb_depart > 0 %}
-                                <span class="text-danger fw-bold">{{ d.nb_depart }}</span>
+                                    <span class="text-danger fw-bold">{{ d.nb_depart }}</span>
                                 {% else %}
-                                <span class="text-muted">0</span>
+                                    <span class="text-muted">0</span>
                                 {% endif %}
                             </td>
                             <td>
-                        {% if d.ms > 0 %}
-                        <span class="badge-status badge-warning">-{{ d.ms }}</span>
-                        {% else %}
-                        <span class="badge-status badge-success">0</span>
-                        {% endif %}</td>
+                                {% if d.ms > 0 %}
+                                    <span class="badge-status badge-warning">-{{ d.ms }}</span>
+                                {% else %}
+                                    <span class="badge-status badge-success">0</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-muted text-center py-3">Aucune donnée disponible</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -158,6 +162,78 @@
         </div>
 
     </div>
+
+    <!-- 3. Détails : Départs récents & Changements d'affectation -->
+    <div class="list-grid mt-4">
+
+        <!-- Derniers départs -->
+        <div class="card-panel">
+            <div class="panel-header mb-3">
+                <h2 class="panel-title">Derniers Départs</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="table-dept">
+                    <thead>
+                        <tr>
+                            <th>Collaborateur</th>
+                            <th>Département</th>
+                            <th>Date</th>
+                            <th>Déclaré par</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dep in liste_departs %}
+                        <tr>
+                            <td class="dept-name">{{ dep.collaborateur_it }}</td>
+                            <td class="text-muted">{{ dep.collaborateur_it.departement.abreviation }}</td>
+                            <td>{{ dep.date|date:"d/m/Y" }}</td>
+                            <td class="text-muted">{{ dep.Ru }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-muted text-center py-3">Aucun départ récent</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Derniers changements d'affectation -->
+        <div class="card-panel">
+            <div class="panel-header mb-3">
+                <h2 class="panel-title">Derniers Changements d'Affectation</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="table-dept">
+                    <thead>
+                        <tr>
+                            <th>Collaborateur</th>
+                            <th>Ancien Ru</th>
+                            <th>Nouveau Ru</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for chg in liste_changements %}
+                        <tr>
+                            <td class="dept-name">{{ chg.collaborateur_it }}</td>
+                            <td class="text-muted">{{ chg.Ru }}</td>
+                            <td class="text-muted">{{ chg.nv_Ru }}</td>
+                            <td>{{ chg.date|date:"d/m/Y" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-muted text-center py-3">Aucun changement récent</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
 </div>
 {% endblock %}
 
@@ -165,51 +241,55 @@
 {{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const ctx = document.getElementById('effectifChart').getContext('2d');
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('effectifChart');
+        if (ctx) {
+            const chartCtx = ctx.getContext('2d');
+            
+            const gradient = chartCtx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(37, 99, 235, 0.25)');
+            gradient.addColorStop(1, 'rgba(37, 99, 235, 0.0)');
 
-    // Gradient sous la courbe
-    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    gradient.addColorStop(0, 'rgba(37, 99, 235, 0.25)');
-    gradient.addColorStop(1, 'rgba(37, 99, 235, 0.0)');
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: {{ labels| safe }},
-        datasets: [{
-            label: 'Effectif réel',
-            data: {{ valeurs| safe }},
-        borderColor: '#2563eb',
-        borderWidth: 2.5,
-        pointBackgroundColor: '#2563eb',
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        backgroundColor: gradient,
-        fill: true,
-        tension: 0.3
-            }]
-        },
-        options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false }
-        },
-        scales: {
-            x: {
-                grid: { display: false }
-            },
-            y: {
-                suggestedMin: 3480, // Plage réaliste sans masquer les petites variations
-                suggestedMax: 3510,
-                ticks: {
-                    stepSize: 5,
-                    precision: 0 // Suppression des décimales inutiles
+            new Chart(chartCtx, {
+                type: 'line',
+                data: {
+                    labels: {{ labels|safe|default:"[]" }},
+                    datasets: [{
+                        label: 'Effectif réel',
+                        data: {{ valeurs|safe|default:"[]" }},
+                        borderColor: '#2563eb',
+                        borderWidth: 2.5,
+                        pointBackgroundColor: '#2563eb',
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.3
+                    }]
                 },
-                grid: { color: '#f1f5f9' }
-            }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false }
+                        },
+                        y: {
+                            suggestedMin: {{ y_min |default:0 }},
+                            suggestedMax: {{ y_max |default:0 }},
+                            ticks: {
+                                stepSize: 5,
+                                precision: 0
+                            },
+                            grid: { color: '#f1f5f9' }
+                        }
+                    }
+                }
+            });
         }
-    }
     });
 </script>
 {% endblock %}

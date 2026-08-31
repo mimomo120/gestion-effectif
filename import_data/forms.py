@@ -13,3 +13,5 @@ class MultipleImportForm(forms.Form):
         label="Fichier Collaborateurs",
         widget=forms.FileInput(attrs={'class': 'form-control'})
     )
+    fichier_changement = forms.FileField(required=False, label="Fichier changement",
+            widget=forms.FileInput(attrs={'class': 'form-control'}))

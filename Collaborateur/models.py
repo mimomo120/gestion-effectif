@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
+
 class Departement(models.Model):
     nom_departement = models.CharField(max_length=30, unique=True)
     abreviation = models.CharField(max_length=5, unique=True)
@@ -13,7 +14,7 @@ class Departement(models.Model):
         related_name='departements_RH',
         verbose_name="RH Responsable"
     )
-    ADNMIN = models.ForeignKey(
+    ADMIN = models.ForeignKey(
             "Collaborateur", to_field="it",
             on_delete=models.SET_NULL,
             null=True,

@@ -1,4 +1,4 @@
-{% extends 'declaration_effectif/HRBP/navbar.html' %}
+{% extends template_de_base %}
 
 {% load static %}
 
@@ -14,7 +14,8 @@
 <div class="import-container">
     <h1 class="import-title">Importation des Fichiers</h1>
     <p class="import-subtitle">
-        Veuillez charger les fichiers des Départements, des Unités et des Collaborateurs (.xlsx, .xls, .csv).
+        Veuillez charger les fichiers des Départements, des Unités, des Collaborateurs et des Changements d'affectation
+        (.xlsx, .xls, .csv).
     </p>
 
     <!-- Guide des structures de fichiers attendues -->
@@ -23,24 +24,26 @@
 
         <div class="row g-3">
             <!-- Fichier Départements -->
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="guide-card h-100">
                     <div class="guide-card-header">
                         <span class="guide-icon">📂</span>
                         <strong>Fichier Départements</strong>
                     </div>
-                    <p class="guide-text">Doit contenir au minimum la colonne suivante :</p>
+                    <p class="guide-text">Doit obligatoirement inclure la colonne requise (*) :</p>
                     <div class="column-tags">
-                        <span class="tag tag-required">Nom *</span>
-                        <span class="tag">Abreviation</span>
-                        <span class="tag">RH</span>
+                        <span class="tag tag-required">Abreviation *</span>
+                        <span class="tag">nom_departement</span>
+                        <span class="tag">HRBP</span>
+                        <span class="tag">ADMIN</span>
+                        <span class="tag">DRH</span>
                         <span class="tag">Maquette</span>
                     </div>
                 </div>
             </div>
 
             <!-- Fichier Unités -->
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="guide-card h-100">
                     <div class="guide-card-header">
                         <span class="guide-icon">📊</span>
@@ -60,7 +63,7 @@
             </div>
 
             <!-- Fichier Collaborateurs -->
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="guide-card h-100">
                     <div class="guide-card-header">
                         <span class="guide-icon">👥</span>
@@ -82,6 +85,25 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Fichier Changements d'affectation -->
+            <div class="col-md-3">
+                <div class="guide-card h-100">
+                    <div class="guide-card-header">
+                        <span class="guide-icon">🔄</span>
+                        <strong>Fichier Changements d'affectation</strong>
+                    </div>
+                    <p class="guide-text">Doit obligatoirement inclure la colonne requise (*) :</p>
+                    <div class="column-tags">
+                        <span class="tag tag-required">Nom & prénom *</span>
+                        <span class="tag">Ru (Initial)</span>
+                        <span class="tag">RU D'accueil</span>
+                        <span class="tag">Etat</span>
+                        <span class="tag">DPT</span>
+                        <span class="tag">DPT (accueil)</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -97,10 +119,9 @@
     {% endif %}
 
     <!-- Formulaire d'importation -->
-    <!-- Formulaire d'importation -->
     <form method="post" enctype="multipart/form-data" class="import-form">
         {% csrf_token %}
-    
+
         <!-- Champ 1 : Départements -->
         <div class="import-field">
             <label for="{{ form.fichier_departement.id_for_label }}">
@@ -113,7 +134,7 @@
             <small class="import-error">{{ error }}</small>
             {% endfor %}
         </div>
-    
+
         <!-- Champ 2 : Unités -->
         <div class="import-field">
             <label for="{{ form.fichier_unite.id_for_label }}">
@@ -126,7 +147,7 @@
             <small class="import-error">{{ error }}</small>
             {% endfor %}
         </div>
-    
+
         <!-- Champ 3 : Collaborateurs -->
         <div class="import-field">
             <label for="{{ form.fichier_collaborateur.id_for_label }}">
@@ -139,7 +160,20 @@
             <small class="import-error">{{ error }}</small>
             {% endfor %}
         </div>
-    
+
+        <!-- Champ 4 : Changements d'affectation -->
+        <div class="import-field">
+            <label for="{{ form.fichier_changement.id_for_label }}">
+                🔄 Fichier Changements d'affectation
+            </label>
+            <div class="file-input-wrapper">
+                {{ form.fichier_changement }}
+            </div>
+            {% for error in form.fichier_changement.errors %}
+            <small class="import-error">{{ error }}</small>
+            {% endfor %}
+        </div>
+
         <button type="submit" class="import-submit">
             <i class="fas fa-file-import me-2"></i>Lancer l'importation
         </button>

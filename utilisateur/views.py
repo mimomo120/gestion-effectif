@@ -20,7 +20,9 @@ from django.db import transaction, IntegrityError
 from collections import Counter
 from django.http import HttpResponseForbidden
 import secrets
+from collections import defaultdict
 import string
+from django.views.decorators.http import require_POST
 # ============================================================
 # login_view : authentifie l'utilisateur et l'aiguille vers le
 # tableau de bord correspondant à son rôle actif (N+1 à N+4).
@@ -33,7 +35,6 @@ def login_view(request):
         try:
             utilis = utilisateur.objects.get(pk=it)
             collab = utilis.it
-     
             if check_password(password, utilis.password):
                 request.session["it"] = utilis.it.it
                 request.session["role"] = utilis.role
@@ -54,9 +55,9 @@ def login_view(request):
                     roles_disponibles.append("ADMIN")
                 if utilis.HRBP :
                     roles_disponibles.append("HRBP")
-                                   
+                if utilis.DRH :
+                    roles_disponibles.append("DRH")
 
-                        # Stockage en session
                 request.session['roles_disponibles'] = roles_disponibles
                 if utilis.role == "N+1":
                     return redirect('dashboard_N1')
@@ -67,13 +68,16 @@ def login_view(request):
                     return redirect("Dashboard_N3")
                     
                 elif utilis.role == "N+4":
-                    
                     return redirect('page_N4')
                 
                 elif utilis.role == "SUPER":
-                    return redirect('Admin')
+                    return redirect('SUPER')
                 elif utilis.role == "HRBP":
-                                    return redirect('HRBP')
+                    return redirect('dashboard')
+                elif utilis.role == "DRH":
+                    return redirect('dashboard')
+                elif utilis.role == "ADMIN":
+                    return redirect('dashboard')
             else:
                 return render(
                     request,
@@ -142,7 +146,7 @@ def register_view(request):
         "N4": n4,
         "ADMIN": 0,
         "HRBP": 0,
-        "SUPER": 0,
+        "SUPER": 0,"DRH":0
     }
 )
 
@@ -207,7 +211,6 @@ def determiner_hierarchie(it_val):
 # graphique des 7 derniers jours de déclaration.
 # ============================================================
 @role_required('N+1')
-
 def tableau(request):
     # 1. Récupération des informations du RU
     it = request.session.get("it")
@@ -272,8 +275,8 @@ def tableau(request):
     Cs = counts_lot_ls.get("C", 0)
 
     # Écarts vs Maquette
-    diff_r_m =  maquette - reel
-    diff_s_m = maquette - syste 
+    diff_r_m = maquette - reel
+    diff_s_m = maquette - syste
 
     der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
     date_declaration = der.date if der else timezone.localdate()
@@ -285,6 +288,9 @@ def tableau(request):
         reelEff(it, date_reference=d).values('it').distinct().count()
         for d in dates
     ]
+
+    # 5. Derniers mouvements effectués par le RU
+    derniers_mouvements = derniers_mouvements_respo(it, limite=10)
 
     # 7. Rendu Final
     context = {
@@ -307,11 +313,11 @@ def tableau(request):
 
         'reel_par_lot_json': json.dumps([Ar + OLr, Pr, Er, Cr]),
         'maquette_par_lot_json': json.dumps([A, P, E, C]),
-        'systeme_par_lot_json': json.dumps([As+OLs, Ps, Es, Cs]),
+        'systeme_par_lot_json': json.dumps([As + OLs, Ps, Es, Cs]),
+
+        'derniers_mouvements': derniers_mouvements,
     }
     return render(request, "declaration_effectif/N1/dashboard_N1.html", context)
-
-
 
 #verifier que Ru existe
 # ============================================================
@@ -352,8 +358,8 @@ def dashboard_N2(request):
     # Somme des effectifs réels de tous les RU, pour chaque date
     data_list = []
     for d in dates:
-        total_jour=0
-        for ru in ru_its :
+        total_jour = 0
+        for ru in ru_its:
             total_jour += reelEff(ru, date_reference=d).values('it').distinct().count()
         data_list.append(total_jour)
 
@@ -413,6 +419,31 @@ def dashboard_N2(request):
             .values_list('Ru_id', 'total')
         )
 
+    # 6bis. Derniers mouvements (Départ / Changement / Ajout) pour tous les RU en 1 seule requête
+    NB_MOUVEMENTS_PAR_RU = 5
+
+    toutes_declarations = (
+        declaration_effectif.objects
+        .filter(Ru_id__in=ru_its, nature__in=["D", "C", "A"])
+        .select_related('collaborateur_it', 'nv_Ru')
+        .order_by('Ru_id', '-date', '-id')
+    )
+
+    mouvements_par_ru = {}
+    for d in toutes_declarations:
+        ru_id = d.Ru_id
+        if ru_id not in mouvements_par_ru:
+            mouvements_par_ru[ru_id] = []
+        if len(mouvements_par_ru[ru_id]) < NB_MOUVEMENTS_PAR_RU:
+            mouvements_par_ru[ru_id].append({
+                "collaborateur": d.collaborateur_it.nom_complete if d.collaborateur_it else None,
+                "collaborateur_it": d.collaborateur_it.it if d.collaborateur_it else None,
+                "nature": d.nature,
+                "nature_display": d.get_nature_display(),
+                "nouveau_responsable": d.nv_Ru.nom_complete if d.nv_Ru else None,
+                "date": d.date.strftime("%d/%m/%Y"),
+            })
+
     # 7. Construction de la liste des résultats sans requêtes SQL supplémentaires
     liste_ru_stats = []
     effectif_syste = 0
@@ -429,7 +460,7 @@ def dashboard_N2(request):
 
         liste_ru_stats.append({
             "matricule": a.matricule,
-            "it":a.it,
+            "it": a.it,
             "nom_complete": a.nom_complete,
             "lot": a.lot,
             "unite": a.unite_id,
@@ -437,13 +468,14 @@ def dashboard_N2(request):
             "reel": reel,
             "systeme": systeme,
             "maquette": maquette,
-            "MS":  systeme -maquette ,
-            "MR":  reel -maquette ,
+            "MS": systeme - maquette,
+            "MR": reel - maquette,
+            "derniers_mouvements": mouvements_par_ru.get(a.it, []),
         })
 
     # Calcul des écarts globaux
-    MR = effectif_reel - maquette_total 
-    MS =  effectif_syste - maquette_total 
+    MR = effectif_reel - maquette_total
+    MS = effectif_syste - maquette_total
 
     context = {
         'chart_labels': json.dumps(labels_list),
@@ -508,7 +540,7 @@ def notifications(request):
         "nb_notifications": nv,
     }
 
-def admin_dashboard(request):
+def SUPER_dashboard(request):
         it=request.session.get("it")
         util = utilisateur.objects.all().exclude(it_id=it)
         total=util.count()
@@ -561,7 +593,7 @@ def ajouter_user(request):
                 "N4": n4,
                 "ADMIN": 1 if role_final == "ADMIN" else 0,
                 "HRBP": 1 if role_final == "HRBP" else 0,
-                "SUPER": 1 if role_final == "SUPER" else 0,
+                "SUPER": 1 if role_final == "SUPER" else 0,"DRH": 1 if role_final == "DRH" else 0,
             }
         )
 
@@ -627,8 +659,7 @@ def modifier_user(request, id):
         "message": "Utilisateur mis à jour avec succès.",
         "role": role_final
     }, status=200)
-from collections import defaultdict
-from datetime import timedelta
+
 
 def calculer_evolution_effectif_reel(departements, jours=30):
     collaborateurs = Collaborateur.objects.filter(departement_id__in=departements)
@@ -672,11 +703,28 @@ def calculer_evolution_effectif_reel(departements, jours=30):
 
     return {"labels": labels, "valeurs": valeurs}
 
-
 def dashboard_rh(request):
     it = request.session.get("it")
+    role = request.session.get("role")
 
-    departements_qs = Departement.objects.filter(HRBP_id=it)
+    if role == "HRBP":
+        y_min = 3480
+        y_max = 3510
+        departements_qs = Departement.objects.filter(HRBP_id=it)
+    elif role == "DRH":
+        y_min = 6770
+        y_max = 6800
+        departements_qs = Departement.objects.filter(DRH_id=it)
+    elif role == "ADMIN":
+                y_min = 3530
+                y_max = 3500
+                departements_qs = Departement.objects.filter(ADMIN_id=it)
+    else:
+        # rôle absent ou inconnu : valeurs par défaut sûres, pas de crash
+        y_min = 0
+        y_max = 0
+        departements_qs = Departement.objects.none()
+
     departements = list(departements_qs.values_list("abreviation", flat=True))
 
     # --- Totaux globaux ---
@@ -720,14 +768,15 @@ def dashboard_rh(request):
         .annotate(total=Count("it"))
         .values_list("departement_id", "total")
     )
-    depart_TOT=0
+
+    depart_TOT = 0
     detail_par_dept = []
     for dept in departements_qs:
         abrev = dept.abreviation
         syst_dept = syst_par_dept.get(abrev, 0)
         reel_dept = reel_par_dept.get(abrev, 0)
         nb_depart_dept = depart_par_dept.get(abrev, 0)
-        depart_TOT+=nb_depart_dept
+        depart_TOT += nb_depart_dept
         detail_par_dept.append({
             "abreviation": abrev,
             "nom": getattr(dept, "nom", abrev),
@@ -741,6 +790,29 @@ def dashboard_rh(request):
 
     graphe = calculer_evolution_effectif_reel(departements)
 
+    # --------------------------------------------------------------
+    # Liste des personnes en départ (10 plus récentes) — nature = "D"
+    # --------------------------------------------------------------
+    liste_departs = (
+        depart
+        .select_related("collaborateur_it", "collaborateur_it__departement", "Ru")
+        .order_by("-date")[:10]
+    )
+
+    # --------------------------------------------------------------
+    # Liste des changements d'affectation (10 plus récents) — nature = "C"
+    # (même modèle declaration_effectif, Ru = ancien responsable,
+    #  nv_Ru = nouveau responsable)
+    # --------------------------------------------------------------
+    liste_changements = (
+        declaration_effectif.objects.filter(
+            collaborateur_it__departement_id__in=departements,
+            nature="C"
+        )
+        .select_related("collaborateur_it", "collaborateur_it__departement", "Ru", "nv_Ru")
+        .order_by("-date")[:10]
+    )
+
     today = timezone.now().date()
     context = {
         "departements": departements,
@@ -752,7 +824,73 @@ def dashboard_rh(request):
         "MR": maquette - colReel,
         "labels": graphe["labels"],
         "valeurs": graphe["valeurs"],
-        "detail_par_dept": detail_par_dept,"depart_TOT":depart_TOT
+        "detail_par_dept": detail_par_dept,
+        "depart_TOT": depart_TOT,
+        "liste_departs": liste_departs,
+        "liste_changements": liste_changements,
+        "y_min": y_min,
+        "y_max": y_max,
     }
 
     return render(request, "declaration_effectif/HRBP/dashboard.html", context)
+
+def derniers_mouvements_respo(it_respo, limite=10):
+    """
+    Fonction utilitaire : retourne une liste de dicts (pas de JsonResponse).
+    """
+    if not it_respo:
+        return []
+
+    declarations = (
+        declaration_effectif.objects
+        .filter(Ru__it=it_respo,nature__in=["A","D","C"])
+        .select_related('collaborateur_it', 'Ru', 'nv_Ru')
+        .order_by('-date', '-id')[:limite]
+    )
+
+    return [
+        {
+            "id": d.pk,
+            "collaborateur": d.collaborateur_it.nom_complete if d.collaborateur_it else None,
+            "collaborateur_it": d.collaborateur_it.it if d.collaborateur_it else None,
+            "nature": d.nature,
+            "nature_display": d.get_nature_display(),
+            "nouveau_responsable": d.nv_Ru.nom_complete if d.nv_Ru else None,
+            "nouveau_responsable_it": d.nv_Ru.it if d.nv_Ru else None,
+            "date": d.date.strftime("%d/%m/%Y"),
+        }
+        for d in declarations
+    ]
+
+
+def changer_mot_de_passe(request):
+    it = request.session.get("it")
+    if not it:
+        return JsonResponse({"error": "Session expirée, veuillez vous reconnecter."}, status=401)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Requête invalide."}, status=400)
+
+    ancien_password = data.get("ancien_password", "")
+    nouveau_password = data.get("nouveau_password", "")
+
+    if not ancien_password or not nouveau_password:
+        return JsonResponse({"error": "Tous les champs sont requis."}, status=400)
+
+    if len(nouveau_password) < 8:
+        return JsonResponse({"error": "Le nouveau mot de passe doit contenir au moins 8 caractères."}, status=400)
+
+    try:
+        user = utilisateur.objects.get(it_id=it)
+    except utilisateur.DoesNotExist:
+        return JsonResponse({"error": "Utilisateur introuvable."}, status=404)
+
+    # Vérification de l'ancien mot de passe via la méthode du modèle
+    if not user.check_password(ancien_password):
+        return JsonResponse({"error": "Mot de passe actuel incorrect."}, status=400)
+
+    user.set_password(nouveau_password)  # hash + save() déjà géré par la méthode du modèle
+
+    return JsonResponse({"success": True})

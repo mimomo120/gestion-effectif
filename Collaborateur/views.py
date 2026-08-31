@@ -25,11 +25,11 @@ def rec(request):
         changements = declaration_effectif.objects.filter(
             nature__in=["C", "D"], Ru_id=it, date=derniere
         )
-        ajouters = declaration_effectif.objects.filter(
-            nature="A", Ru_id=it, date=derniere
+        ajouters_valider = declaration_effectif.objects.filter(
+            nature__in=["A","V"], Ru_id=it, date=derniere
         )
         liste_ch = set(changements.values_list("collaborateur_it_id", flat=True))
-        liste_a = set(ajouters.values_list("collaborateur_it_id", flat=True))
+        liste_a = set(ajouters_valider.values_list("collaborateur_it_id", flat=True))
 
         operateurs_finaux = Collaborateur.objects.filter(
             (Q(ru_it_id=it) & ~Q(it__in=liste_ch)) | Q(it__in=liste_a)

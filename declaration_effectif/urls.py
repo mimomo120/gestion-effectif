@@ -23,6 +23,7 @@ urlpatterns=[
     path("filter_date/",views.validation_date_N2,name="validation_date"),
     path("filter_date_N3/",views.validation_date_N3,name="validation_date_N3"),
     path("affectation departements/",views.affectation_HRBP,name="affectation_HRBP"),
-    path("declaration departements/",views.responsables_ru_sans_declaration_du_jour,name="declaration_HRBP")
+    path("declaration departements/",views.responsables_ru_sans_declaration_du_jour,name="declaration_HRBP"),
+    path("filter_date2/",views.filter_date2,name="validation_filtre"),
     
 ]

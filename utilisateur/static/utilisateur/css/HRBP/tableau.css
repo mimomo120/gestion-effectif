@@ -1,31 +1,33 @@
 :root {
+    --page-bg: #eef2f5;
+    --card-bg: #ffffff;
     --text-primary: #0f172a;
     --text-secondary: #64748b;
     --border-color: #e2e8f0;
     --accent-blue: #2563eb;
-    --accent-green: #10b981;
-    --accent-red: #ef4444;
-    --page-bg: #f8fafc;
-    --card-bg: #ffffff;
-    --text-title: #1e293b;
+    --accent-purple: #9333ea;
+    --accent-orange: #ea580c;
+    --accent-red: #dc2626;
 
-    /* Couleurs de badges */
+    /* Badges */
     --badge-pos-bg: #dcfce7;
-    --badge-pos-text: #166534;
+    --badge-pos-text: #15803d;
     --badge-neg-bg: #fee2e2;
-    --badge-neg-text: #991b1b;
+    --badge-neg-text: #b91c1c;
     --badge-alert-bg: #fef3c7;
-    --badge-alert-text: #92400e;
+    --badge-alert-text: #b45309;
+    --badge-neutral-bg: #f1f5f9;
+    --badge-neutral-text: #475569;
 }
 
 body {
-    background-color: var(--page-bg) !important;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: var(--text-title);
-    margin: 0;
+    background-color: var(--page-bg);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-.dashboard-wrapper {
+/* Page Container */
+.page-container {
     padding: 2rem;
     max-width: 1600px;
     margin: 0 auto;
@@ -35,15 +37,23 @@ body {
 .page-title {
     font-size: 1.5rem;
     font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
 }
 
-.filter-dropdown,
+.page-subtitle {
+    font-size: 0.875rem;
+}
+
 .date-badge {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    padding: 0.4rem 0.8rem;
+    padding: 0.5rem 0.875rem;
     border-radius: 8px;
     font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 /* KPIs Top Row */
@@ -61,7 +71,13 @@ body {
     display: flex;
     align-items: center;
     gap: 1rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
 .kpi-icon-wrapper {
@@ -76,23 +92,29 @@ body {
 }
 
 .icon-blue {
-    background: #dbeafe;
-    color: #2563eb;
+    background: #eff6ff;
+    color: var(--accent-blue);
 }
 
 .icon-purple {
     background: #f3e8ff;
-    color: #9333ea;
+    color: var(--accent-purple);
 }
 
 .icon-orange {
     background: #ffedd5;
-    color: #ea580c;
+    color: var(--accent-orange);
 }
 
 .icon-red {
     background: #fee2e2;
-    color: #dc2626;
+    color: var(--accent-red);
+}
+
+.kpi-content {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
 }
 
 .kpi-title {
@@ -100,29 +122,30 @@ body {
     color: var(--text-secondary);
     font-weight: 600;
     display: block;
+    margin-bottom: 0.25rem;
 }
 
 .kpi-value {
     font-size: 1.5rem;
     font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
 }
 
 .kpi-val-group {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: space-between;
 }
 
+/* Badges de Statut */
 .status-badge {
-    font-size: 0.7rem;
-    padding: 0.2rem 0.5rem;
+    font-size: 0.725rem;
+    padding: 0.2rem 0.55rem;
     border-radius: 20px;
     font-weight: 600;
-}
-
-.status-badge.negative {
-    background: var(--badge-neg-bg);
-    color: var(--badge-neg-text);
+    display: inline-flex;
+    align-items: center;
 }
 
 .status-badge.positive {
@@ -130,46 +153,95 @@ body {
     color: var(--badge-pos-text);
 }
 
+.status-badge.negative {
+    background: var(--badge-neg-bg);
+    color: var(--badge-neg-text);
+}
+
 .status-badge.neutral {
-    background: #f1f5f9;
-    color: #475569;
+    background: var(--badge-neutral-bg);
+    color: var(--badge-neutral-text);
 }
 
-.status-badge.alert {
-    background: var(--badge-alert-bg);
-    color: var(--badge-alert-text);
-}
-
-/* Main Grid */
-.main-grid {
-    display: grid;
-    grid-template-columns: 1.8fr 1.2fr;
-    gap: 1.25rem;
-}
-
+/* Card Panels */
 .card-panel {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .panel-title {
     font-size: 1rem;
     font-weight: 700;
+    color: var(--text-primary);
     margin: 0;
 }
 
+/* Grilles Principales */
+.main-grid {
+    display: grid;
+    grid-template-columns: 1.8fr 1.2fr;
+    gap: 1.25rem;
+    /* Force les deux panneaux (graphique + départements) à la même hauteur,
+       quel que soit le contenu de chacun */
+    align-items: stretch;
+}
+
+.main-grid .card-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.list-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: stretch;
+}
+
+.list-grid .card-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Chart Box */
 .chart-box {
     position: relative;
-    height: 380px;
+    height: 320px;
+    width: 100%;
 }
 
-/* Nouveau Tableau Moderne des Départements */
-.dept-panel {
-    padding: 1.25rem;
+/* Détail par Département : hauteur alignée sur le graphique,
+   avec défilement interne si beaucoup de départements (cas DRH) */
+.dept-panel .table-responsive {
+    max-height: 320px;
+    overflow-y: auto;
 }
 
+.dept-panel .table-dept thead th {
+    position: sticky;
+    top: 0;
+    background-color: var(--card-bg);
+    z-index: 1;
+}
+
+/* Derniers Départs / Derniers Changements : même logique,
+   pour ne pas dépendre du nombre de lignes selon le rôle */
+.list-grid .table-responsive {
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.list-grid .table-dept thead th {
+    position: sticky;
+    top: 0;
+    background-color: var(--card-bg);
+    z-index: 1;
+}
+
+/* Tableaux */
 .table-dept {
     width: 100%;
     border-collapse: separate;
@@ -183,7 +255,7 @@ body {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    padding: 0.5rem 0.6rem;
+    padding: 0.6rem 0.75rem;
     border-bottom: 2px solid var(--border-color);
     text-align: center;
 }
@@ -203,9 +275,10 @@ body {
 }
 
 .table-dept td {
-    padding: 0.55rem 0.6rem;
+    padding: 0.6rem 0.75rem;
     text-align: center;
     vertical-align: middle;
+    color: var(--text-primary);
 }
 
 .table-dept td:first-child {
@@ -219,7 +292,7 @@ body {
 }
 
 .dept-name {
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-primary);
 }
 
@@ -227,15 +300,50 @@ body {
     white-space: nowrap;
 }
 
-/* Responsive */
+/* Badges dans les tableaux */
+.badge-status {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-warning {
+    background-color: var(--badge-alert-bg);
+    color: var(--badge-alert-text);
+}
+
+.badge-success {
+    background-color: var(--badge-pos-bg);
+    color: var(--badge-pos-text);
+}
+
+/* Responsive Layout */
 @media (max-width: 1200px) {
     .main-grid {
         grid-template-columns: 1fr;
     }
+
+    .dept-panel .table-responsive {
+        max-height: 400px;
+    }
 }
 
-@media (max-width: 1024px) {
-    .kpi-row {
+@media (max-width: 992px) {
+
+    .kpi-row,
+    .list-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .page-container {
+        padding: 1rem;
+    }
+
+    .kpi-row,
+    .list-grid {
+        grid-template-columns: 1fr;
     }
 }

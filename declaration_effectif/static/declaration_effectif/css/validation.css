@@ -1,106 +1,95 @@
-/* ==========================================
-   DECLARATION EFFECTIF - VALIDATION CSS
-   ========================================== */
-
 :root {
-    --bg-main: #eef2f5;
+--page-bg: #eef2f5;
     --card-bg: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
     --border-color: #e2e8f0;
-    --text-heading: #0f172a;
-    --text-body: #334155;
-    --text-muted: #64748b;
     --accent-blue: #2563eb;
-    --warning-bg: #fef3c7;
-    --warning-color: #d97706;
-    --success-bg: #dcfce7;
-    --success-color: #15803d;
-    --danger-color: #ef4444;
-    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-    --border-radius: 16px;
+    --accent-blue-hover: #1d4ed8;
+    --accent-orange-bg: #ffedd5;
+    --accent-orange-text: #ea580c;
+    --btn-sent-bg: #e2e8f0;
+    --btn-sent-text: #94a3b8;
 }
 
 body {
-    background-color: var(--bg-main) !important;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: var(--text-body);
+    background-color: var(--page-bg);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
+/* Conteneur principal */
 .page-container {
     padding: 2rem;
     max-width: 1400px;
     margin: 0 auto;
 }
 
-/* Header */
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
-
+/* En-tête */
 .header h1 {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     font-weight: 700;
-    color: var(--text-heading);
-    margin: 0;
+    color: var(--text-primary);
+    margin-bottom: 1.25rem;
 }
 
-/* Stats Summary / KPI Card */
+/* Résumé KPI */
 .stats-summary {
+    display: flex;
     margin-bottom: 1.5rem;
 }
 
 .summary-card {
     background: var(--card-bg);
-    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     padding: 1.25rem 1.5rem;
-    box-shadow: var(--card-shadow);
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    max-width: 300px;
+    justify-content: space-between;
+    min-width: 240px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .summary-info span {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 0.25rem;
 }
 
 .summary-info h3 {
-    font-size: 1.8rem;
+    font-size: 1.75rem;
     font-weight: 800;
-    color: var(--text-heading);
-    margin: 0.25rem 0 0 0;
-}
-
-.summary-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
+    color: var(--text-primary);
+    margin: 0;
 }
 
 .summary-icon.warning {
-    background-color: var(--warning-bg);
-    color: var(--warning-color);
+    width: 42px;
+    height: 42px;
+    background-color: var(--accent-orange-bg);
+    color: var(--accent-orange-text);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
 }
 
-/* Main Card & Table Wrapper */
+/* Carte Table */
 .card-table {
     background: var(--card-bg);
-    border-radius: var(--border-radius);
-    padding: 1.25rem 1.5rem;
-    box-shadow: var(--card-shadow);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
-/* Toolbar & Date Filter */
+/* Barre d'outils / Filtre */
 .table-toolbar {
     margin-bottom: 1.25rem;
 }
@@ -114,18 +103,18 @@ body {
 .date-filter-group label {
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--text-heading);
+    color: var(--text-secondary);
 }
 
 .date-input {
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 0.55rem 0.9rem;
-    font-size: 0.875rem;
-    color: var(--text-heading);
     background-color: #ffffff;
+    border-radius: 8px;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
     outline: none;
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    transition: border-color 0.15s ease;
 }
 
 .date-input:focus {
@@ -133,127 +122,113 @@ body {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-/* Table Design */
+/* Tableau */
 .table-wrapper {
+    width: 100%;
     overflow-x: auto;
 }
 
 .custom-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0 0.35rem;
+    font-size: 0.875rem;
 }
 
 .custom-table th {
+    color: var(--text-secondary);
+    font-weight: 700;
     font-size: 0.75rem;
-    font-weight: 800;
-    color: #475569;
-    letter-spacing: 0.5px;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #cbd5e1;
     text-transform: uppercase;
-    text-align: left;
+    letter-spacing: 0.04em;
+    padding: 0.75rem 1rem;
+    border-bottom: 2px solid var(--border-color);
 }
 
-.custom-table td {
-    font-size: 0.875rem;
-    color: var(--text-body);
-    padding: 0.85rem 1rem;
-    border-bottom: 1px solid #f1f5f9;
-    vertical-align: middle;
-}
-
-.custom-table tbody tr:last-child td {
-    border-bottom: none;
+.custom-table tbody tr {
+    background-color: #f8fafc;
+    transition: background-color 0.15s ease;
 }
 
 .custom-table tbody tr:hover {
-    background-color: #f8fafc;
+    background-color: #f1f5f9;
 }
 
-/* Utility Cell Styles */
-.text-center {
-    text-align: center !important;
+.custom-table td {
+    padding: 0.65rem 1rem;
+    vertical-align: middle;
 }
 
-.text-end {
-    text-align: right !important;
+.custom-table td:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
 }
 
+.custom-table td:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+/* Cells formatting */
 .cell-mono {
-    font-family: monospace;
-    font-weight: 700;
-    color: var(--text-heading);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.825rem;
+    color: var(--text-secondary);
 }
 
 .cell-name {
     font-weight: 600;
-    color: var(--text-heading);
+    color: var(--text-primary);
 }
 
-/* Badges */
 .badge-circle {
-    display: inline-block;
-    background-color: #eff6ff;
-    color: var(--accent-blue);
-    font-weight: 700;
-    font-size: 0.8rem;
-    padding: 0.25rem 0.6rem;
-    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e2e8f0;
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.75rem;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
 }
 
-/* Action Buttons (Alert) */
+.empty-row {
+    padding: 2rem !important;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Boutons d'action */
 .alert_btn {
     background-color: var(--accent-blue);
     color: #ffffff;
     border: none;
-    padding: 0.45rem 0.9rem;
+    border-radius: 6px;
+    padding: 0.4rem 1rem;
     font-size: 0.8rem;
     font-weight: 600;
-    border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background-color 0.15s ease;
 }
 
-.alert_btn:hover:not([disabled]) {
-    background-color: #1d4ed8;
-    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+.alert_btn:hover {
+    background-color: var(--accent-blue-hover);
 }
 
-.alert_btn.sent {
-    background-color: var(--success-bg);
-    color: var(--success-color);
-    cursor: default;
-}
-
-.alert_btn[disabled] {
-    opacity: 0.8;
+.alert_btn.sent,
+.alert_btn:disabled {
+    background-color: var(--btn-sent-bg);
+    color: var(--btn-sent-text);
     cursor: not-allowed;
 }
 
-/* Empty State */
-.empty-row {
+/* Utilitaires de cadrage */
+.text-center {
     text-align: center;
-    color: var(--text-muted);
-    padding: 2.5rem !important;
-    font-style: italic;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .page-container {
-        padding: 1rem;
-    }
-
-    .summary-card {
-        max-width: 100%;
-    }
-
-    .date-filter-group {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .date-input {
-        width: 100%;
-    }
+.text-end {
+    text-align: right;
 }

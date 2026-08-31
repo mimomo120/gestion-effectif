@@ -49,19 +49,20 @@
 
             <!-- Section Droite: Alertes + Profil Utilisateur -->
             <div class="user-section d-flex align-items-center gap-3 px-4 py-2">
-
+                {% if request.session.role == "N+1" %}
                 <!-- Bouton Cloche de Notification -->
                 <button id="notification-bell" type="button"
                     class="btn btn-light position-relative rounded-circle p-2 d-flex align-items-center justify-content-center shadow-sm"
                     data-bs-toggle="modal" data-bs-target="#alertsModal" style="width: 42px; height: 42px;">
                     <i class="fas fa-bell fs-5 text-secondary"></i>
-                    {% if notifications %}
-                    <span
+                    {% if nb_notifications > 0 %}
+                    <span id="notif-badge"
                         class="badge-notification position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
                         <span class="visually-hidden">Nouvelles alertes</span>
                     </span>
                     {% endif %}
                 </button>
+                {% endif %}
 
                 <!-- Profil Utilisateur -->
                 <div class="user-card d-flex align-items-center gap-3 bg-white px-3 py-2 rounded-3 shadow-sm">
@@ -97,16 +98,24 @@
                         <small class="user-role text-muted d-block">{{ request.session.role|default:"N+1" }}</small>
                     </div>
 
-                    <!-- Bouton Déconnexion -->
-                    <a href="{% url 'deconnecter' %}"
-                        class="btn btn-outline-custom-logout btn-sm d-flex align-items-center gap-1 ms-2">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>Déconnecter</span>
-                    </a>
+                    <!-- Bouton Changer Mot de Passe + Déconnexion -->
+                    <div class="d-flex align-items-center gap-2 ms-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
+                            data-bs-toggle="modal" data-bs-target="#modal-changer-password"
+                            title="Changer le mot de passe">
+                            <i class="fas fa-key"></i>
+                        </button>
+                        <a href="{% url 'deconnecter' %}"
+                            class="btn btn-outline-custom-logout btn-sm d-flex align-items-center gap-1">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Déconnecter</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
 
+        {% if request.session.role == "N+1" %}
         <!-- Navigation Bar (Deuxième niveau avec Onglets) -->
         <nav class="sub-navbar border-top">
             <div class="container-fluid px-4">
@@ -138,9 +147,189 @@
                 </ul>
             </div>
         </nav>
+        {% endif %}
+
+        {% if request.session.role == "N+2" %}
+        <nav class="sub-navbar border-top">
+            <div class="container-fluid px-4">
+                <ul class="nav nav-tabs border-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_N2' %}active{% endif %}"
+                            href="{% url 'dashboard_N2' %}">
+                            <i class="fas fa-home me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N1_par_N2' %}active{% endif %}"
+                            href="{% url 'liste_N1_par_N2' %}">
+                            <i class="fas fa-users me-2"></i>Responsables
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N1_non_valides_N2' %}active{% endif %}"
+                            href="{% url 'liste_N1_non_valides_N2' %}">
+                            <i class="fas fa-calendar-check me-2"></i>Validation du jour
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N2' %}active{% endif %}"
+                            href="{% url 'affectation_N2' %}">
+                            <i class="fas fa-link me-2"></i>Affectation
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        {% endif %}
+
+        {% if request.session.role == "N+3" %}
+        <nav class="sub-navbar border-top">
+            <div class="container-fluid px-4">
+                <ul class="navbar-nav me-auto align-items-lg-center">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'Dashboard_N3' %}active fw-bold{% endif %}"
+                            href="{% url 'Dashboard_N3' %}">
+                            <i class="fas fa-home me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N2_par_N3' %}active fw-bold{% endif %}"
+                            href="{% url 'liste_N2_par_N3' %}">
+                            <i class="fas fa-users me-2"></i>Responsables
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N1_non_valides_N3' %}active fw-bold{% endif %}"
+                            href="{% url 'liste_N1_non_valides_N3' %}">
+                            <i class="fas fa-check-circle me-2"></i>Validation du jour
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N3' %}active fw-bold{% endif %}"
+                            href="{% url 'affectation_N3' %}">
+                            <i class="fas fa-history me-2"></i>Affectations
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        {% endif %}
+
+        {% if request.session.role == "N+4" %}
+        <nav class="sub-navbar border-top">
+            <div class="container-fluid px-4">
+                <ul class="navbar-nav me-auto align-items-lg-center">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'page_N4' %}active fw-bold{% endif %}"
+                            href="{% url 'page_N4' %}">
+                            <i class="fas fa-home me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N3' %}active fw-bold{% endif %}"
+                            href="{% url 'liste_N3' %}">
+                            <i class="fas fa-users me-2"></i>Responsables
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'validation_N4' %}active fw-bold{% endif %}"
+                            href="{% url 'validation_N4' %}">
+                            <i class="fas fa-check-circle me-2"></i>Validation du jour
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N4' %}active fw-bold{% endif %}"
+                            href="{% url 'affectation_N4' %}">
+                            <i class="fas fa-history me-2"></i>Affectations
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        {% endif %}
+        {% if request.session.role == "HRBP" %}
+        <!-- Navigation Bar (Deuxième niveau avec Onglets) -->
+        <nav class="sub-navbar border-top">
+            <div class="container-fluid px-4">
+                <ul class="nav nav-tabs border-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+                            href="{% url 'dashboard' %}">
+                            <i class="fas fa-users me-2"></i>Dasboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'importer_fichier' %}active{% endif %}"
+                            href="{% url 'importer_fichier' %}">
+                            <i class="fas fa-file-import me-2"></i></i>Importer Fichiers
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link  {% if request.resolver_match.url_name == 'affectation_HRBP' %}active{% endif %}"
+                            href="{% url 'affectation_HRBP' %}">
+                            <i class="fas fa-exchange-alt me-2"></i>Changement d'affectation
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'declaration_HRBP' %}active{% endif %}"
+                            href="{% url 'declaration_HRBP' %}">
+                            <i class="fas fa-users me-2"></i></i>Declaration d'effectifs
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        {% endif%}
+        {% if request.session.role == "SUPER" %}
+        <nav class="sub-navbar border-top">
+            <div class="container-fluid px-4">
+                <ul class="nav nav-tabs border-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'SUPER' %}active{% endif %}"
+                            href="{% url 'SUPER' %}">
+                            <i class="fas fa-users me-2"></i>Liste Utilisateurs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'importer_fichier' %}active{% endif %}"
+                            href="{% url 'importer_fichier' %}">
+                            <i class="fas fa-file-import me-2"></i></i>Importer Fichiers
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        {% endif %}
+            {% if request.session.role == "ADMIN" %}
+            <nav class="sub-navbar border-top">
+                <div class="container-fluid px-4">
+                    <ul class="nav nav-tabs border-0">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+                                href="{% url 'dashboard' %}">
+                                <i class="fas fa-users me-2"></i>Dasboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'importer_fichier' %}active{% endif %}"
+                                href="{% url 'importer_fichier' %}">
+                                <i class="fas fa-file-import me-2"></i></i>Importer Fichiers
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link  {% if request.resolver_match.url_name == 'affectation_HRBP' %}active{% endif %}"
+                                href="{% url 'affectation_HRBP' %}">
+                                <i class="fas fa-exchange-alt me-2"></i>Changement d'affectation
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+            {% endif %}
     </header>
 
-    <!-- Modal Alertes -->
+    <!-- Modal Alertes (uniquement pertinent pour N+1) -->
+    {% if request.session.role == "N+1" %}
     <div class="modal fade" id="alertsModal" tabindex="-1" aria-labelledby="alertsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content">
@@ -176,15 +365,154 @@
             </div>
         </div>
     </div>
+    {% endif %}
+
+    <!-- Modal Changer Mot de Passe (disponible pour tous les rôles connectés) -->
+    <div class="modal fade" id="modal-changer-password" tabindex="-1" aria-labelledby="modalChangerPasswordLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalChangerPasswordLabel">
+                        <i class="fas fa-key me-2"></i>Changer le mot de passe
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="ancien-password" class="form-label">Mot de passe actuel</label>
+                        <input type="password" class="form-control" id="ancien-password"
+                            autocomplete="current-password">
+                    </div>
+                    <div class="mb-3">
+                        <label for="nouveau-password" class="form-label">Nouveau mot de passe</label>
+                        <input type="password" class="form-control" id="nouveau-password" autocomplete="new-password">
+                        <small class="text-muted">8 caractères minimum.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirmer-password" class="form-label">Confirmer le nouveau mot de passe</label>
+                        <input type="password" class="form-control" id="confirmer-password" autocomplete="new-password">
+                    </div>
+
+                    <div class="alert-password"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-success" id="btn-confirmer-password">
+                        <span id="btn-spinner-password" class="spinner-border spinner-border-sm d-none" role="status"
+                            aria-hidden="true"></span>
+                        Enregistrer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Main Content -->
     <div class="container-fluid px-4">
         {% block content %}{% endblock %}
     </div>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    {% block script %}
+
+    <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            /* ============================================================
+               CHANGER MOT DE PASSE
+               ============================================================ */
+            const btnConfirmerPassword = document.getElementById("btn-confirmer-password");
+            const alertPassword = document.querySelector(".alert-password");
+            const spinnerPassword = document.getElementById("btn-spinner-password");
+            const modalPasswordEl = document.getElementById("modal-changer-password");
+            const modalPassword = (typeof bootstrap !== "undefined" && modalPasswordEl)
+                ? new bootstrap.Modal(modalPasswordEl) : null;
+
+            if (btnConfirmerPassword) {
+                btnConfirmerPassword.addEventListener("click", async () => {
+                    const ancien = document.getElementById("ancien-password").value;
+                    const nouveau = document.getElementById("nouveau-password").value;
+                    const confirmer = document.getElementById("confirmer-password").value;
+
+                    if (!ancien || !nouveau || !confirmer) {
+                        alertPassword.innerHTML = `<div class="alert alert-warning py-2 mb-0 mt-2">Veuillez remplir tous les champs.</div>`;
+                        return;
+                    }
+                    if (nouveau.length < 8) {
+                        alertPassword.innerHTML = `<div class="alert alert-warning py-2 mb-0 mt-2">Le nouveau mot de passe doit contenir au moins 8 caractères.</div>`;
+                        return;
+                    }
+                    if (nouveau !== confirmer) {
+                        alertPassword.innerHTML = `<div class="alert alert-warning py-2 mb-0 mt-2">Les deux mots de passe ne correspondent pas.</div>`;
+                        return;
+                    }
+
+                    btnConfirmerPassword.disabled = true;
+                    if (spinnerPassword) spinnerPassword.classList.remove("d-none");
+                    alertPassword.innerHTML = "";
+
+                    try {
+                        const response = await fetch('/utilisateurs/changer-mot-de-passe/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCookie('csrftoken')
+                            },
+                            body: JSON.stringify({
+                                ancien_password: ancien,
+                                nouveau_password: nouveau
+                            })
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            alertPassword.innerHTML = `<div class="alert alert-success py-2 mb-0 mt-2"><i class="fas fa-check-circle me-1"></i> Mot de passe modifié avec succès.</div>`;
+                            document.getElementById("ancien-password").value = "";
+                            document.getElementById("nouveau-password").value = "";
+                            document.getElementById("confirmer-password").value = "";
+                            setTimeout(() => {
+                                if (modalPassword) modalPassword.hide();
+                            }, 1200);
+                        } else {
+                            alertPassword.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || "Erreur lors du changement de mot de passe."}</div>`;
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alertPassword.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau ou serveur.</div>`;
+                    } finally {
+                        btnConfirmerPassword.disabled = false;
+                        if (spinnerPassword) spinnerPassword.classList.add("d-none");
+                    }
+                });
+            }
+
+            if (modalPasswordEl) {
+                modalPasswordEl.addEventListener("hidden.bs.modal", () => {
+                    document.getElementById("ancien-password").value = "";
+                    document.getElementById("nouveau-password").value = "";
+                    document.getElementById("confirmer-password").value = "";
+                    if (alertPassword) alertPassword.innerHTML = "";
+                });
+            }
+        });
+    </script>
+
+    {% if request.session.role == "N+1" %}
     <script>
         const ALERTES_URL = "{% url 'votre-url-alertes' %}";
         const bellBtn = document.getElementById('notification-bell');
@@ -194,16 +522,18 @@
                     .then(response => response.json())
                     .then(data => {
                         if (data.statu === "true") {
-                            const badge = document.querySelector('.badge-notification');
-                            if (badge) badge.style.display = 'none';
+                            const badge = document.getElementById('notif-badge');
+                            if (badge) badge.remove();
                         }
                     })
                     .catch(err => console.error("Erreur alerte:", err));
             });
         }
     </script>
-    {% endblock %}
+    {% endif %}
 
+
+    {% block script %}{% endblock %}
 </body>
 
 </html>

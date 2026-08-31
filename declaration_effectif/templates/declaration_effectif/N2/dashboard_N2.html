@@ -1,4 +1,4 @@
-{% extends 'utilisateur/navbar_N2.html' %}
+{% extends 'utilisateur/navbar_N1.html' %}
 {% load static %}
 
 {% block title %}Tableau de bord{% endblock %}
@@ -25,8 +25,7 @@
                 <span class="unite">opérateurs</span>
             </div>
             {% if MR > 0 %} <span class="badge-vs positive">&#9650; +{{ MR }} vs maquette</span>
-                {% elif MR < 0 %}
-                <span class="badge-vs negative">&#9660; {{ MR }} vs maquette</span>
+            {% elif MR < 0 %} <span class="badge-vs negative">&#9660; {{ MR }} vs maquette</span>
                 {% endif %}
         </div>
 
@@ -37,8 +36,7 @@
                 <span class="unite">opérateurs</span>
             </div>
             {% if MS > 0 %} <span class="badge-vs positive">&#9650; +{{ MS }} vs maquette</span>
-                {% elif MS < 0 %}
-                <span class="badge-vs negative">&#9660; {{ MS }} vs maquette</span>
+            {% elif MS < 0 %} <span class="badge-vs negative">&#9660; {{ MS }} vs maquette</span>
                 {% endif %}
         </div>
 
@@ -105,6 +103,7 @@
                             <th>Effectif réel</th>
                             <th>Effectif système</th>
                             <th>Effectif maquette</th>
+                            <th>Derniers mouvements</th>
                         </tr>
                     </thead>
                     <tbody id="corps-tableau-ru">
@@ -119,8 +118,7 @@
                                 <div class="cell-stat-container">
                                     <span class="valeur-chiffre">{{ ru.reel|default:"0" }}</span>
                                     {% if ru.MR > 0 %} <span class="badge-vs positive">&#9650; +{{ ru.MR }}</span>
-                                        {% elif ru.MR < 0 %}
-                                        <span class="badge-vs negative">&#9660; {{ ru.MR }}</span>
+                                    {% elif ru.MR < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MR }}</span>
                                         {% endif %}
                                 </div>
                             </td>
@@ -128,8 +126,7 @@
                                 <div class="cell-stat-container">
                                     <span class="valeur-chiffre">{{ ru.systeme|default:"0" }}</span>
                                     {% if ru.MS > 0 %} <span class="badge-vs positive">&#9650; +{{ ru.MS }}</span>
-                                        {% elif ru.MS < 0 %}
-                                        <span class="badge-vs negative">&#9660; {{ ru.MS }}</span>
+                                    {% elif ru.MS < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MS }}</span>
                                         {% endif %}
                                 </div>
                             </td>
@@ -138,10 +135,21 @@
                                     <span class="valeur-chiffre">{{ ru.maquette|default:"0" }}</span>
                                 </div>
                             </td>
+                            <td class="text-center">
+                                {% if ru.derniers_mouvements %}
+                                <button type="button" class="btn-mouvements" data-it="{{ ru.it }}"
+                                    title="Voir les derniers mouvements">
+                                    <i class="fas fa-history"></i>
+                                    <span class="badge-count">{{ ru.derniers_mouvements|length }}</span>
+                                </button>
+                                {% else %}
+                                <span class="no-mouvement">—</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="empty-row">Aucune donnée disponible</td>
+                            <td colspan="9" class="empty-row">Aucune donnée disponible</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -155,6 +163,29 @@
                     <span class="pagination-pages" id="pagination-pages"></span>
                     <button type="button" id="page-suiv" class="pagination-btn">Suivant &raquo;</button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MODAL PARTAGÉ - DERNIERS MOUVEMENTS D'UN RU ===== -->
+<div class="modal fade" id="modal-mouvements-ru" tabindex="-1" aria-labelledby="modalMouvementsRuLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalMouvementsRuLabel">
+                    <i class="fas fa-history me-2"></i>Derniers mouvements — <span id="mouvement-ru-nom"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="liste-mouvements" id="liste-mouvements-body">
+                    <!-- Rempli dynamiquement en JS -->
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
             </div>
         </div>
     </div>
@@ -197,8 +228,9 @@
         1. GRAPHIQUE CHART.JS
         ========================================================= */
         const donneesRuEl = document.getElementById("donnees-ru");
+        let donneesRu = [];
         if (donneesRuEl) {
-            const donneesRu = JSON.parse(donneesRuEl.textContent || "[]");
+            donneesRu = JSON.parse(donneesRuEl.textContent || "[]");
 
             const labels = donneesRu.map(r => r.nom_complete || "Inconnu");
             const reel = donneesRu.map(r => r.reel || 0);
@@ -246,7 +278,72 @@
         }
 
         /* =========================================================
-           2. RECHERCHE ET PAGINATION DYNAMIQUES
+           2. MODAL DERNIERS MOUVEMENTS
+        ========================================================= */
+        const modalMouvementsEl = document.getElementById("modal-mouvements-ru");
+        const modalMouvements = (typeof bootstrap !== "undefined" && modalMouvementsEl)
+            ? new bootstrap.Modal(modalMouvementsEl) : null;
+        const nomSpan = document.getElementById("mouvement-ru-nom");
+        const listeBody = document.getElementById("liste-mouvements-body");
+
+        const badgeClasses = {
+            "A": "badge-ajout",
+            "D": "badge-depart",
+            "C": "badge-changement",
+            "V": "badge-valide"
+        };
+        const badgeIcons = {
+            "A": "fa-arrow-down",
+            "D": "fa-arrow-up",
+            "C": "fa-exchange-alt",
+            "V": "fa-check-circle"
+        };
+
+        document.querySelectorAll(".btn-mouvements").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                const it = btn.dataset.it;
+                const ru = donneesRu.find(r => r.it === it);
+                if (!ru) return;
+
+                nomSpan.textContent = ru.nom_complete || it;
+                listeBody.innerHTML = "";
+
+                (ru.derniers_mouvements || []).forEach(function (m) {
+                    const li = document.createElement("li");
+                    li.className = "mouvement-item";
+
+                    const badgeClass = badgeClasses[m.nature] || "badge-default";
+                    const icon = badgeIcons[m.nature] || "fa-circle";
+
+                    let detail = m.collaborateur
+                        ? `${m.collaborateur} (${m.collaborateur_it || "-"})`
+                        : "-";
+                    if (m.nature === "C" && m.nouveau_responsable) {
+                        detail += ` → vers ${m.nouveau_responsable}`;
+                    }
+
+                    li.innerHTML = `
+                        <div class="mouvement-header">
+                            <span class="mouvement-badge ${badgeClass}">
+                                <i class="fas ${icon}"></i> ${m.nature_display}
+                            </span>
+                            <span class="mouvement-date">${m.date}</span>
+                        </div>
+                        <div class="mouvement-detail">${detail}</div>
+                    `;
+                    listeBody.appendChild(li);
+                });
+
+                if ((ru.derniers_mouvements || []).length === 0) {
+                    listeBody.innerHTML = '<li class="mouvement-item mouvement-vide">Aucun mouvement récent.</li>';
+                }
+
+                if (modalMouvements) modalMouvements.show();
+            });
+        });
+
+        /* =========================================================
+           3. RECHERCHE ET PAGINATION DYNAMIQUES
         ========================================================= */
         const rechercheInput = document.getElementById("recherche-ru");
         const tbody = document.getElementById("corps-tableau-ru");
@@ -301,7 +398,7 @@
             if (total === 0) {
                 const ligneVide = document.createElement("tr");
                 ligneVide.className = "empty-row-recherche";
-                ligneVide.innerHTML = '<td colspan="8" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
+                ligneVide.innerHTML = '<td colspan="9" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
                 tbody.appendChild(ligneVide);
             }
 

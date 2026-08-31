@@ -112,7 +112,6 @@ body {
     font-weight: 700;
 }
 
-/* ✅ Base de style commune pour tous les badges de variation */
 .badge-vs {
     display: inline-flex;
     align-items: center;

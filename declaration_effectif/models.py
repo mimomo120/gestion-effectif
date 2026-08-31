@@ -1,5 +1,5 @@
 from django.db import models
-from Collaborateur.models import Collaborateur
+from Collaborateur.models import Collaborateur , Departement
 
 # Create your models here.
 class declaration_effectif(models.Model):
@@ -30,6 +30,20 @@ class historique(models.Model):
     initial=models.CharField(max_length=30,null=False)
     acceuil=models.CharField(max_length=30,null=False)
     etat=models.CharField(max_length=30,null=False)
+    dpt_init=models.ForeignKey(
+        Departement,
+        to_field="abreviation",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="DPT_initial"
+    )
+    dpt_acceuil=models.ForeignKey(
+        Departement,
+        to_field="abreviation",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="DPT_acceuil"
+    )
     def __str__(self):
         return self.initial
 

@@ -1,4 +1,4 @@
-{% extends "declaration_effectif/HRBP/navbar.html" %}
+{% extends "utilisateur/navbar_N1.html" %}
 {% load static %}
 
 {% block title %}Validation du Jour{% endblock %}
@@ -11,10 +11,11 @@
 <div class="page-container">
 
     <!-- En-tête de la page -->
-
     <header class="header">
         <h1>Validation des Déclarations</h1>
+
     </header>
+
     <!-- Carte de Résumé KPI -->
     <div class="stats-summary">
         <div class="summary-card">
@@ -48,6 +49,7 @@
                         <th>Utilisateur</th>
                         <th>Nom & Prénom</th>
                         <th class="text-center">Lot</th>
+                        <th class="text-center">Date</th>
                         <th class="text-end">Action</th>
                     </tr>
                 </thead>
@@ -60,6 +62,7 @@
                         <td class="text-center">
                             <span class="badge-circle">{{ operateur.lot }}</span>
                         </td>
+                        <td class="text-center">{{ date }}</td>
                         <td class="text-end">
                             <button class="alert_btn" data-ru_it="{{ operateur.it }}">Alerter</button>
                         </td>
@@ -72,21 +75,7 @@
                     {% endfor %}
                 </tbody>
             </table>
-            {% if page_obj.paginator.num_pages > 1 %}
-            <div class="pagination-container">
-                {% if page_obj.has_previous %}
-                <a class="page-btn" href="?page={{ page_obj.previous_page_number }}">&laquo; Précédent</a>
-                {% endif %}
-            
-                <span class="page-btn active">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-            
-                {% if page_obj.has_next %}
-                <a class="page-btn" href="?page={{ page_obj.next_page_number }}">Suivant &raquo;</a>
-                {% endif %}
-            </div>
-            {% endif %}
         </div>
-
 
     </div>
 </div>
@@ -144,7 +133,7 @@
         }
 
         try {
-            const response = await fetch(`/filter_date?time=${encodeURIComponent(date)}`);
+            const response = await fetch(`/filter_date_N3/?time=${encodeURIComponent(date)}`);
             if (!response.ok) throw new Error("Erreur réseau");
 
             const data = await response.json();

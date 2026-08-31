@@ -1,4 +1,4 @@
-{% extends 'declaration_effectif/Super/navbar.html' %}
+{% extends "utilisateur/navbar_N1.html" %}
 {% load static %}
 
 {% block title %}Gestion des Utilisateurs{% endblock %}
@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="{% static 'utilisateur/css/Super/dashboard.css' %}">
 {% endblock %}
-<!-- NOTE: le JS de Bootstrap doit être chargé UNE SEULE FOIS, dans navbar.html avant </body> -->
 
 {% block content %}
 <div class="operateurs-container">
@@ -143,6 +142,8 @@
                         <option value="">Déterminer automatiquement</option>
                         <option value="ADMIN">ADMIN</option>
                         <option value="HRBP">HRBP</option>
+                        <option value="DRH">DRH</option>
+
                     </select>
                 </div>
 
@@ -209,6 +210,7 @@
                         <option value="">Déterminer automatiquement</option>
                         <option value="ADMIN">ADMIN</option>
                         <option value="HRBP">HRBP</option>
+                        <option value="DRH">DRH</option>
                     </select>
                 </div>
 
@@ -389,7 +391,7 @@
         }
 
         /* ============================================================
-           SUPPRESSION UTILISATEUR
+        SUPPRESSION UTILISATEUR
            ============================================================ */
         let idASupprimer = null;
         const modalSupprimerEl = document.getElementById("modal-supprimer");
