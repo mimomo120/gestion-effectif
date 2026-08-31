@@ -22,8 +22,22 @@
         <div class="top-bar d-flex justify-content-between align-items-center">
             <!-- Section Gauche: Logo MODULA sur fond clair -->
             <div class="brand-section d-flex align-items-center px-4 py-3">
+                {% if request.session.role == "N+1" %}
                 <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none"
                     href="{% url 'dashboard_N1' %}">
+                    {% elif request.session.role == "N+2" %}
+                    <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'dashboard_N2' %}">
+                    {% elif request.session.role == "N+3" %}
+                    <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'Dashboard_N3' %}">
+                    {% elif request.session.role == "N+4" %}
+                        <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'page_N4' %}">
+                    {% elif request.session.role == "HRBP" %}
+                    <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'dashboard' %}">
+                    {% elif request.session.role == "ADMIN" %}
+                        <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'dashboard' %}">
+                    {% elif request.session.role == "DRH" %}
+                        <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'dashboard' %}">
+                    {% endif %}
                     <!-- Icone Logo SVG -->
                     <svg width="32" height="32" viewBox="0 0 70 55" fill="none" class="flex-shrink-0">
                         <rect x="0" y="40" width="8" height="8" fill="#0d233a" rx="1" />
@@ -74,12 +88,12 @@
                     <!-- Info Utilisateur + Role Dropdown -->
                     <div class="user-details text-start">
                         <div class="dropdown role-switcher">
+                            {% if request.session.roles_disponibles|length > 1 %}
                             <button
                                 class="btn btn-link dropdown-toggle text-dark fw-bold p-0 text-decoration-none shadow-none d-flex align-items-center gap-2"
                                 type="button" id="userRoleDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                                <span class="user-name">{{ request.session.nom|default:"Nadi Yassine" }}</span>
+                                <span class="user-name">{{ request.session.nom|default:" " }}</span>
                             </button>
-                            {% if request.session.roles_disponibles|length > 1 %}
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userRoleDropdown">
                                 <li>
                                     <h6 class="dropdown-header">Changer de rôle</h6>
@@ -93,6 +107,10 @@
                                 </li>
                                 {% endfor %}
                             </ul>
+                            {% else %}
+                            <span class="text-dark fw-bold d-flex align-items-center gap-2">
+                                <span class="user-name">{{ request.session.nom|default:" " }}</span>
+                            </span>
                             {% endif %}
                         </div>
                         <small class="user-role text-muted d-block">{{ request.session.role|default:"N+1" }}</small>
@@ -129,7 +147,7 @@
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'Liste_des_operateurs' %}active{% endif %}"
                             href="{% url 'Liste_des_operateurs' %}">
-                            <i class="fas fa-users me-2"></i>Opérateurs
+                            <i class="fas fa-users me-2"></i>Collaborateurs
                         </a>
                     </li>
                     <li class="nav-item">
