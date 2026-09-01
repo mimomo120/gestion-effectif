@@ -5,6 +5,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'declaration_effectif/css/validation.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 {% endblock %}
 
 {% block content %}
@@ -13,7 +14,6 @@
     <!-- En-tête de la page -->
     <header class="header">
         <h1>Validation des Déclarations</h1>
-
     </header>
 
     <!-- Carte de Résumé KPI -->
@@ -42,6 +42,11 @@
                 <label for="filtre-nom">Rechercher :</label>
                 <input type="text" class="name-input" id="filtre-nom" placeholder="Nom, matricule ou utilisateur...">
             </div>
+            <div class="reset-filter-group">
+                <button type="button" class="btn btn-outline-secondary filter-btn-reset" onclick="resetFilters()">
+                    <i class="fa-solid fa-rotate-left"></i> Effacer
+                </button>
+            </div>
         </div>
 
         <!-- Tableau des données -->
@@ -52,6 +57,7 @@
                         <th>Matricule</th>
                         <th>Utilisateur</th>
                         <th>Nom & Prénom</th>
+                        <th> DPT </th>
                         <th class="text-center">Lot</th>
                         <th class="text-center">Date</th>
                         <th class="text-end">Action</th>
@@ -63,6 +69,7 @@
                         <td class="cell-mono">{{ operateur.matricule }}</td>
                         <td class="cell-mono">{{ operateur.it }}</td>
                         <td class="cell-name">{{ operateur.nom_complete }}</td>
+                        <td class="cell-name">{{ operateur.departement.abreviation }}</td>
                         <td class="text-center">
                             <span class="badge-circle">{{ operateur.lot }}</span>
                         </td>
@@ -73,7 +80,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="empty-row text-center">Aucun responsable d'unité sans validation trouvé.
+                        <td colspan="7" class="empty-row text-center">Aucun responsable d'unité sans validation trouvé.
                         </td>
                     </tr>
                     {% endfor %}
@@ -142,8 +149,6 @@
             .replace(/'/g, "&#039;");
     }
 
-    // Enlève les accents pour une recherche plus tolérante
-    // (ex: "eleve" retrouve "Élève")
     function normaliser(str) {
         return String(str)
             .normalize("NFD")
@@ -170,18 +175,28 @@
         nameInput.addEventListener("input", filterByName);
     }
 
-    // --------------------------------------------------------------
-    // Filtre par nom / matricule / utilisateur : purement côté client,
-    // s'applique sur les lignes déjà affichées (rendu initial ou après
-    // un rechargement AJAX suite à un changement de date).
-    // --------------------------------------------------------------
+    function resetFilters() {
+        if (nameInput) nameInput.value = "";
+
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        const day = String(today.getDate()).padStart(2, "0");
+
+        if (dateInput) {
+            dateInput.value = `${year}-${month}-${day}`;
+            filterByDate();
+        } else {
+            filterByName();
+        }
+    }
+
     function filterByName() {
         const terme = normaliser(nameInput.value);
         const lignes = resultContainer.querySelectorAll("tr");
         let visibles = 0;
 
         lignes.forEach(function (ligne) {
-            // Ignore les lignes "vide" (colspan) qui n'ont pas de vraies cellules de données
             if (ligne.querySelector("td.empty-row") || ligne.cells.length < 3) {
                 return;
             }
@@ -203,6 +218,13 @@
         if (emptySearchRow) {
             emptySearchRow.style.display = (terme !== "" && visibles === 0) ? "block" : "none";
         }
+
+        if (countRu && terme !== "") {
+            countRu.textContent = visibles;
+        } else if (countRu && terme === "") {
+            const validRows = Array.from(lignes).filter(r => !r.querySelector("td.empty-row") && r.cells.length >= 3);
+            countRu.textContent = validRows.length;
+        }
     }
 
     async function filterByDate() {
@@ -211,7 +233,7 @@
         if (!date) {
             resultContainer.innerHTML = `
             <tr>
-                <td colspan="6" class="empty-row text-center">Sélectionnez une date</td>
+                <td colspan="7" class="empty-row text-center">Sélectionnez une date</td>
             </tr>
         `;
             if (countRu) countRu.textContent = "0";
@@ -284,7 +306,7 @@
                 if (countRu) countRu.textContent = "0";
                 resultContainer.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty-row text-center">Aucune donnée pour cette date.</td>
+                    <td colspan="7" class="empty-row text-center">Aucune donnée pour cette date.</td>
                 </tr>
             `;
             }
@@ -293,7 +315,7 @@
             if (countRu) countRu.textContent = "0";
             resultContainer.innerHTML = `
             <tr>
-                <td colspan="6" class="empty-row text-center" style="color: #ef4444;">Erreur lors du chargement des données.</td>
+                <td colspan="7" class="empty-row text-center" style="color: #ef4444;">Erreur lors du chargement des données.</td>
             </tr>
         `;
         } finally {

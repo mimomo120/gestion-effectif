@@ -6,21 +6,19 @@ from .forms import MultipleImportForm
 from Collaborateur.models import Collaborateur, Departement, Unite
 from declaration_effectif.models import historique
 from utilisateur.decorators import role_required
+
 # ------------------------------------------------------------------
-# FONCTIONS AUXILIAIRES SIMPLIFIÉES
+# FONCTIONS AUXILIAIRES
 # ------------------------------------------------------------------
 
 def clean_val(val):
-    """Convertit les valeurs Pandas (NaN, 1467.0) en chaîne propre ou None."""
     if val is None or pd.isna(val):
         return None
     if isinstance(val, float) and val.is_integer():
         return str(int(val))
     return str(val).strip()
 
-
 def clean_int(val, default=0):
-    """Convertit proprement en entier."""
     try:
         if pd.isna(val) or val is None:
             return default
@@ -28,9 +26,7 @@ def clean_int(val, default=0):
     except (ValueError, TypeError):
         return default
 
-
 def read_uploaded_file(fichier):
-    """Lit un fichier Excel ou CSV."""
     if fichier.name.endswith(".csv"):
         df = pd.read_csv(fichier)
     else:
@@ -38,16 +34,11 @@ def read_uploaded_file(fichier):
     df.columns = df.columns.str.strip()
     return df
 
-
 # ------------------------------------------------------------------
-# IMPORT DÉPARTEMENTS (optimisé)
+# IMPORT DÉPARTEMENTS
 # ------------------------------------------------------------------
 
 def importer_departements(df_dpt, erreurs):
-    """Traite le DataFrame des départements de façon optimisée (peu de requêtes)."""
-    crees = 0
-
-    # Préchargement des collaborateurs pouvant être HRBP/ADMIN/DRH (1 seule requête)
     collaborateurs_map = {c.it: c for c in Collaborateur.objects.all()}
     departements_existants = {d.abreviation: d for d in Departement.objects.all()}
 
@@ -62,7 +53,6 @@ def importer_departements(df_dpt, erreurs):
                 continue
 
             nom_dpt = row.get("nom_departement") or abbrev
-
             rh_val = clean_val(row.get("HRBP"))
             admin_val = clean_val(row.get("ADMIN"))
             drh_val = clean_val(row.get("DRH"))
@@ -96,7 +86,6 @@ def importer_departements(df_dpt, erreurs):
                 a_creer.append(obj)
                 departements_existants[abbrev] = obj
 
-            crees += 1
         except Exception as e:
             erreurs.append(f"Départements Ligne {i+2}: {e}")
 
@@ -108,17 +97,13 @@ def importer_departements(df_dpt, erreurs):
                 a_maj, ["nom_departement", "HRBP", "ADMIN", "DRH", "maquette"], batch_size=500
             )
 
-    return crees
-
+    return len(a_creer) + len(a_maj)
 
 # ------------------------------------------------------------------
-# IMPORT UNITÉS (optimisé)
+# IMPORT UNITÉS
 # ------------------------------------------------------------------
 
 def importer_unites(df_unite, erreurs):
-    """Traite le DataFrame des unités de façon optimisée (peu de requêtes)."""
-    crees = 0
-
     unites_existantes = {u.abreviation: u for u in Unite.objects.all()}
     a_creer = []
     a_maj = []
@@ -149,7 +134,6 @@ def importer_unites(df_unite, erreurs):
                 a_creer.append(obj)
                 unites_existantes[abbrev] = obj
 
-            crees += 1
         except Exception as e:
             erreurs.append(f"Unités Ligne {i+2}: {e}")
 
@@ -159,23 +143,16 @@ def importer_unites(df_unite, erreurs):
         if a_maj:
             Unite.objects.bulk_update(a_maj, ["nom", "maquette", "A", "T", "P", "C"], batch_size=500)
 
-    return crees
-
+    return len(a_creer) + len(a_maj)
 
 # ------------------------------------------------------------------
 # IMPORT COLLABORATEURS
 # ------------------------------------------------------------------
 
 def importer_collaborateurs(df_collab, erreurs):
-    """Traite le DataFrame des collaborateurs de façon optimisée (peu de requêtes)."""
-    crees = 0
-
-    # --- Préchargement de TOUTES les données de référence en mémoire (4 requêtes au total) ---
     departements_map = {d.abreviation: d for d in Departement.objects.all()}
     unites_map = {u.abreviation: u for u in Unite.objects.all()}
     collaborateurs_map = {c.it: c for c in Collaborateur.objects.all()}
-    # Map matricule -> it, pour le cas où la colonne "RU" du fichier contient un matricule
-    # plutôt qu'un code "it" (les deux formats sont gérés automatiquement).
     collaborateurs_par_matricule = {
         c.matricule: c.it for c in collaborateurs_map.values() if c.matricule
     }
@@ -202,7 +179,6 @@ def importer_collaborateurs(df_collab, erreurs):
                 erreurs.append(f"Collaborateurs Ligne {i+2}: Unité '{unite_code}' introuvable.")
 
             ru_mat = clean_val(row.get("RU"))
-
             nom = str(row.get("Nom") or "").strip()
             prenom = str(row.get("Prénom") or "").strip()
 
@@ -227,21 +203,17 @@ def importer_collaborateurs(df_collab, erreurs):
             else:
                 obj = Collaborateur(it=utilisateur_it, **data)
                 a_creer.append(obj)
-                collaborateurs_map[utilisateur_it] = obj  # pour que les lignes suivantes le retrouvent
+                collaborateurs_map[utilisateur_it] = obj
 
-            # On garde aussi la map matricule -> it à jour pour ce nouveau/mis à jour collaborateur,
-            # au cas où il serait lui-même référencé comme RU par une autre ligne du fichier.
             if matricule_val:
                 collaborateurs_par_matricule[matricule_val] = utilisateur_it
 
             if ru_mat:
                 ru_a_resoudre.append((utilisateur_it, ru_mat))
 
-            crees += 1
         except Exception as e:
             erreurs.append(f"Collaborateurs Ligne {i+2}: {e}")
 
-    # --- Écriture en base : requêtes groupées au lieu d'une par ligne ---
     with transaction.atomic():
         if a_creer:
             Collaborateur.objects.bulk_create(a_creer, batch_size=500)
@@ -252,8 +224,6 @@ def importer_collaborateurs(df_collab, erreurs):
                 batch_size=500,
             )
 
-    # --- Résolution des RU en une seule passe, après que tous les collaborateurs existent ---
-    # (gère le cas où le RU est plus bas dans le fichier, ou créé dans le même import)
     if ru_a_resoudre:
         tous_les_collabs = {
             c.it: c for c in Collaborateur.objects.filter(it__in=[u for u, _ in ru_a_resoudre])
@@ -265,15 +235,12 @@ def importer_collaborateurs(df_collab, erreurs):
             if collab is None:
                 continue
 
-            # 1er essai : la valeur du fichier est directement un code "it" existant
             ru_it_resolu = ru_val if ru_val in collaborateurs_map else None
-
-            # 2e essai (fallback) : la valeur du fichier est un matricule -> on retrouve son "it"
             if not ru_it_resolu:
                 ru_it_resolu = collaborateurs_par_matricule.get(ru_val)
 
             if ru_it_resolu:
-                collab.ru_it_id = ru_it_resolu  # assignation directe de l'ID, pas de requête supplémentaire
+                collab.ru_it_id = ru_it_resolu
                 a_maj_ru.append(collab)
             else:
                 erreurs.append(
@@ -283,16 +250,13 @@ def importer_collaborateurs(df_collab, erreurs):
         if a_maj_ru:
             Collaborateur.objects.bulk_update(a_maj_ru, ["ru_it"], batch_size=500)
 
-    return crees
+    return len(a_creer) + len(a_maj)
 
 # ------------------------------------------------------------------
-# IMPORT HISTORIQUE DES CHANGEMENTS D'AFFECTATION (optimisé)
+# IMPORT CHANGEMENTS D'AFFECTATION
 # ------------------------------------------------------------------
 
 def importer_changements(df_chg, erreurs):
-    """Traite le DataFrame des changements d'affectation (sharepoint) de façon optimisée."""
-    crees = 0
-
     departements_map = {d.abreviation: d for d in Departement.objects.all()}
     a_creer = []
 
@@ -327,7 +291,6 @@ def importer_changements(df_chg, erreurs):
                 dpt_acceuil=dpt_acceuil_obj,
             )
             a_creer.append(obj)
-            crees += 1
         except Exception as e:
             erreurs.append(f"Changements Ligne {i+2}: {e}")
 
@@ -335,13 +298,14 @@ def importer_changements(df_chg, erreurs):
         if a_creer:
             historique.objects.bulk_create(a_creer, batch_size=500)
 
-    return crees
+    return len(a_creer)
+
 # ------------------------------------------------------------------
 # VUE PRINCIPALE
 # ------------------------------------------------------------------
-@role_required(['HRBP', 'ADMIN','SUPER'])
+
+@role_required(['HRBP', 'ADMIN', 'SUPER'])
 def importer_fichiers_combines(request):
-    list(messages.get_messages(request))
     role = request.session.get('role')
     template_de_base = {
         "HRBP":  "utilisateur/navbar_N1.html",
@@ -350,6 +314,11 @@ def importer_fichiers_combines(request):
     }.get(role, "utilisateur/navbar_N1.html")
 
     if request.method != "POST":
+        # Consomme et vide les anciens messages accumulés lors des changements de rôle
+        storage = messages.get_messages(request)
+        for _ in storage:
+            pass
+        
         return render(request, "import_data/import.html", {
             "form": MultipleImportForm(),
             "template_de_base": template_de_base,
@@ -392,9 +361,6 @@ def importer_fichiers_combines(request):
         except Exception as e:
             messages.error(request, f"Erreur de lecture du fichier Collaborateurs : {e}")
 
-    # --------------------------------------------------------------
-    # 4. IMPORT DES CHANGEMENTS D'AFFECTATION (historique)
-    # --------------------------------------------------------------
     if f_chg:
         try:
             df_chg = read_uploaded_file(f_chg)
@@ -402,13 +368,19 @@ def importer_fichiers_combines(request):
         except Exception as e:
             messages.error(request, f"Erreur de lecture du fichier Changements : {e}")
 
+    # Construction du message récapitulatif par ligne
     resume = []
-    if f_dpt: resume.append(f"{crees_dpts} départements")
-    if f_unite: resume.append(f"{crees_unites} unités")
-    if f_collab: resume.append(f"{crees_collabs} collaborateurs")
-    if f_chg: resume.append(f"{crees_chgs} changements d'affectation")
+    if f_dpt: 
+        resume.append(f"Départements: {crees_dpts} ligne(s) importée(s) avec succès")
+    if f_unite: 
+        resume.append(f"Unités: {crees_unites} ligne(s) importée(s) avec succès")
+    if f_collab: 
+        resume.append(f"Collaborateurs: {crees_collabs} ligne(s) importée(s) avec succès")
+    if f_chg: 
+        resume.append(f"Changements d'affectation: {crees_chgs} ligne(s) importée(s) avec succès")
 
-    messages.success(request, f"Importation terminée : {', '.join(resume)} traité(s).")
+    messages.success(request, "Importation terminée : " + " | ".join(resume))
+    
     if erreurs:
         messages.warning(request, f"{len(erreurs)} avertissement(s) : " + " | ".join(erreurs[:5]))
 

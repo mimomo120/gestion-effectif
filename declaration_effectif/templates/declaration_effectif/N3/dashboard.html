@@ -2,171 +2,170 @@
 {% load static %}
 
 {% block title %}Tableau de bord{% endblock %}
-{% block css%}
+{% block css %}
 <link rel="stylesheet" href="{% static 'utilisateur/css/N2/dashboard.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="page-container">
-<header class="header">
-    <h1>Tableau de bord</h1>
-    <div class="time">
-        <h5 id="time" aria-live="polite">{{ maint }}</h5>
-    </div>
-</header>
-
-<!-- ===== STATISTIQUES GÉNÉRALES ===== -->
-<div class="statistique-cards">
-    <!-- Carte 1: Effectif Réel -->
-    <div class="stat-card card-reel">
-        <h3>Effectif réel</h3>
-        <div class="stat-valeur-group">
-            <span class="valeur">{{ total_r|default:"0" }}</span>
-            <span class="unite">opérateurs</span>
+    <header class="header">
+        <h1>Tableau de bord</h1>
+        <div class="time">
+            <h5 id="time" aria-live="polite">{{ maint }}</h5>
         </div>
-        {% if MR > 0 %}
-        <span class="badge-vs positive">&#9650; +{{ MR }} vs maquette</span>
-        {% elif MR < 0 %} <span class="badge-vs negative">&#9660; {{ MR }} vs maquette</span>
-            {% endif %}
-    </div>
+    </header>
 
-    <!-- Carte 2: Effectif Système -->
-    <div class="stat-card card-systeme">
-        <h3>Effectif système</h3>
-        <div class="stat-valeur-group">
-            <span class="valeur">{{ total_syst|default:"0" }}</span>
-            <span class="unite">opérateurs</span>
+    <!-- ===== STATISTIQUES GÉNÉRALES ===== -->
+    <div class="statistique-cards">
+        <!-- Carte 1: Effectif Réel -->
+        <div class="stat-card card-reel">
+            <h3>Effectif réel</h3>
+            <div class="stat-valeur-group">
+                <span class="valeur">{{ total_r|default:"0" }}</span>
+                <span class="unite">opérateurs</span>
+            </div>
+            {% if MR > 0 %}
+            <span class="badge-vs positive">&#9650; +{{ MR }} vs maquette</span>
+            {% elif MR < 0 %} <span class="badge-vs negative">&#9660; {{ MR }} vs maquette</span>
+                {% endif %}
         </div>
-        {% if MS > 0 %}
-        <span class="badge-vs positive">&#9650; +{{ MS }} vs maquette</span>
-        {% elif MS < 0 %} <span class="badge-vs negative">&#9660; {{ MS }} vs maquette</span>
-            {% endif %}
-    </div>
 
-    <!-- Carte 3: Effectif Maquette -->
-    <div class="stat-card card-maquette">
-        <h3>Effectif maquette</h3>
-        <div class="stat-valeur-group">
-            <span class="valeur">{{ maquette_totale|default:"0" }}</span>
-            <span class="unite">opérateurs</span>
+        <!-- Carte 2: Effectif Système -->
+        <div class="stat-card card-systeme">
+            <h3>Effectif système</h3>
+            <div class="stat-valeur-group">
+                <span class="valeur">{{ total_syst|default:"0" }}</span>
+                <span class="unite">opérateurs</span>
+            </div>
+            {% if MS > 0 %}
+            <span class="badge-vs positive">&#9650; +{{ MS }} vs maquette</span>
+            {% elif MS < 0 %} <span class="badge-vs negative">&#9660; {{ MS }} vs maquette</span>
+                {% endif %}
         </div>
-    </div>
 
-    <!-- Carte 4: RU non validés -->
-    <div class="stat-card card-warning">
-        <h3>RU non validés</h3>
-        <div class="stat-valeur-group">
-            <span class="valeur">{{ non_valides|default:"0" }}</span>
-            <span class="unite">responsables</span>
+        <!-- Carte 3: Effectif Maquette -->
+        <div class="stat-card card-maquette">
+            <h3>Effectif maquette</h3>
+            <div class="stat-valeur-group">
+                <span class="valeur">{{ maquette_totale|default:"0" }}</span>
+                <span class="unite">opérateurs</span>
+            </div>
         </div>
-    </div>
-</div>
 
-<!-- ===== GRAPHIQUES ===== -->
-<div class="charts-grid">
-    <div class="ru-card">
-        <h4>Évolution Réel</h4>
-        <div class="chart-container">
-            <canvas id="chart-global"></canvas>
-        </div>
-    </div>
-    <div class="ru-card">
-        <h4>Réel vs Système vs Maquette par RU</h4>
-        <div class="chart-container">
-            <canvas id="chart-comparatif"></canvas>
-        </div>
-    </div>
-</div>
-
-<!-- ===== STATISTIQUES PAR RU ===== -->
-<div class="section">
-    <div class="section-header">
-        <h2>Statistiques par responsable d'unité</h2>
-        <div class="recherche-ru">
-            <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="7"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input type="text" id="recherche-ru" placeholder="Rechercher par matricule ou nom...">
+        <!-- Carte 4: RU non validés -->
+        <div class="stat-card card-warning">
+            <h3>RU non validés</h3>
+            <div class="stat-valeur-group">
+                <span class="valeur">{{ non_valides|default:"0" }}</span>
+                <span class="unite">responsables</span>
+            </div>
         </div>
     </div>
 
-    <div class="table-container">
-        <table class="table-ru">
-            <thead>
-                <tr>
-                    <th>Utilisateur</th>
-                    <th>Responsable Unité</th>
-                    <th>Lot</th>
-                    <th>Unité</th>
-                    <th>DPT</th>
-                    <th>Effectif réel</th>
-                    <th>Effectif système</th>
-                    <th>Effectif maquette</th>
-                    <th>Responsable</th>
-                </tr>
-            </thead>
-            <tbody id="corps-tableau-ru">
-                {% for ru in liste_ru_stats %}
-                <tr data-matricule="{{ ru.n1.it }}" data-nom="{{ ru.nom_complete }}">
-                    <td class="matricule">{{ ru.n1.it|default:"-" }}</td>
-                    <td>{{ ru.n1.nom_complete|default:"-" }}</td>
-                    <td>{{ ru.n1.lot|default:"-" }}</td>
-                    <td>{% if ru.unite and ru.unite != "None" %}{{ ru.unite }}{% else %}-{% endif %}</td>
-                    <td>{{ ru.n1.departement|default:"-" }}</td>
-
-                    <!-- Effectif Réel -->
-                    <td>
-                        <div class="cell-stat-container">
-                            <span class="valeur-chiffre">{{ ru.reel|default:"0" }}</span>
-                            {% if ru.mr > 0 %}
-                            <span class="badge-vs positive">&#9650; +{{ ru.mr }}</span>
-                            {% elif ru.mr < 0 %} <span class="badge-vs negative">&#9660; {{ ru.mr }}</span>
-                                {% endif %}
-                        </div>
-                    </td>
-
-                    <!-- Effectif Système -->
-                    <td>
-                        <div class="cell-stat-container">
-                            <span class="valeur-chiffre">{{ ru.systeme|default:"0" }}</span>
-                            {% if ru.ms > 0 %}
-                            <span class="badge-vs positive">&#9650; +{{ ru.ms }}</span>
-                            {% elif ru.ms < 0 %} <span class="badge-vs negative">&#9660; {{ ru.ms }}</span>
-                                {% endif %}
-                        </div>
-                    </td>
-
-                    <!-- Effectif Maquette -->
-                    <td>
-                        <div class="cell-stat-container">
-                            <span class="valeur-chiffre">{{ ru.maquette|default:"0" }}</span>
-                        </div>
-                    </td>
-                    <td>{{ ru.n1.ru_it.nom_complete}}</td>
-
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="8" class="empty-row">Aucune donnée disponible</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Pagination -->
-    <div class="pagination-bar" id="pagination-bar">
-        <span class="pagination-info" id="pagination-info"></span>
-        <div class="pagination-controls">
-            <button type="button" id="page-prec" class="pagination-btn">&laquo; Précédent</button>
-            <span class="pagination-pages" id="pagination-pages"></span>
-            <button type="button" id="page-suiv" class="pagination-btn">Suivant &raquo;</button>
+    <!-- ===== GRAPHIQUES ===== -->
+    <div class="charts-grid">
+        <div class="ru-card">
+            <h4>Évolution Réel</h4>
+            <div class="chart-container">
+                <canvas id="chart-global"></canvas>
+            </div>
+        </div>
+        <div class="ru-card">
+            <h4>Réel vs Système vs Maquette par RU</h4>
+            <div class="chart-container">
+                <canvas id="chart-comparatif"></canvas>
+            </div>
         </div>
     </div>
-</div>
+
+    <!-- ===== STATISTIQUES PAR RU ===== -->
+    <div class="section">
+        <div class="section-header">
+            <h2>Statistiques par responsable d'unité</h2>
+            <div class="recherche-ru">
+                <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="recherche-ru" placeholder="Rechercher par matricule ou nom...">
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="table-ru">
+                <thead>
+                    <tr>
+                        <th>Utilisateur</th>
+                        <th>Responsable Unité</th>
+                        <th>Lot</th>
+                        <th>Unité</th>
+                        <th>DPT</th>
+                        <th>Effectif réel</th>
+                        <th>Effectif système</th>
+                        <th>Effectif maquette</th>
+                        <th>Responsable</th>
+                    </tr>
+                </thead>
+                <tbody id="corps-tableau-ru">
+                    {% for ru in liste_ru_stats %}
+                    <tr class="table-row-data" data-matricule="{{ ru.n1.it|default:'' }}"
+                        data-nom="{{ ru.n1.nom_complete|default:'' }}">
+                        <td class="matricule">{{ ru.n1.it|default:"-" }}</td>
+                        <td>{{ ru.n1.nom_complete|default:"-" }}</td>
+                        <td>{{ ru.n1.lot|default:"-" }}</td>
+                        <td>{% if ru.unite and ru.unite != "None" %}{{ ru.unite }}{% else %}-{% endif %}</td>
+                        <td>{{ ru.n1.departement|default:"-" }}</td>
+
+                        <!-- Effectif Réel -->
+                        <td>
+                            <div class="cell-stat-container">
+                                <span class="valeur-chiffre">{{ ru.reel|default:"0" }}</span>
+                                {% if ru.mr > 0 %}
+                                <span class="badge-vs positive">&#9650; +{{ ru.mr }}</span>
+                                {% elif ru.mr < 0 %} <span class="badge-vs negative">&#9660; {{ ru.mr }}</span>
+                                    {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Effectif Système -->
+                        <td>
+                            <div class="cell-stat-container">
+                                <span class="valeur-chiffre">{{ ru.systeme|default:"0" }}</span>
+                                {% if ru.ms > 0 %}
+                                <span class="badge-vs positive">&#9650; +{{ ru.ms }}</span>
+                                {% elif ru.ms < 0 %} <span class="badge-vs negative">&#9660; {{ ru.ms }}</span>
+                                    {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Effectif Maquette -->
+                        <td>
+                            <div class="cell-stat-container">
+                                <span class="valeur-chiffre">{{ ru.maquette|default:"0" }}</span>
+                            </div>
+                        </td>
+                        <td>{{ ru.n1.ru_it.it|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr class="empty-row-initial">
+                        <td colspan="9" class="empty-row">Aucune donnée disponible</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination-bar" id="pagination-bar">
+            <span class="pagination-info" id="pagination-info"></span>
+            <div class="pagination-controls">
+                <button type="button" id="page-prec" class="pagination-btn">&laquo; Précédent</button>
+                <span class="pagination-pages" id="pagination-pages"></span>
+                <button type="button" id="page-suiv" class="pagination-btn">Suivant &raquo;</button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -200,7 +199,7 @@
         type: "bar",
         data: {
             labels: [
-                {% for stat in liste_ru_stats %}"{{ stat.nom_complete|escapejs }}",{% endfor %}
+                {% for stat in liste_ru_stats %}"{{ stat.n1.nom_complete|escapejs }}",{% endfor %}
             ],
         datasets: [
         {
@@ -245,7 +244,7 @@
         if (!rechercheInput || !tbody) return;
 
         const LIGNES_PAR_PAGE = 10;
-        const toutesLesLignes = Array.from(tbody.querySelectorAll("tr[data-matricule]"));
+        const toutesLesLignes = Array.from(tbody.querySelectorAll("tr.table-row-data"));
         let pageActuelle = 1;
 
         const btnPrec = document.getElementById("page-prec");
@@ -272,11 +271,19 @@
         }
 
         function afficher() {
+            // Nettoyage de la ligne dynamique
             const ligneVideExistante = tbody.querySelector(".empty-row-recherche");
             if (ligneVideExistante) ligneVideExistante.remove();
 
             const correspondances = lignesCorrespondantes();
             const total = correspondances.length;
+
+            // Masquer la ligne vide de Django s'il y a des données ou si on recherche
+            const ligneVideInitial = tbody.querySelector(".empty-row-initial");
+            if (ligneVideInitial) {
+                ligneVideInitial.style.display = (toutesLesLignes.length === 0) ? "" : "none";
+            }
+
             const totalPages = Math.max(1, Math.ceil(total / LIGNES_PAR_PAGE));
 
             if (pageActuelle > totalPages) pageActuelle = totalPages;
@@ -290,10 +297,10 @@
                 ligne.style.display = aAfficher.has(ligne) ? "" : "none";
             });
 
-            if (total === 0) {
+            if (total === 0 && toutesLesLignes.length > 0) {
                 const ligneVide = document.createElement("tr");
                 ligneVide.className = "empty-row-recherche";
-                ligneVide.innerHTML = '<td colspan="8" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
+                ligneVide.innerHTML = '<td colspan="9" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
                 tbody.appendChild(ligneVide);
             }
 

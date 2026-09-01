@@ -1,7 +1,7 @@
 {% extends "utilisateur/navbar_N1.html" %}
 {% load static %}
 
-{% block title %}Tableau de bord {% endblock %}
+{% block title %}Tableau de bord{% endblock %}
 
 {% block css %}
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -26,7 +26,7 @@
         </div>
     </div>
 
-    <!-- 1. KPIs (Cartes supérieures) -->
+    <!-- 1. KPIs -->
     <section class="kpi-row mb-4">
         <div class="kpi-card">
             <div class="kpi-icon-wrapper icon-blue">
@@ -36,11 +36,11 @@
                 <span class="kpi-title">Effectif Réel</span>
                 <div class="kpi-val-group">
                     <span class="kpi-value">{{ colReel|default:0 }}</span>
-                    {% if MR < 0 %}
-                        <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MR }}</span>
-                    {% else %}
+                    {% if MR < 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MR
+                        }}</span>
+                        {% else %}
                         <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i>{{ MR }}</span>
-                    {% endif %}
+                        {% endif %}
                 </div>
             </div>
         </div>
@@ -53,11 +53,11 @@
                 <span class="kpi-title">Effectif Système</span>
                 <div class="kpi-val-group">
                     <span class="kpi-value">{{ colSyst|default:"3496" }}</span>
-                    {% if MS < 0 %}
-                        <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MS }}</span>
-                    {% else %}
+                    {% if MS < 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MS
+                        }}</span>
+                        {% else %}
                         <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i>{{ MS }}</span>
-                    {% endif %}
+                        {% endif %}
                 </div>
             </div>
         </div>
@@ -88,10 +88,9 @@
         </div>
     </section>
 
-    <!-- 2. Zone Principale (Graphique + Détails Départements) -->
+    <!-- 2. Zone Principale -->
     <div class="main-grid">
-
-        <!-- Graphique d'évolution -->
+        <!-- Graphique -->
         <div class="card-panel chart-panel">
             <div class="panel-header d-flex justify-content-between align-items-center mb-3">
                 <h2 class="panel-title">Évolution de l'Effectif Réel</h2>
@@ -127,13 +126,13 @@
                         <tr>
                             <td class="dept-name">{{ d.nom }}</td>
                             <td class="dept-values">
-                                <span class="fw-bold">{{ d.reel }}</span> <span class="text-muted">/ {{ d.maquette }}</span>
+                                <span class="fw-bold">{{ d.reel }}</span> <span class="text-muted">/ {{ d.maquette}}</span>
                             </td>
                             <td>
                                 {% if d.mr > 0 %}
-                                    <span class="badge-status badge-warning">-{{ d.mr }}</span>
+                                <span class="badge-status badge-warning">-{{ d.mr }}</span>
                                 {% else %}
-                                    <span class="badge-status badge-success">0</span>
+                                <span class="badge-status badge-success">0</span>
                                 {% endif %}
                             </td>
                             <td class="text-muted">{{ d.syst }}</td>
@@ -142,38 +141,47 @@
                             </td>
                             <td>
                                 {% if d.nb_depart > 0 %}
-                                    <span class="text-danger fw-bold">{{ d.nb_depart }}</span>
+                                <span class="text-danger fw-bold">{{ d.nb_depart }}</span>
                                 {% else %}
-                                    <span class="text-muted">0</span>
+                                <span class="text-muted">0</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if d.ms > 0 %}
-                                    <span class="badge-status badge-warning">-{{ d.ms }}</span>
+                                <span class="badge-status badge-warning">-{{ d.ms }}</span>
                                 {% else %}
-                                    <span class="badge-status badge-success">0</span>
+                                <span class="badge-status badge-success">0</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-muted text-center py-3">Aucune donnée disponible</td>
+                            <td colspan="7" class="text-muted text-center py-3">Aucune donnée disponible</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-
     </div>
 
-    <!-- 3. Détails : Départs récents & Changements d'affectation -->
+    <!-- 3. Départs & Changements -->
     <div class="list-grid mt-4">
-
         <!-- Derniers départs -->
         <div class="card-panel">
-            <div class="panel-header mb-3">
-                <h2 class="panel-title">Derniers Départs</h2>
+            <div class="panel-header mb-3 d-flex justify-content-between align-items-center">
+                <h2 class="panel-title mb-0">Derniers Départs</h2>
+                <form method="GET" class="d-flex align-items-center gap-2">
+                    {% if date_changement %}
+                    <input type="hidden" name="date_changement" value="{{ date_changement }}">
+                    {% endif %}
+                    <input type="date" name="date_depart" value="{{ date_depart }}" class="form-control form-control-sm"
+                        onchange="this.form.submit()">
+                    {% if date_depart %}
+                    <a href="?{% if date_changement %}date_changement={{ date_changement }}{% endif %}"
+                        class="btn btn-sm btn-outline-secondary" title="Réinitialiser"><i class="fas fa-times"></i></a>
+                    {% endif %}
+                </form>
             </div>
             <div class="table-responsive">
                 <table class="table-dept">
@@ -195,7 +203,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-muted text-center py-3">Aucun départ récent</td>
+                            <td colspan="4" class="text-muted text-center py-3">Aucun départ trouvé</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -205,8 +213,19 @@
 
         <!-- Derniers changements d'affectation -->
         <div class="card-panel">
-            <div class="panel-header mb-3">
-                <h2 class="panel-title">Derniers Changements d'Affectation</h2>
+            <div class="panel-header mb-3 d-flex justify-content-between align-items-center">
+                <h2 class="panel-title mb-0">Derniers Changements d'Affectation</h2>
+                <form method="GET" class="d-flex align-items-center gap-2">
+                    {% if date_depart %}
+                    <input type="hidden" name="date_depart" value="{{ date_depart }}">
+                    {% endif %}
+                    <input type="date" name="date_changement" value="{{ date_changement }}"
+                        class="form-control form-control-sm" onchange="this.form.submit()">
+                    {% if date_changement %}
+                    <a href="?{% if date_depart %}date_depart={{ date_depart }}{% endif %}"
+                        class="btn btn-sm btn-outline-secondary" title="Réinitialiser"><i class="fas fa-times"></i></a>
+                    {% endif %}
+                </form>
             </div>
             <div class="table-responsive">
                 <table class="table-dept">
@@ -228,14 +247,13 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-muted text-center py-3">Aucun changement récent</td>
+                            <td colspan="4" class="text-muted text-center py-3">Aucun changement trouvé</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-
     </div>
 
 </div>
@@ -245,11 +263,10 @@
 {{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const ctx = document.getElementById('effectifChart');
         if (ctx) {
             const chartCtx = ctx.getContext('2d');
-            
             const gradient = chartCtx.createLinearGradient(0, 0, 0, 300);
             gradient.addColorStop(0, 'rgba(37, 99, 235, 0.25)');
             gradient.addColorStop(1, 'rgba(37, 99, 235, 0.0)');
@@ -257,38 +274,38 @@
             new Chart(chartCtx, {
                 type: 'line',
                 data: {
-                    labels: {{ labels|safe|default:"[]" }},
-                    datasets: [{
-                        label: 'Effectif réel',
-                        data: {{ valeurs|safe|default:"[]" }},
-                        borderColor: '#2563eb',
-                        borderWidth: 2.5,
-                        pointBackgroundColor: '#2563eb',
-                        pointRadius: 3,
-                        pointHoverRadius: 6,
-                        backgroundColor: gradient,
-                        fill: true,
-                        tension: 0.3
+                    labels: {{labels|safe}},
+        datasets: [{
+            label: 'Effectif réel',
+            data: {{valeurs|safe}},
+        borderColor: '#2563eb',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#2563eb',
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        backgroundColor: gradient,
+        fill: true,
+        tension: 0.3
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false }
-                        },
-                        y: {
-                            suggestedMin: {{ y_min |default:0 }},
-                            suggestedMax: {{ y_max |default:0 }},
-                            ticks: {
-                                stepSize: 5,
-                                precision: 0
-                            },
-                            grid: { color: '#f1f5f9' }
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            x: {
+                grid: { display: false }
+            },
+            y: {
+                suggestedMin: {{ y_min|default:0 }},
+        suggestedMax: {{ y_max|default:0 }},
+        ticks: {
+        stepSize: 5,
+        precision: 0
+    },
+        grid: { color: '#f1f5f9' }
                         }
                     }
                 }

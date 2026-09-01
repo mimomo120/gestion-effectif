@@ -531,13 +531,15 @@ def dashboard_N3 (request):
     maquette_totale = 0
     maint_global = None
 
+    seen_unite_ids = set()
+
     try:
         for collab in collaborateurs_n1:
             ru_it = collab.it
-            
+
             # Injection temporaire du RU dans la session pour exécuter vos 2 fonctions
             request.session["it"] = ru_it
-            
+
             # Effectif système issu de SystEff(request)
             qs_syst = SystEff(collab.it)
             systeme = qs_syst.values('it').distinct().count()
@@ -555,7 +557,13 @@ def dashboard_N3 (request):
             )
             date_ref = last_decl.date if last_decl else None
 
-            maquette = collab.unite.maquette or 0 if collab.unite else 0
+            # --- calcul de la maquette (éviter les doublons par unité) ---
+            maquette = 0
+            unit_key = getattr(collab, "unite_id", None)
+            if unit_key and unit_key not in seen_unite_ids:
+                # collab.unite est select_related, mais on protège l'accès
+                maquette = getattr(collab.unite, "maquette", 0) or 0
+                seen_unite_ids.add(unit_key)
 
             liste_ru_stats.append({
                 "n1": collab,
@@ -564,9 +572,9 @@ def dashboard_N3 (request):
                 "unite": getattr(collab, 'unite_id', None),
                 "reel": reel,
                 "systeme": systeme,
-                "maquette": maquette,
-                "mr": reel - maquette,
-                "ms": systeme - maquette,
+                "maquette": getattr(collab.unite, "maquette", 0) or 0,
+                "mr": reel - getattr(collab.unite, "maquette", 0) or 0,
+                "ms": systeme - getattr(collab.unite, "maquette", 0) or 0,
                 "last_decl_date": date_ref,
             })
 

@@ -236,7 +236,7 @@
         {% if request.session.role == "N+4" %}
         <nav class="sub-navbar border-top">
             <div class="container-fluid px-4">
-                <ul class="navbar-nav me-auto align-items-lg-center">
+                <ul class="nav nav-tabs border-0">
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'page_N4' %}active fw-bold{% endif %}"
                             href="{% url 'page_N4' %}">
@@ -265,6 +265,7 @@
             </div>
         </nav>
         {% endif %}
+
         {% if request.session.role == "HRBP" %}
         <!-- Navigation Bar (Deuxième niveau avec Onglets) -->
         <nav class="sub-navbar border-top">

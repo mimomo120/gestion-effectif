@@ -43,10 +43,18 @@ function showAlert(message, type = 'error') {
         alertEl.innerHTML = `<p style="color: ${type === 'error' ? '#DC2626' : '#16A34A'}; font-weight: 600; margin-top: 10px;">${escapeHtml(message)}</p>`;
     }
 }
+
 function showAlert2(message, type = 'error') {
     const alertEl = document.querySelector(".alert2");
     if (alertEl) {
         alertEl.innerHTML = `<p style="color: ${type === 'error' ? '#DC2626' : '#16A34A'}; font-weight: 600; margin-top: 10px;">${escapeHtml(message)}</p>`;
+    }
+}
+
+function clearAlert2() {
+    const alertEl = document.querySelector(".alert2");
+    if (alertEl) {
+        alertEl.innerHTML = "";
     }
 }
 
@@ -70,7 +78,6 @@ function resetLigneStyle(ligne) {
     const btn_v = ligne.querySelector(".btn-valider");
     const btn_inv = ligne.querySelector(".btn-refuser");
 
-    // Décocher la case de la ligne
     const checkbox = ligne.querySelector(".op-checkbox");
     if (checkbox) {
         checkbox.checked = false;
@@ -86,7 +93,6 @@ function resetLigneStyle(ligne) {
         btn_inv.style.display = "inline-flex";
     }
 
-    // Décocher "Select All" si toutes les cases ne sont plus cochées
     const selectAll = document.getElementById('selectAll');
     if (selectAll) {
         const total = document.querySelectorAll('.op-checkbox').length;
@@ -101,15 +107,24 @@ function appliquerEtatExistant(ligne, it) {
     const checkbox = ligne.querySelector(".op-checkbox");
 
     if (liste_valider.includes(it)) {
-        if (btn_v) btn_v.innerHTML = "✓ Validé";
+        if (btn_v) {
+            btn_v.innerHTML = "✓ Validé";
+            btn_v.style.display = "inline-flex";
+        }
         if (btn_inv) btn_inv.style.display = "none";
         if (checkbox) checkbox.checked = true;
     } else if (liste_D.includes(it)) {
-        if (btn_inv) btn_inv.innerHTML = "⊘ Départ";
+        if (btn_inv) {
+            btn_inv.innerHTML = "⊘ Départ";
+            btn_inv.style.display = "inline-flex";
+        }
         if (btn_v) btn_v.style.display = "none";
         if (checkbox) checkbox.checked = true;
     } else if (liste_C.some(o => o.it === it)) {
-        if (btn_inv) btn_inv.innerHTML = "↻ Changement";
+        if (btn_inv) {
+            btn_inv.innerHTML = "↻ Changement";
+            btn_inv.style.display = "inline-flex";
+        }
         if (btn_v) btn_v.style.display = "none";
         if (checkbox) checkbox.checked = true;
     }
@@ -124,7 +139,6 @@ function fermerModalEnSecurite(modal) {
         console.error("Erreur lors de la fermeture du modal:", error);
     }
 
-    // Nettoyage fiable : on attend l'événement Bootstrap plutôt qu'un délai fixe
     modal.addEventListener("hidden.bs.modal", function nettoyer() {
         modal.removeEventListener("hidden.bs.modal", nettoyer);
         const modalOuvert = document.querySelector(".modal.show");
@@ -237,6 +251,7 @@ document.addEventListener("click", async function (e) {
         liste_valider.push(it);
 
         btnValider.innerHTML = "✓ Validé";
+        btnValider.style.display = "inline-flex";
         if (btn_inv) btn_inv.style.display = "none";
         return;
     }
@@ -264,7 +279,10 @@ document.addEventListener("click", async function (e) {
                 retirerDesListes(it);
                 liste_D.push(it);
 
-                if (btn_inv) btn_inv.innerHTML = "⊘ Départ";
+                if (btn_inv) {
+                    btn_inv.innerHTML = "⊘ Départ";
+                    btn_inv.style.display = "inline-flex";
+                }
                 if (btn_v) btn_v.style.display = "none";
             } catch (error) {
                 console.error("Erreur Départ:", error);
@@ -294,7 +312,10 @@ document.addEventListener("click", async function (e) {
                 retirerDesListes(it);
                 liste_C.push({ it: it, nvRu: nvRu });
 
-                if (btn_inv) btn_inv.innerHTML = "↻ Changement";
+                if (btn_inv) {
+                    btn_inv.innerHTML = "↻ Changement";
+                    btn_inv.style.display = "inline-flex";
+                }
                 if (btn_v) btn_v.style.display = "none";
 
                 nvRuInput.value = "";
@@ -339,7 +360,7 @@ document.addEventListener("click", async function (e) {
     }
 
     if (findRowByIT(it) || liste_A.includes(it)) {
-        showAlert2("  Cet opérateur figure déjà dans la liste");
+        showAlert2("Cet opérateur figure déjà dans la liste");
         inputElement.value = "";
         return;
     }
@@ -348,7 +369,7 @@ document.addEventListener("click", async function (e) {
         const response = await fetch(`${OPERATEUR_URL}?q=${encodeURIComponent(it)}`);
         const data = await response.json();
         if (!response.ok) {
-            showAlert2(data.error || "  Opérateur non trouvé");
+            showAlert2(data.error || "Opérateur non trouvé");
             inputElement.value = "";
             return;
         }
@@ -357,8 +378,6 @@ document.addEventListener("click", async function (e) {
 
         const tbody = document.getElementById("result");
 
-        // Retire la ligne "Aucun opérateur..." si présente, sinon la
-        // nouvelle ligne s'ajoute à côté d'elle au lieu de la remplacer
         const emptyRow = tbody.querySelector(".empty-row");
         if (emptyRow) {
             const emptyTr = emptyRow.closest("tr");
@@ -368,7 +387,6 @@ document.addEventListener("click", async function (e) {
         const newRow = construireLigneOperateur(data);
         tbody.appendChild(newRow);
 
-        // Si "Tout sélectionner" est déjà coché, on aligne la nouvelle ligne
         const selectAll = document.getElementById('selectAll');
         if (selectAll && selectAll.checked) {
             const cb = newRow.querySelector('.op-checkbox');
@@ -385,11 +403,12 @@ document.addEventListener("click", async function (e) {
         }
 
         inputElement.value = "";
+        clearAlert2();
         fermerModalEnSecurite(modal);
         showAlert("Opérateur ajouté avec succès", "success");
     } catch (error) {
-        console.error("  Erreur lors de l'ajout:", error);
-        showAlert2("  Erreur lors de l'ajout de l'opérateur");
+        console.error("Erreur lors de l'ajout:", error);
+        showAlert2("Erreur lors de l'ajout de l'opérateur");
         inputElement.value = "";
     }
 });
@@ -399,6 +418,16 @@ document.addEventListener("click", async function (e) {
 // =====================================================================
 
 document.addEventListener("DOMContentLoaded", function () {
+    // Écouteur pour réinitialiser le modal d'ajout d'opérateur à sa fermeture
+    const modalAjoutOp = document.querySelector("#modalAjoutOp, .modal:has(.btn-confirmer1)");
+    if (modalAjoutOp) {
+        modalAjoutOp.addEventListener("hidden.bs.modal", function () {
+            clearAlert2();
+            const input = modalAjoutOp.querySelector(".nouveau-op-input");
+            if (input) input.value = "";
+        });
+    }
+
     const searchInput = document.getElementById("chercher");
     const lotSelect = document.getElementById("choix");
     const result = document.getElementById("result");
@@ -435,7 +464,6 @@ document.addEventListener("DOMContentLoaded", function () {
         lotSelect.addEventListener("change", performSearch);
     }
 
-    // Select All Checkbox logic
     function reinitialiserLigne(row, it) {
         if (typeof retirerDesListes === 'function') {
             retirerDesListes(it);
@@ -454,6 +482,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (btnModifier) btnModifier.disabled = false;
     }
 
+    // Select All Checkbox logic
     document.addEventListener("change", function (e) {
         if (e.target && e.target.id === 'selectAll') {
             const isChecked = e.target.checked;
@@ -466,11 +495,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 const it = cb.value;
                 const btnValider = row.querySelector('.btn-valider');
+                const btnRefuser = row.querySelector('.btn-refuser');
 
                 if (isChecked) {
-                    if (typeof retirerDesListes === 'function') retirerDesListes(it);
-                    if (typeof liste_valider !== 'undefined') liste_valider.push(it);
-                    if (btnValider) btnValider.click();
+                    retirerDesListes(it);
+                    liste_valider.push(it);
+
+                    if (btnValider) {
+                        btnValider.innerHTML = "✓ Validé";
+                        btnValider.style.display = "inline-flex";
+                    }
+                    if (btnRefuser) {
+                        btnRefuser.style.display = "none";
+                    }
                 } else {
                     reinitialiserLigne(row, it);
                 }
@@ -478,6 +515,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
+    // Individual Checkbox logic
     document.addEventListener("change", function (e) {
         if (e.target && e.target.classList.contains('op-checkbox')) {
             const cb = e.target;
@@ -485,11 +523,19 @@ document.addEventListener("DOMContentLoaded", function () {
             const it = cb.value;
 
             if (cb.checked) {
-                if (typeof retirerDesListes === 'function') retirerDesListes(it);
-                if (typeof liste_valider !== 'undefined') liste_valider.push(it);
+                retirerDesListes(it);
+                liste_valider.push(it);
 
                 const btnValider = row ? row.querySelector('.btn-valider') : null;
-                if (btnValider) btnValider.click();
+                const btnRefuser = row ? row.querySelector('.btn-refuser') : null;
+
+                if (btnValider) {
+                    btnValider.innerHTML = "✓ Validé";
+                    btnValider.style.display = "inline-flex";
+                }
+                if (btnRefuser) {
+                    btnRefuser.style.display = "none";
+                }
             } else {
                 if (row) {
                     reinitialiserLigne(row, it);

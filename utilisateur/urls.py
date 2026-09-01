@@ -21,3 +21,4 @@ urlpatterns = [
     path('utilisateurs/changer-mot-de-passe/', views.changer_mot_de_passe, name='changer_mot_de_passe'),
 ]
 
+

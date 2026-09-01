@@ -87,7 +87,8 @@
                         <circle cx="11" cy="11" r="7"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <input type="text" id="recherche-ru" placeholder="Rechercher par Id ou nom...">
+                    <input type="text" id="recherche-ru" name="recherche-ru-dashboard" autocomplete="off"
+                        placeholder="Rechercher par Id ou nom...">
                 </div>
             </div>
 
@@ -191,7 +192,6 @@
     </div>
 </div>
 {% endblock %}
-
 {% block script %}
 {{ block.super }}
 <!-- Chart.js CDN -->
@@ -220,9 +220,32 @@
     }
     });
 </script>
-<!-- Fichier JS externe -->
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+
+        /* =========================================================
+           0. RÉFÉRENCES COMMUNES
+        ========================================================= */
+        const rechercheInput = document.getElementById("recherche-ru");
+        const tbody = document.getElementById("corps-tableau-ru");
+        if (!rechercheInput || !tbody) return;
+
+        /* ---------------------------------------------------------
+           FIX CHROME — empêche la restauration automatique du champ
+           de recherche après un F5 / retour arrière.
+           Chrome mémorise la valeur d'un champ en se basant sur son
+           attribut "name" + l'URL. En changeant ce "name" à chaque
+           chargement de page (valeur aléatoire), Chrome ne reconnaît
+           plus jamais le champ et n'a donc rien à restaurer.
+           L'id reste inchangé, donc tout le reste du script fonctionne
+           normalement.
+        --------------------------------------------------------- */
+        function reinitialiserChamp() {
+            rechercheInput.setAttribute("name", "recherche-ru-" + Date.now());
+            rechercheInput.value = "";
+            rechercheInput.setAttribute("autocomplete", "off");
+        }
+        reinitialiserChamp();
 
         /* =========================================================
         1. GRAPHIQUE CHART.JS
@@ -244,21 +267,9 @@
                     data: {
                         labels: labels,
                         datasets: [
-                            {
-                                label: "Réel",
-                                data: reel,
-                                backgroundColor: "#dc2626"
-                            },
-                            {
-                                label: "Système",
-                                data: systeme,
-                                backgroundColor: " #16a34a"
-                            },
-                            {
-                                label: "Maquette",
-                                data: maquette,
-                                backgroundColor: "#d97706"
-                            }
+                            { label: "Réel", data: reel, backgroundColor: "#dc2626" },
+                            { label: "Système", data: systeme, backgroundColor: "#16a34a" },
+                            { label: "Maquette", data: maquette, backgroundColor: "#d97706" }
                         ]
                     },
                     options: {
@@ -301,6 +312,8 @@
 
         document.querySelectorAll(".btn-mouvements").forEach(function (btn) {
             btn.addEventListener("click", function () {
+                rechercheInput.blur();
+
                 const it = btn.dataset.it;
                 const ru = donneesRu.find(r => r.it === it);
                 if (!ru) return;
@@ -345,10 +358,6 @@
         /* =========================================================
            3. RECHERCHE ET PAGINATION DYNAMIQUES
         ========================================================= */
-        const rechercheInput = document.getElementById("recherche-ru");
-        const tbody = document.getElementById("corps-tableau-ru");
-        if (!rechercheInput || !tbody) return;
-
         const LIGNES_PAR_PAGE = 10;
         const toutesLesLignes = Array.from(tbody.querySelectorAll("tr[data-it]"));
         let pageActuelle = 1;
@@ -429,6 +438,19 @@
         });
 
         afficher();
+
+        /* =========================================================
+           4. FIX CHROME BFCACHE — cas du bouton "retour" du navigateur
+              (la page peut être restaurée depuis le cache mémoire
+              sans réexécuter DOMContentLoaded)
+        ========================================================= */
+        window.addEventListener("pageshow", function (event) {
+            if (event.persisted) {
+                reinitialiserChamp();
+                pageActuelle = 1;
+                afficher();
+            }
+        });
     });
 </script>
 {% endblock %}

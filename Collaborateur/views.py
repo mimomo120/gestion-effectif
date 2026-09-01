@@ -556,3 +556,42 @@ def verifier(request):
         return JsonResponse({"valide": False, "erreur": "Cet identifiant n'est pas un RU."})
 
     return JsonResponse({"valide": True})
+
+
+def rechercher_N3_par_N4(request):
+    it = request.session.get("it")
+    q = request.GET.get("q", "").strip()
+    lot = request.GET.get("choix", "").strip()
+    page_number = request.GET.get("page", 1)
+
+    n3_valides_ids = liste_N3_N4(it)
+    resultat = Collaborateur.objects.filter(it__in=n3_valides_ids)
+
+    if q:
+        resultat = resultat.filter(
+            Q(matricule__icontains=q) | Q(nom_complete__icontains=q)
+        )
+    if lot:
+        resultat = resultat.filter(lot=lot)
+
+    paginator = Paginator(resultat, 15)
+    page_obj = paginator.get_page(page_number)
+
+    results = [
+        {
+            "matricule": op.matricule,
+            "it": op.it,
+            "nom_complete": op.nom_complete,
+            "lot": op.lot,
+        }
+        for op in page_obj
+    ]
+
+    return JsonResponse({
+        "results": results,
+        "count": paginator.count,
+        "page": page_obj.number,
+        "num_pages": paginator.num_pages,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+    })

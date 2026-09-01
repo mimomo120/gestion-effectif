@@ -700,6 +700,7 @@ def calculer_evolution_effectif_reel(departements, jours=30):
         date_courante += timedelta(days=1)
 
     return {"labels": labels, "valeurs": valeurs}
+
 @role_required(["HRBP", "DRH", "ADMIN"])
 def dashboard_rh(request):
     it = request.session.get("it")
@@ -718,7 +719,6 @@ def dashboard_rh(request):
         y_max = 3530
         departements_qs = Departement.objects.filter(ADMIN_id=it)
     else:
-        # rôle absent ou inconnu : valeurs par défaut sûres, pas de crash
         y_min = 0
         y_max = 0
         departements_qs = Departement.objects.none()
@@ -736,7 +736,6 @@ def dashboard_rh(request):
 
     dernier_etat_activite = {}
     for decl in declarations_activite:
-
         if decl.collaborateur_it_id not in dernier_etat_activite:
             dernier_etat_activite[decl.collaborateur_it_id] = decl.nature
 
@@ -748,7 +747,6 @@ def dashboard_rh(request):
 
     maquette = departements_qs.aggregate(total=Sum("maquette"))["total"] or 0
 
-    # Système par département
     syst_par_dept = dict(
         Collaborateur.objects.filter(departement_id__in=departements)
         .values("departement_id")
@@ -756,7 +754,6 @@ def dashboard_rh(request):
         .values_list("departement_id", "total")
     )
 
-    # Réel par département (mêmes liste_D corrigée)
     reel_par_dept = dict(
         Collaborateur.objects.filter(departement_id__in=departements)
         .exclude(it__in=liste_D)
@@ -765,7 +762,6 @@ def dashboard_rh(request):
         .values_list("departement_id", "total")
     )
 
-    # Nombre de départs ("D" en dernier état) par département
     depart_par_dept = dict(
         Collaborateur.objects.filter(departement_id__in=departements, it__in=liste_D)
         .values("departement_id")
@@ -794,27 +790,37 @@ def dashboard_rh(request):
 
     graphe = calculer_evolution_effectif_reel(departements)
 
-    liste_departs = (
-        declaration_effectif.objects
-        .filter(
-            collaborateur_it__departement_id__in=departements,
-            nature="D",
-            collaborateur_it_id__in=liste_D,
-        )
-        .select_related("collaborateur_it", "collaborateur_it__departement", "Ru")
-        .order_by("-date")[:10]
-    )
+    # --- NOUVEAU : Récupération des filtres de dates ---
+    date_depart = request.GET.get("date_depart")
+    date_changement = request.GET.get("date_changement")
 
-    liste_changements = (
-        declaration_effectif.objects.filter(
-            collaborateur_it__departement_id__in=departements,
-            nature="C"
-        )
-        .select_related("collaborateur_it", "collaborateur_it__departement", "Ru", "nv_Ru")
-        .order_by("-date")[:10]
+    # Requête de base pour les départs
+    liste_departs_qs = declaration_effectif.objects.filter(
+        collaborateur_it__departement_id__in=departements,
+        nature="D",
+        collaborateur_it_id__in=liste_D,
     )
+    if date_depart:
+        liste_departs_qs = liste_departs_qs.filter(date=date_depart)
+
+    liste_departs = liste_departs_qs.select_related(
+        "collaborateur_it", "collaborateur_it__departement", "Ru"
+    ).order_by("-date")[:10]
+
+    # Requête de base pour les changements
+    liste_changements_qs = declaration_effectif.objects.filter(
+        collaborateur_it__departement_id__in=departements,
+        nature="C"
+    )
+    if date_changement:
+        liste_changements_qs = liste_changements_qs.filter(date=date_changement)
+
+    liste_changements = liste_changements_qs.select_related(
+        "collaborateur_it", "collaborateur_it__departement", "Ru", "nv_Ru"
+    ).order_by("-date")[:10]
 
     today = timezone.now().date()
+    
     context = {
         "departements": departements,
         "colSyst": colSyst,
@@ -831,9 +837,13 @@ def dashboard_rh(request):
         "liste_changements": liste_changements,
         "y_min": y_min,
         "y_max": y_max,
+        # Transmission des dates sélectionnées au template
+        "date_depart": date_depart or "",
+        "date_changement": date_changement or "",
     }
 
     return render(request, "declaration_effectif/HRBP/dashboard.html", context)
+
 
 def derniers_mouvements_respo(it_respo, limite=10):
     """

@@ -5,6 +5,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'utilisateur/css/N2/affectation.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 {% endblock %}
 
 {% block content %}
@@ -39,6 +40,11 @@
                 <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés</option>
             </select>
         </div>
+        <div class="filter-reset">
+            <button type="button" class="btn btn-outline-secondary filter-btn-reset" onclick="resetFilters()">
+                <i class="fa-solid fa-rotate-left"></i> Effacer
+            </button>
+        </div>
     </div>
 
     <div class="sections-wrapper">
@@ -69,7 +75,8 @@
                             </td>
                             <td class="text-center">
                                 {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                                <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat|slugify }}">
+                                <span class="badge badge-{{ affectation.etat|slugify }}"
+                                    title="{{ affectation.etat|slugify }}">
                                     {{ affectation.etat }}
                                 </span>
                                 {% else %}
@@ -130,7 +137,8 @@
                             </td>
                             <td class="text-center">
                                 {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                                <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat|slugify }}">
+                                <span class="badge badge-{{ affectation.etat|slugify }}"
+                                    title="{{ affectation.etat|slugify }}">
                                     {{ affectation.etat }}
                                 </span>
                                 {% else %}
@@ -179,6 +187,23 @@
             const text = row.textContent.toLowerCase();
             row.style.display = text.includes(filter) ? "" : "none";
         });
+    }
+
+    function resetFilters() {
+        const searchInput = document.getElementById("searchInput");
+        if (searchInput) {
+            searchInput.value = "";
+            localStorage.removeItem("savedSearch");
+            filterTable();
+        }
+
+        // Réinitialisation du filtre d'état vers "all" s'il est sélectionné
+        const currentTab = "{% if request.GET.tab == 'tab-toutes' %}tab-toutes{% else %}tab-mes{% endif %}";
+        const currentStatus = "{{ status }}";
+
+        if (currentStatus && currentStatus !== "all") {
+            location.href = '?tab=' + currentTab + '&status=all';
+        }
     }
 
     document.addEventListener("DOMContentLoaded", function () {

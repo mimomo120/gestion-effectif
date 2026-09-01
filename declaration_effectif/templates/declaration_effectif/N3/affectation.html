@@ -9,10 +9,10 @@
 
 {% block content %}
 <div class="affectations-container">
-<header class="header">
-    <h1>Gestion des affectations</h1>
-    
-</header>
+    <header class="header">
+        <h1>Gestion des affectations</h1>
+    </header>
+
     <!-- Onglets de navigation (Conserve le filtre d'état en paramètre URL) -->
     <div class="tabs-switch" role="tablist">
         <a href="?tab=tab-mes{% if status %}&status={{ status }}{% endif %}"
@@ -30,6 +30,9 @@
         <div class="filter-group">
             <input type="text" id="searchInput" class="filter-input" placeholder="Rechercher par nom, RU ou état..." />
         </div>
+        <button type="button" class="btn btn-outline-secondary filter-btn-reset" id="resetBtn">
+            <i class="fa-solid fa-rotate-left"></i> Effacer
+        </button>
         <div class="filter-box">
             <select id="statusFilter" class="filter-select"
                 onchange="location.href='?tab={% if request.GET.tab == 'tab-toutes' %}tab-toutes{% else %}tab-mes{% endif %}&status=' + this.value">
@@ -69,7 +72,8 @@
                             </td>
                             <td class="text-center">
                                 {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                                <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat|slugify }}">
+                                <span class="badge badge-{{ affectation.etat|slugify }}"
+                                    title="{{ affectation.etat|slugify }}">
                                     {{ affectation.etat }}
                                 </span>
                                 {% else %}
@@ -128,15 +132,16 @@
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                        <td class="text-center">
-                            {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                            <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat|slugify }}">
-                                {{ affectation.etat }}
-                            </span>
-                            {% else %}
-                            <span class="badge badge-en-attente">En attente</span>
-                            {% endif %}
-                        </td>
+                            <td class="text-center">
+                                {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
+                                <span class="badge badge-{{ affectation.etat|slugify }}"
+                                    title="{{ affectation.etat|slugify }}">
+                                    {{ affectation.etat }}
+                                </span>
+                                {% else %}
+                                <span class="badge badge-en-attente">En attente</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
@@ -172,6 +177,8 @@
 <script>
     function filterTable() {
         const input = document.getElementById("searchInput");
+        if (!input) return;
+
         const filter = input.value.toLowerCase();
         const rows = document.querySelectorAll("#result .table-row");
 
@@ -183,16 +190,37 @@
 
     document.addEventListener("DOMContentLoaded", function () {
         const searchInput = document.getElementById("searchInput");
+        const resetBtn = document.getElementById("resetBtn");
+        const currentTab = "{% if request.GET.tab == 'tab-toutes' %}tab-toutes{% else %}tab-mes{% endif %}";
 
-        if (localStorage.getItem("savedSearch")) {
+        if (localStorage.getItem("savedSearch") && searchInput) {
             searchInput.value = localStorage.getItem("savedSearch");
             filterTable();
         }
 
-        searchInput.addEventListener("keyup", function () {
-            localStorage.setItem("savedSearch", searchInput.value);
-            filterTable();
-        });
+        if (searchInput) {
+            searchInput.addEventListener("keyup", function () {
+                localStorage.setItem("savedSearch", searchInput.value);
+                filterTable();
+            });
+        }
+
+        if (resetBtn) {
+            resetBtn.addEventListener("click", function () {
+                // 1. Vide le champ texte et le stockage local
+                if (searchInput) {
+                    searchInput.value = "";
+                }
+                localStorage.removeItem("savedSearch");
+                filterTable();
+
+                // 2. Si un filtre d'état était appliqué, recharge la page sans ce filtre
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has("status") && urlParams.get("status") !== "all") {
+                    window.location.href = `?tab=${currentTab}&status=all`;
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

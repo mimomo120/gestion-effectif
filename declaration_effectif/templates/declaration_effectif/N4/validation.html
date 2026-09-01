@@ -5,18 +5,16 @@
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'declaration_effectif/css/validation.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 {% endblock %}
 
 {% block content %}
 <div class="page-container">
 
     <!-- En-tête de la page -->
-    <div class="page-header">
-        <div class="header-title">
-            <h1>Validation des Déclarations</h1>
-            <p>Suivi et relance des responsables d'unité n'ayant pas validé leur journée</p>
-        </div>
-    </div>
+    <header class="header">
+        <h1>Validation des Déclarations</h1>
+    </header>
 
     <!-- Carte de Résumé KPI -->
     <div class="stats-summary">
@@ -39,6 +37,15 @@
             <div class="date-filter-group">
                 <label for="date">Date de déclaration :</label>
                 <input type="date" class="date-input" id="date">
+            </div>
+            <div class="search-filter-group">
+                <label for="search">Recherche :</label>
+                <input type="text" class="search-input" id="search" placeholder="Matricule, utilisateur ou nom...">
+            </div>
+            <div class="reset-filter-group">
+                <button type="button" class="btn btn-outline-secondary filter-btn-reset" onclick="resetFilters()">
+                    <i class="fa-solid fa-rotate-left"></i> Effacer
+                </button>
             </div>
         </div>
 
@@ -93,6 +100,7 @@
 
     const csrftoken = getCookie('csrftoken');
     const dateInput = document.getElementById("date");
+    const searchInput = document.getElementById("search");
     const resultContainer = document.getElementById("result");
     const head = document.getElementById("titre");
     const countRu = document.getElementById("count-ru");
@@ -107,18 +115,55 @@
             .replace(/'/g, "&#039;");
     }
 
-    document.addEventListener("DOMContentLoaded", function () {
+    function getTodayFormatted() {
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, "0");
         const day = String(today.getDate()).padStart(2, "0");
-        dateInput.value = `${year}-${month}-${day}`;
+        return `${year}-${month}-${day}`;
+    }
 
+    document.addEventListener("DOMContentLoaded", function () {
+        dateInput.value = getTodayFormatted();
         attachAlertListeners();
     });
 
     if (dateInput) {
         dateInput.addEventListener("change", filterByDate);
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener("input", filterBySearch);
+    }
+
+    function resetFilters() {
+        if (searchInput) searchInput.value = "";
+        if (dateInput) {
+            dateInput.value = getTodayFormatted();
+            filterByDate();
+        } else {
+            filterBySearch();
+        }
+    }
+
+    function filterBySearch() {
+        const term = searchInput.value.trim().toLowerCase();
+        const rows = resultContainer.querySelectorAll("tr");
+
+        rows.forEach(function (row) {
+            if (row.querySelector("td[colspan]")) {
+                row.style.display = "";
+                return;
+            }
+
+            const cellsMono = row.querySelectorAll(".cell-mono");
+            const matricule = cellsMono[0]?.textContent.toLowerCase() || "";
+            const utilisateur = cellsMono[1]?.textContent.toLowerCase() || "";
+            const nom = row.querySelector(".cell-name")?.textContent.toLowerCase() || "";
+
+            const match = matricule.includes(term) || utilisateur.includes(term) || nom.includes(term);
+            row.style.display = match ? "" : "none";
+        });
     }
 
     async function filterByDate() {
@@ -213,6 +258,8 @@
             </tr>
         `;
         }
+
+        filterBySearch();
     }
 
     function attachAlertListeners() {

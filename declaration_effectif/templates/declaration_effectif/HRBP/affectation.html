@@ -24,7 +24,7 @@
         </div>
         <div class="filter-box">
             <select id="statusFilter" class="filter-select" onchange="applyFilters()">
-                <option value="all" {% if status == "all" or not status %}selected{% endif %}>Tous les états</option>
+                <option value="all" {% if status  ==  "all" or not status %}selected{% endif %}>Tous les états</option>
                 <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
                 <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
                 <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés</option>
@@ -38,6 +38,11 @@
                 <option value="{{ dpt }}" {% if dpt_filtre == dpt %}selected{% endif %}>{{ dpt }}</option>
                 {% endfor %}
             </select>
+        </div>
+        <div class="filter-box">
+            <button type="button" class="btn btn-outline-secondary filter-btn-reset" onclick="resetFilters()">
+                <i class="fa-solid fa-rotate-left"></i> Effacer
+            </button>
         </div>
     </div>
 
@@ -61,7 +66,6 @@
                             <td class="cell-primary">
                                 {{ affectation.collaborateur|default:"—" }}
                             </td>
-
                             <td>
                                 {{ affectation.initial|default:"—" }}
                             </td>
@@ -139,6 +143,11 @@
         const status = document.getElementById("statusFilter").value;
         const dpt = document.getElementById("dptFilter").value;
         window.location.href = '?status=' + encodeURIComponent(status) + '&dpt=' + encodeURIComponent(dpt);
+    }
+
+    function resetFilters() {
+        localStorage.removeItem("savedSearch");
+        window.location.href = window.location.pathname;
     }
 
     function filterTable() {

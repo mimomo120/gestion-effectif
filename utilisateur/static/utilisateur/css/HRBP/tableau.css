@@ -20,10 +20,16 @@
     --badge-neutral-text: #475569;
 }
 
+* {
+    box-sizing: border-box;
+}
+
 body {
     background-color: var(--page-bg);
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Page Container */
@@ -172,11 +178,45 @@ body {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
-.panel-title {
+.card-panel .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.panel-header .panel-title {
     font-size: 1rem;
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
+}
+
+.panel-header form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.panel-header form input[type="date"] {
+    height: 36px;
+    padding: 0.35rem 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    max-width: 150px;
+    min-width: 110px;
+}
+
+.panel-header form .btn {
+    height: 36px;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.875rem;
 }
 
 /* Grilles Principales */
@@ -184,8 +224,6 @@ body {
     display: grid;
     grid-template-columns: 1.8fr 1.2fr;
     gap: 1.25rem;
-    /* Force les deux panneaux (graphique + départements) à la même hauteur,
-       quel que soit le contenu de chacun */
     align-items: stretch;
 }
 
@@ -213,8 +251,7 @@ body {
     width: 100%;
 }
 
-/* Détail par Département : hauteur alignée sur le graphique,
-   avec défilement interne si beaucoup de départements (cas DRH) */
+/* Tables scrollables */
 .dept-panel .table-responsive {
     max-height: 320px;
     overflow-y: auto;
@@ -224,32 +261,32 @@ body {
     position: sticky;
     top: 0;
     background-color: var(--card-bg);
-    z-index: 1;
+    z-index: 2;
 }
 
-/* Derniers Départs / Derniers Changements : même logique,
-   pour ne pas dépendre du nombre de lignes selon le rôle */
 .list-grid .table-responsive {
-    max-height: 280px;
+    max-height: 420px;
     overflow-y: auto;
+    padding-right: 6px;
 }
 
 .list-grid .table-dept thead th {
     position: sticky;
     top: 0;
     background-color: var(--card-bg);
-    z-index: 1;
+    z-index: 2;
 }
 
-/* Tableaux */
+/* Styles des Tableaux */
 .table-dept {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0 0.35rem;
     font-size: 0.85rem;
+    margin: 0;
 }
 
-.table-dept th {
+.table-dept thead th {
     color: var(--text-secondary);
     font-weight: 600;
     font-size: 0.75rem;
@@ -258,11 +295,13 @@ body {
     padding: 0.6rem 0.75rem;
     border-bottom: 2px solid var(--border-color);
     text-align: center;
+    vertical-align: middle;
 }
 
 .table-dept th:first-child,
 .table-dept td:first-child {
     text-align: left;
+    padding-left: 1rem;
 }
 
 .table-dept tbody tr {
@@ -281,12 +320,12 @@ body {
     color: var(--text-primary);
 }
 
-.table-dept td:first-child {
+.table-dept tbody tr td:first-child {
     border-top-left-radius: 8px;
     border-bottom-left-radius: 8px;
 }
 
-.table-dept td:last-child {
+.table-dept tbody tr td:last-child {
     border-top-right-radius: 8px;
     border-bottom-right-radius: 8px;
 }
@@ -300,7 +339,6 @@ body {
     white-space: nowrap;
 }
 
-/* Badges dans les tableaux */
 .badge-status {
     padding: 3px 8px;
     border-radius: 6px;
@@ -318,7 +356,31 @@ body {
     color: var(--badge-pos-text);
 }
 
-/* Responsive Layout */
+.text-muted {
+    color: var(--text-secondary) !important;
+}
+
+/* Design Scrollbar */
+.list-grid .table-responsive::-webkit-scrollbar,
+.dept-panel .table-responsive::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.list-grid .table-responsive::-webkit-scrollbar-thumb,
+.dept-panel .table-responsive::-webkit-scrollbar-thumb {
+    background: rgba(15, 23, 42, 0.12);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.list-grid .table-responsive::-webkit-scrollbar-track,
+.dept-panel .table-responsive::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Responsive */
 @media (max-width: 1200px) {
     .main-grid {
         grid-template-columns: 1fr;
@@ -330,20 +392,54 @@ body {
 }
 
 @media (max-width: 992px) {
-
-    .kpi-row,
-    .list-grid {
+    .kpi-row {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .list-grid {
+        grid-template-columns: 1fr 1fr;
     }
 }
 
-@media (max-width: 576px) {
-    .page-container {
-        padding: 1rem;
-    }
+@media (max-width: 768px) {
 
     .kpi-row,
     .list-grid {
         grid-template-columns: 1fr;
+    }
+
+    .panel-header {
+        gap: 0.5rem;
+    }
+
+    .panel-header form input[type="date"] {
+        max-width: 100%;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .panel-header form .btn {
+        flex: 0 0 auto;
+    }
+
+    .list-grid .table-responsive {
+        max-height: 360px;
+    }
+}
+
+@media (max-width: 420px) {
+    .page-container {
+        padding: 0.75rem;
+    }
+
+    .kpi-card,
+    .card-panel {
+        padding: 0.75rem;
+    }
+
+    .table-dept thead th,
+    .table-dept td {
+        padding: 0.45rem 0.5rem;
+        font-size: 0.8rem;
     }
 }
