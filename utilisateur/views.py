@@ -96,7 +96,6 @@ def login_view(request):
                 "utilisateur/login.html")
 
 
-#Cree ou bien deriger vers la page de register
 # ============================================================
 # register_view : crée un compte utilisateur pour un IT donné en
 # déduisant automatiquement son rôle (N+1 à N+4) à partir de sa
@@ -569,10 +568,8 @@ def ajouter_user(request):
         if utilisateur.objects.filter(it=col).exists():
             return JsonResponse({"error": "Cet utilisateur est déjà enregistré."}, status=400)
 
-        # Calcul des hiérarchies
         role_calcule, n1, n2, n3, n4 = determiner_hierarchie(it_val)
 
-        # Le rôle est soit celui du formulaire, soit celui calculé automatiquement
         role_final = role_form or role_calcule
 
         if not role_final:
@@ -636,7 +633,6 @@ def modifier_user(request, id):
 
     role_form = (data.get("role") or "").strip()
 
-    # Recalcule la hiérarchie (N1..N4) pour cet utilisateur
     role_calcule, n1, n2, n3, n4 = determiner_hierarchie(util.it_id)
     role_final = role_form or role_calcule
 
@@ -644,10 +640,6 @@ def modifier_user(request, id):
         return JsonResponse({"error": "Impossible de déterminer un rôle pour cet utilisateur."}, status=400)
 
     util.role = role_final
-    util.N1 = n1
-    util.N2 = n2
-    util.N3 = n3
-    util.N4 = n4
     util.ADMIN = 1 if role_final == "ADMIN" else 0
     util.HRBP = 1 if role_final == "HRBP" else 0
     util.SUPER = 1 if role_final == "SUPER" else 0
@@ -725,7 +717,6 @@ def dashboard_rh(request):
 
     departements = list(departements_qs.values_list("abreviation", flat=True))
 
-    # --- Totaux globaux ---
     colSyst = Collaborateur.objects.filter(departement_id__in=departements).count()
 
     declarations_activite = (
@@ -790,11 +781,9 @@ def dashboard_rh(request):
 
     graphe = calculer_evolution_effectif_reel(departements)
 
-    # --- NOUVEAU : Récupération des filtres de dates ---
     date_depart = request.GET.get("date_depart")
     date_changement = request.GET.get("date_changement")
 
-    # Requête de base pour les départs
     liste_departs_qs = declaration_effectif.objects.filter(
         collaborateur_it__departement_id__in=departements,
         nature="D",
@@ -807,7 +796,6 @@ def dashboard_rh(request):
         "collaborateur_it", "collaborateur_it__departement", "Ru"
     ).order_by("-date")[:10]
 
-    # Requête de base pour les changements
     liste_changements_qs = declaration_effectif.objects.filter(
         collaborateur_it__departement_id__in=departements,
         nature="C"
@@ -837,7 +825,6 @@ def dashboard_rh(request):
         "liste_changements": liste_changements,
         "y_min": y_min,
         "y_max": y_max,
-        # Transmission des dates sélectionnées au template
         "date_depart": date_depart or "",
         "date_changement": date_changement or "",
     }
@@ -902,6 +889,6 @@ def changer_mot_de_passe(request):
     if not user.check_password(ancien_password):
         return JsonResponse({"error": "Mot de passe actuel incorrect."}, status=400)
 
-    user.set_password(nouveau_password)  # hash + save() déjà géré par la méthode du modèle
+    user.set_password(nouveau_password)
 
     return JsonResponse({"success": True})

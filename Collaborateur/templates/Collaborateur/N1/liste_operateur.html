@@ -240,9 +240,7 @@
         lotSelect.addEventListener("change", () => { currentPage = 1; applyFilters(); });
         dateInput.addEventListener("change", () => { currentPage = 1; applyFilters(); });
         resetBtn.addEventListener("click", resetFilters);
-
-        // Synchronise l'affichage initial (rendu Django, non filtré) avec le
-        // filtre par défaut actif à l'écran (date = aujourd'hui)
+        
         applyFilters();
     });
 </script>

@@ -314,7 +314,6 @@ def importer_fichiers_combines(request):
     }.get(role, "utilisateur/navbar_N1.html")
 
     if request.method != "POST":
-        # Consomme et vide les anciens messages accumulés lors des changements de rôle
         storage = messages.get_messages(request)
         for _ in storage:
             pass
