@@ -530,7 +530,7 @@ def notifications(request):
     alert = Alert.objects.filter(recepteur=it)
     nv = alert.filter(lu=False).count()
     return {
-        "notifications": alert,
+        "notifications": alert.order_by("-date")[:5],
         "nb_notifications": nv,
     }
 @role_required('SUPER')

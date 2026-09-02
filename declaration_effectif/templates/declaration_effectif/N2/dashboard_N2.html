@@ -182,7 +182,6 @@
             </div>
             <div class="modal-body">
                 <ul class="liste-mouvements" id="liste-mouvements-body">
-                    <!-- Rempli dynamiquement en JS -->
                 </ul>
             </div>
             <div class="modal-footer">
@@ -224,22 +223,12 @@
     document.addEventListener("DOMContentLoaded", function () {
 
         /* =========================================================
-           0. RÉFÉRENCES COMMUNES
+        0. RÉFÉRENCES COMMUNES
         ========================================================= */
         const rechercheInput = document.getElementById("recherche-ru");
         const tbody = document.getElementById("corps-tableau-ru");
         if (!rechercheInput || !tbody) return;
 
-        /* ---------------------------------------------------------
-           FIX CHROME — empêche la restauration automatique du champ
-           de recherche après un F5 / retour arrière.
-           Chrome mémorise la valeur d'un champ en se basant sur son
-           attribut "name" + l'URL. En changeant ce "name" à chaque
-           chargement de page (valeur aléatoire), Chrome ne reconnaît
-           plus jamais le champ et n'a donc rien à restaurer.
-           L'id reste inchangé, donc tout le reste du script fonctionne
-           normalement.
-        --------------------------------------------------------- */
         function reinitialiserChamp() {
             rechercheInput.setAttribute("name", "recherche-ru-" + Date.now());
             rechercheInput.value = "";
@@ -289,7 +278,7 @@
         }
 
         /* =========================================================
-           2. MODAL DERNIERS MOUVEMENTS
+        2. MODAL DERNIERS MOUVEMENTS
         ========================================================= */
         const modalMouvementsEl = document.getElementById("modal-mouvements-ru");
         const modalMouvements = (typeof bootstrap !== "undefined" && modalMouvementsEl)
@@ -332,7 +321,7 @@
                         ? `${m.collaborateur} (${m.collaborateur_it || "-"})`
                         : "-";
                     if (m.nature === "C" && m.nouveau_responsable) {
-                        detail += ` → vers ${m.nouveau_responsable}`;
+                        detail += ` → vers ${m.nouveau_responsable }`;
                     }
 
                     li.innerHTML = `
@@ -439,11 +428,6 @@
 
         afficher();
 
-        /* =========================================================
-           4. FIX CHROME BFCACHE — cas du bouton "retour" du navigateur
-              (la page peut être restaurée depuis le cache mémoire
-              sans réexécuter DOMContentLoaded)
-        ========================================================= */
         window.addEventListener("pageshow", function (event) {
             if (event.persisted) {
                 reinitialiserChamp();

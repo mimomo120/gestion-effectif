@@ -3,46 +3,51 @@
 Application Django de gestion des effectifs, des affectations et des validations par rôle (N+1, N+2, N+3, N+4).
 
 Version du projet : 2.0.0
-Date de version : 2026-08-31
+Date de version : 2026-09-02
 
 ## 1. Présentation
 
 Ce projet permet de :
 - gérer les collaborateurs et les unités de travail,
 - importer les données de structure (unités et collaborateurs),
-- enregistrer les déclarations d’effectif par RU,
+- enregistrer les déclarations d'effectif par RU,
 - suivre les validations et refus au niveau hiérarchique,
 - consulter des tableaux de bord selon le profil utilisateur,
-- gérer les alertes et l’historique des changements.
+- gérer les alertes et l'historique des changements,
+- exporter les effectifs réels au format Excel (HRBP/DRH/ADMIN).
 
 ## 2. Stack technique
 
-- Python 3.14
+- Python 3.10+ (développé avec 3.14)
 - Django 6.0.7
-- SQLite
-- HTML / CSS / JavaScript
-- Pandas 2.2.3 pour l’import de fichiers Excel/CSV
-- OpenPyXL 3.1.5
+- SQLite (développement) / PostgreSQL (production recommandée)
+- HTML / CSS / JavaScript / Chart.js
+- Pandas 2.2.3 pour l'import de fichiers Excel/CSV
+- OpenPyXL 3.1.5 pour l'export Excel
+- python-dotenv pour la gestion des variables d'environnement
 
 ## 3. Structure du projet
 
-- `config/` : configuration Django du projet
+- `config/` : configuration Django du projet (settings, urls, wsgi)
 - `Collaborateur/` : modèles et vues liées aux collaborateurs, départements, unités et listes hiérarchiques
-- `declaration_effectif/` : déclarations d’effectif, validations, historiques et alertes
+- `declaration_effectif/` : déclarations d'effectif, validations, historiques et alertes
 - `utilisateur/` : authentification, rôles et gestion des accès
 - `import_data/` : import de fichiers Excel/CSV
 - `static/` : fichiers CSS/JS globaux
-- `db.sqlite3` : base de données locale SQLite
-- `manage.py` : point d’entrée Django
+- `db.sqlite3` : base de données locale SQLite (développement uniquement — ne doit pas être versionnée)
+- `manage.py` : point d'entrée Django
+- `.env.example` : modèle des variables d'environnement à copier en `.env`
+- `requirements.txt` : dépendances Python
 
 ## 4. Rôles fonctionnels
 
 Le système est organisé autour de différents niveaux de gestion :
 
-- N+1 : gestion directe des opérateurs / validation d’effectif
-- N+2 : supervision des RU et validation des changements
-- N+3 : suivi au niveau DUR
-- N+4 : niveau hiérarchique supérieur / validation de niveau 4
+- **N+1** : gestion directe des opérateurs / validation d'effectif
+- **N+2** : supervision des RU et validation des changements
+- **N+3** : suivi au niveau DUR
+- **N+4** : niveau hiérarchique supérieur / validation de niveau 4
+- **HRBP / DRH / ADMIN** : vue consolidée par département, export des effectifs
 
 ## 5. Fonctionnalités principales
 
@@ -56,7 +61,7 @@ Le système est organisé autour de différents niveaux de gestion :
 - traitement des unités et des collaborateurs,
 - mise à jour ou création des objets métier.
 
-### Déclaration d’effectif
+### Déclaration d'effectif
 - validation et enregistrement des opérateurs actifs,
 - ajout / départ / changement de RU,
 - historique des déclarations.
@@ -64,12 +69,16 @@ Le système est organisé autour de différents niveaux de gestion :
 ### Tableaux de bord
 - vues spécifiques selon le rôle,
 - statistiques sur les effectifs système/réel,
-- comparaison avec la maquette.
+- comparaison avec la maquette,
+- graphiques (Chart.js) : évolution sur 7 jours, comparatif réel/système/maquette par RU.
+
+### Export
+- export Excel de l'effectif réel (HRBP/DRH/ADMIN), filtré par département.
 
 ### Alertes et historique
-- génération d’alertes,
+- génération d'alertes,
 - suivi des décisions de validation ou refus,
-- consultation de l’historique des affectations.
+- consultation de l'historique des affectations.
 
 ## 6. Prérequis
 
@@ -77,60 +86,159 @@ Le système est organisé autour de différents niveaux de gestion :
 - pip
 - environnement virtuel recommandé
 
-## 7. Installation
+## 7. Installation (développement local)
 
-1. Cloner le projet
+1. Cloner le projet :
+   ```bash
+   git clone https://github.com/mimomo120/gestion-effectif.git
+   cd gestion-effectif
+   ```
 2. Créer un environnement virtuel :
+   ```bash
    python -m venv venv
-3. Activer l’environnement :
+   ```
+3. Activer l'environnement :
    - Windows :
+     ```bash
      venv\Scripts\activate
+     ```
    - Linux/macOS :
+     ```bash
      source venv/bin/activate
+     ```
 4. Installer les dépendances :
+   ```bash
    pip install -r requirements.txt
+   ```
+5. (Optionnel en développement) Copier le modèle de variables d'environnement :
+   ```bash
+   cp .env.example .env
+   ```
+   Sans fichier `.env`, l'application démarre automatiquement avec SQLite et `DEBUG=True`.
 
-## 8. Démarrage
+## 8. Démarrage (développement)
 
 Depuis la racine du projet :
 
+```bash
 python manage.py migrate
 python manage.py runserver
+```
 
 puis ouvrir :
 
+```
 http://127.0.0.1:8000/
+```
 
 ## 9. Base de données
 
-Le projet utilise SQLite par défaut avec le fichier :
-
-- db.sqlite3
+- **Développement** : SQLite par défaut (`db.sqlite3`), aucune configuration nécessaire.
+- **Production** : PostgreSQL, activé automatiquement dès que la variable `DB_NAME` est définie dans `.env` (voir section 11).
 
 ## 10. Commandes utiles
 
 - Créer les migrations :
+  ```bash
   python manage.py makemigrations
-
+  ```
 - Appliquer les migrations :
+  ```bash
   python manage.py migrate
-
+  ```
 - Lancer le shell Django :
+  ```bash
   python manage.py shell
-
+  ```
 - Vérifier le projet :
+  ```bash
   python manage.py check
+  ```
+- Sauvegarder les données (avant migration de base) :
+  ```bash
+  python manage.py dumpdata --natural-foreign --natural-primary -e contenttypes -e auth.Permission --indent 2 > data_backup.json
+  ```
+- Recharger les données :
+  ```bash
+  python manage.py loaddata data_backup.json
+  ```
 
-## 11. Points d’attention
+## 11. Déploiement en production
 
-- Le projet est conçu pour un contexte interne d’entreprise avec des rôles hiérarchiques spécifiques.
-- La configuration actuelle est en mode développement, avec `DEBUG = True` et une clé secrète de test.
-- Pour un usage en production, il faudra sécuriser les paramètres Django, la base de données et les fichiers statiques.
+### 11.1. Fichiers nécessaires
 
-## 12. Auteurs / contexte
+| Fichier | Rôle |
+|---|---|
+| `.env.example` | Modèle des variables d'environnement — à copier en `.env` et compléter avec les vraies valeurs sur le serveur |
+| `.gitignore` | Exclut `.env`, `db.sqlite3`, `__pycache__/`, `/staticfiles/`, etc. du dépôt Git |
+| `Procfile` | Commandes de démarrage pour plateformes cloud (Heroku, Railway, Render...) |
+| `requirements.txt` | Contient désormais aussi `psycopg2-binary`, `gunicorn`, `whitenoise` |
+
+### 11.2. Variables d'environnement à définir sur le serveur
+
+Copier `.env.example` en `.env` (ou configurer ces variables directement dans l'interface de la plateforme cloud) :
+
+```
+SECRET_KEY=une-cle-secrete-longue-et-aleatoire
+DEBUG=False
+ALLOWED_HOSTS=tondomaine.com,www.tondomaine.com
+
+DB_NAME=gestion_effectif
+DB_USER=app_user
+DB_PASSWORD=un-mot-de-passe-fort
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+Générer une `SECRET_KEY` robuste :
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+### 11.3. Base de données PostgreSQL
+
+1. Installer PostgreSQL sur le serveur (ou utiliser un service managé).
+2. Créer la base et l'utilisateur :
+   ```sql
+   CREATE DATABASE gestion_effectif;
+   CREATE USER app_user WITH PASSWORD 'un-mot-de-passe-fort';
+   GRANT ALL PRIVILEGES ON DATABASE gestion_effectif TO app_user;
+   ```
+3. Une fois `DB_NAME` défini dans `.env`, l'application bascule automatiquement sur PostgreSQL.
+
+### 11.4. Étapes de mise en production
+
+```bash
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py collectstatic --noinput
+gunicorn config.wsgi --log-file -
+```
+
+Sur un VPS classique (hors plateforme cloud type Heroku), ajouter Nginx en reverse proxy devant Gunicorn, et servir les fichiers statiques via WhiteNoise (déjà configuré dans `settings.py`).
+
+### 11.5. Checklist avant mise en ligne
+
+- [ ] `DEBUG=False` dans `.env`
+- [ ] `ALLOWED_HOSTS` renseigné avec le(s) vrai(s) domaine(s)
+- [ ] `SECRET_KEY` unique générée pour la production (jamais celle de développement)
+- [ ] Base de données PostgreSQL configurée et migrée
+- [ ] `python manage.py collectstatic` exécuté
+- [ ] `db.sqlite3` non présent / non utilisé en production
+- [ ] HTTPS actif (certificat SSL) et `SECURE_SSL_REDIRECT = True` si applicable
+- [ ] Sauvegardes régulières de la base PostgreSQL planifiées
+
+## 12. Points d'attention
+
+- Le projet est conçu pour un contexte interne d'entreprise avec des rôles hiérarchiques spécifiques.
+- En développement local sans `.env`, l'application utilise SQLite et `DEBUG=True` par défaut — pratique, mais à ne jamais laisser en production.
+- Un second `manage.py` (`config/manage.py`) est un doublon à supprimer.
+- `db.sqlite3` contient des données réelles (2.8 Mo) et est actuellement suivi par Git — il devrait être retiré du suivi de version (`git rm --cached db.sqlite3`) une fois le `.gitignore` en place.
+
+## 13. Auteurs / contexte
 
 Ce projet est une application de gestion RH / effectifs interne, destinée à suivre et valider les déclarations des collaborateurs selon les niveaux de management.
 
 ---
 
-Ce README a été mis à jour pour refléter la structure réelle du projet et ses fonctionnalités métier.
+Ce README a été mis à jour pour refléter la structure réelle du projet, ses fonctionnalités métier et les étapes de déploiement en production.

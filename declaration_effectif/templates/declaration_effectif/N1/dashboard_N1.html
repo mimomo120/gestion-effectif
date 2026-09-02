@@ -36,7 +36,7 @@
             {% if diff_r_m > 0 %} <div class="badge-vs positive">
                 <i class="fas fa-arrow-up me-1"></i> +{{ diff_r_m|default:"0" }} vs Maquette
         </div>
-        {% else %}
+        {% elif diff_r_m < 0 %}
         <div class="badge-vs negative">
             <i class="fas fa-arrow-down me-1"></i>{{ diff_r_m|default:"0" }} vs Maquette
         </div>
@@ -53,9 +53,9 @@
         {% if diff_s_m > 0 %} <div class="badge-vs positive">
             <i class="fas fa-arrow-up me-1"></i>+{{ diff_s_m|default:"0" }} vs Maquette
     </div>
-    {% else %}
+    {% elif diff_s_m < 0 %}
     <div class="badge-vs negative">
-        <i class="fas fa-arrow-down me-1"></i>{{ diff_s_m }} vs Maquette
+        <i class="fas fa-arrow-down me-1"></i>{{ diff_s_m|default:"0" }} vs Maquette
     </div>
     {% endif %}
 </div>
