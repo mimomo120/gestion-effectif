@@ -426,10 +426,6 @@ def Rg_Dur(it):
     resultat=Collaborateur.objects.filter(it__in=liste)
     return (resultat)
 
-from django.core.paginator import Paginator
-from django.http import JsonResponse
-from django.db.models import Q
-
 def rechercher_N2_par_N3(request):
     it = request.session.get("it")
     q = request.GET.get("q", "").strip()

@@ -64,14 +64,14 @@
                             <td class="cell-primary">{{ affectation.collaborateur }}</td>
                             <td>{{ affectation.initial }}</td>
                             <td>
-                                {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
+                                {% if affectation.acceuil and affectation.acceuil %}
                                 {{ affectation.acceuil }}
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
+                                {% if affectation.etat and affectation.etat %}
                                 <span class="badge badge-{{ affectation.etat|slugify }}"
                                     title="{{ affectation.etat|slugify }}">
                                     {{ affectation.etat }}
@@ -126,14 +126,14 @@
                             <td class="cell-primary">{{ affectation.collaborateur }}</td>
                             <td>{{ affectation.initial }}</td>
                             <td>
-                                {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
+                                {% if affectation.acceuil and affectation.acceuil %}
                                 {{ affectation.acceuil }}
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
+                                {% if affectation.etat and affectation.etat %}
                                 <span class="badge badge-{{ affectation.etat|slugify }}"
                                     title="{{ affectation.etat|slugify }}">
                                     {{ affectation.etat }}

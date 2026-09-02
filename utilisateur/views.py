@@ -30,7 +30,6 @@ from django.views.decorators.http import require_POST
 def login_view(request):
     if request.method == "POST":
         it = request.POST.get("it")
-        passwd=make_password("oumaima123")
         password = request.POST.get("password")
         try:
             utilis = utilisateur.objects.get(pk=it)
@@ -184,7 +183,6 @@ def determiner_hierarchie(it_val):
     liste_N4.discard(None)
     liste4 = Collaborateur.objects.filter(it__in=liste_N4)
     l4 = set(liste4.values_list("it", flat=True))
-
     n1_flag = 1 if it_val in l1 else 0
     n2_flag = 1 if it_val in l2 else 0
     n3_flag = 1 if it_val in l3 else 0

@@ -40,7 +40,8 @@
             <div class="search-filter-group">
                 <label for="search">Recherche :</label>
                 <input type="text" class="search-input" id="search" placeholder="Matricule, utilisateur ou nom...">
-                <button type="button" class="btn btn-outline-secondary filter-btn-reset" id="reset-btn" onclick="resetFilters()">
+                <button type="button" class="btn btn-outline-secondary filter-btn-reset" id="reset-btn"
+                    onclick="resetFilters()">
                     <i class="fa-solid fa-rotate-left"></i> Effacer
                 </button>
             </div>
@@ -177,7 +178,7 @@
         }
 
         try {
-            const response = await fetch(`/filter_date?time=${encodeURIComponent(date)}`);
+            const response = await fetch(`/filter_date_N3?time=${encodeURIComponent(date)}`);
             if (!response.ok) throw new Error("Erreur réseau");
 
             const data = await response.json();

@@ -77,7 +77,7 @@ def valider(request):
 def validation_view(request):
     it = request.session.get("it")
     if not it:
-        return render(request, 'declaration_effectif/Validation.html', {
+        return render(request, 'declaration_effectif/N1/Validation.html', {
             "operateurs_finaux": [], "nbr": 0, "status": False, "date": timezone.localdate()
         })
 
@@ -469,7 +469,7 @@ def affectation_N3(request):
         "status": status,
     }
 
-    return render(request, "declaration_effectif/N3/affectation.html", context)
+    return render(request, "declaration_effectif/N2/affectation.html", context)
     
 # ============================================================
 # fct pr engregistrer les alerts envoier
@@ -820,16 +820,16 @@ def affectation_N4(request):
 
     return render(
         request,
-        "declaration_effectif/N4/affectation.html",
-        {
-            "toutes_declarations_N4": page_obj_n4,
-            "page_obj_n4": page_obj_n4,
-            "toutes_declarations": page_obj_n1,
-            "page_obj_n1": page_obj_n1,
-            "total_N4": total_N4,
-            "total_nbr": total_nbr,
-            "status": status,
-        }
+        "declaration_effectif/N2/affectation.html",
+    {
+        "n2": page_obj_n4,
+        "page_obj_n2": page_obj_n4,
+        "info": page_obj_n1,
+        "page_obj_n1": page_obj_n1,
+        "nbr2": total_N4,
+        "nbr": total_nbr,
+        "status": status,
+    }
     )
 
 # ============================================================
@@ -1143,6 +1143,54 @@ def filter_date2(request):
         for r in ru_qs
     ]
 
+    return JsonResponse({
+        "resultats": resultats,
+        "status": status
+    })
+
+# ============================================================
+# liste des validation filtre par date pr N+4
+# ============================================================
+def validation_date_N4(request):
+    time_str = request.GET.get("time", "")
+    it = request.session.get("it")
+
+    # Conversion sécurisée de la chaîne en objet date Python
+    query_date = parse_date(time_str) if time_str else None
+
+    # Vérification si la date sélectionnée est aujourd'hui
+    # status = False si c'est aujourd'hui, True sinon
+    is_today = (query_date == timezone.localdate()) if query_date else False
+    status = not is_today
+
+    # 1. Récupération des N+1 gérés (via les N+3 sous ce N+4)
+    liste = []
+    liste_N3 = liste_N3_N4(it)
+    for n in liste_N3:
+        liste.extend(liste_N1_pr_N3(n))
+
+    liste_n1 = set(liste)
+
+    # 2. Récupération des RU ayant déjà fait leur déclaration
+    declarations_faites = set()
+    if query_date:
+        declarations_faites = set(
+            declaration_effectif.objects.filter(
+                date=query_date,
+                Ru_id__in=liste_n1
+            ).values_list("Ru_id", flat=True)
+        )
+
+    # 3. Soustraction entre les 2 sets Python (les IT non encore déclarés)
+    liste_it_manquants = liste_n1 - declarations_faites
+
+    # 4. Filtrage des collaborateurs correspondants
+    resultats = list(
+        Collaborateur.objects.filter(it__in=liste_it_manquants)
+        .values("matricule", "it", "nom_complete", "lot")
+    )
+
+    # 5. Retour sous forme de réponse JSON propre
     return JsonResponse({
         "resultats": resultats,
         "status": status
