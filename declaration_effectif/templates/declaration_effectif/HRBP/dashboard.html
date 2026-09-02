@@ -24,6 +24,15 @@
                 <span>{{ today|default:"29 Août 2026" }}</span>
             </div>
         </div>
+        <div class="actions-bar d-flex gap-2 align-items-center">
+            <div class="date-badge">
+                <i class="far fa-calendar-alt me-2"></i>
+                <span>{{ today|default:"29 Août 2026" }}</span>
+            </div>
+            <a href="{% url 'export_effectif_reel' %}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-file-excel me-2"></i>Exporter le réel
+            </a>
+        </div>
     </div>
 
     <!-- 1. KPIs -->

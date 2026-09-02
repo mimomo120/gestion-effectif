@@ -87,8 +87,8 @@
                         <circle cx="11" cy="11" r="7"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <input type="text" id="recherche-ru" name="recherche-ru-dashboard" autocomplete="off"
-                        placeholder="Rechercher par Id ou nom...">
+                    <input type="text" id="recherche-ru" name="search-nofill"  autocomplete="off" data-lpignore="true"
+                        placeholder="Rechercher par Id ou nom..." >
                 </div>
             </div>
 
@@ -267,14 +267,14 @@
                     data: {
                         labels: labels,
                         datasets: [
-                            { label: "Réel", data: reel, backgroundColor: "#dc2626" },
+                            { label: "Réel", data: reel, backgroundColor: "#3b82f6" },
                             { label: "Système", data: systeme, backgroundColor: "#16a34a" },
-                            { label: "Maquette", data: maquette, backgroundColor: "#d97706" }
+                            { label: "Maquette", data: maquette, backgroundColor: "#f59e0b" }
                         ]
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false, barThickness: 15,
+                        maintainAspectRatio: false, barThickness: 20,
                         plugins: {
                             legend: { position: "top" },
                             tooltip: { mode: "index", intersect: false }

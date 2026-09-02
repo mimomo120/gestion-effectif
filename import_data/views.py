@@ -6,7 +6,11 @@ from .forms import MultipleImportForm
 from Collaborateur.models import Collaborateur, Departement, Unite
 from declaration_effectif.models import historique
 from utilisateur.decorators import role_required
-
+from declaration_effectif.models import declaration_effectif
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+from django.utils import timezone
+from django.http import HttpResponse
 # ------------------------------------------------------------------
 # FONCTIONS AUXILIAIRES
 # ------------------------------------------------------------------
@@ -387,3 +391,106 @@ def importer_fichiers_combines(request):
         "form": MultipleImportForm(),
         "template_de_base": template_de_base,
     })
+
+# ============================================================
+# Récupère les collaborateurs "réels" (hors départs) avec leur RU d'affichage
+# (RU d'accueil si changement, sinon RU habituel)
+# ============================================================
+def get_collaborateurs_reels(departements):
+    collaborateurs = (
+        Collaborateur.objects
+        .filter(departement_id__in=departements)
+        .select_related("departement", "unite", "ru_it")
+    )
+
+    ids = list(collaborateurs.values_list("it", flat=True))
+
+    # Dernière déclaration pertinente (C, D, A, V) par collaborateur
+    declarations = (
+        declaration_effectif.objects
+        .filter(collaborateur_it_id__in=ids, nature__in=["C", "D", "A", "V"])
+        .select_related("nv_Ru")
+        .order_by("collaborateur_it_id", "-date", "-id")
+    )
+
+    dernier_par_collab = {}
+    for d in declarations:
+        cid = d.collaborateur_it_id
+        if cid not in dernier_par_collab:
+            dernier_par_collab[cid] = d
+
+    resultats = []
+    for c in collaborateurs:
+        d = dernier_par_collab.get(c.it)
+
+        # Exclusion des départs
+        if d and d.nature == "D":
+            continue
+
+        if d and d.nature == "C" and d.nv_Ru_id:
+            ru_affiche = d.nv_Ru_id
+        else:
+            ru_affiche = c.ru_it_id
+
+        resultats.append({
+            "collaborateur": c,
+            "ru": ru_affiche,
+        })
+
+    return resultats
+
+@role_required(["HRBP", "DRH", "ADMIN"])
+def export_effectif_reel(request):
+    it = request.session.get("it")
+    role = request.session.get("role")
+
+    if role == "HRBP":
+        departements_qs = Departement.objects.filter(HRBP_id=it)
+    elif role == "DRH":
+        departements_qs = Departement.objects.filter(DRH_id=it)
+    elif role == "ADMIN":
+        departements_qs = Departement.objects.filter(ADMIN_id=it)
+    else:
+        departements_qs = Departement.objects.none()
+
+    departements = list(departements_qs.values_list("abreviation", flat=True))
+
+    resultats = get_collaborateurs_reels(departements)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Effectif Réel"
+    headers = ["Matricule", "IT", "Nom & Prénom", "Département", "Unité", "Lot", "RU(utilisateur)"]
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="1e293b", end_color="1e293b", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    for r in sorted(resultats, key=lambda x: (x["collaborateur"].departement_id or "", x["collaborateur"].nom_complete)):
+        c = r["collaborateur"]
+        ws.append([
+            c.matricule,
+            c.it,
+            c.nom_complete,
+            c.departement.abreviation if c.departement else "-",
+            c.unite_id if c.unite_id else "-",
+            c.lot,
+            r["ru"] or "-",
+        ])
+
+    for col_cells in ws.columns:
+        length = max(len(str(cell.value)) for cell in col_cells if cell.value is not None)
+        ws.column_dimensions[col_cells[0].column_letter].width = max(length + 2, 12)
+
+    today_str = timezone.localdate().strftime("%Y-%m-%d")
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="effectif_reel_{today_str}.xlsx"'
+    wb.save(response)
+
+    return response
