@@ -4,14 +4,13 @@ from django.shortcuts import render, redirect
 from utilisateur.models import utilisateur
 from Collaborateur.models import Departement , Collaborateur
 from django.contrib.auth.hashers import make_password , check_password
-from django.db.models import Q
+from django.db.models import Q , Exists, OuterRef
 from django.contrib import messages
 from django.utils import timezone
 from declaration_effectif.models import declaration_effectif
 from django.http import JsonResponse
 from datetime import date , datetime
 from django.core.paginator import Paginator
-
 #-------------------------------------------------------#
 #Cette fct return les operateurs d'un responsable N+1
 #-------------------------------------------------------#
@@ -348,14 +347,17 @@ def liste_par_jour(request):
 #-------------------------------------------------------#
 
 def Ru_Rg(it):
-    collab = Collaborateur.objects.filter(ru_it_id=it).exclude(it=it)
-    liste = []
-    if collab:
-        for c in collab:
-            if Collaborateur.objects.filter(Q(ru_it_id=c.it) & ~Q(it=it)).count() > 0:
-                liste.append(c.it)
-    result = Collaborateur.objects.filter(it__in=liste)
-    return result
+    a_des_subordonnes = Collaborateur.objects.filter(
+        ru_it_id=OuterRef('it')
+    ).exclude(it=it)
+
+    return Collaborateur.objects.filter(
+        ru_it_id=it
+    ).exclude(
+        it=it
+    ).annotate(
+        has_sub=Exists(a_des_subordonnes)
+    ).filter(has_sub=True)
 
 
 #-------------------------------------------------------#
@@ -417,14 +419,23 @@ def rechercher_N1_par_N2(request):
 #-------------------------------------------------------#
 
 def Rg_Dur(it):
-    operateurs=Collaborateur.objects.filter(Q(ru_it_id=it)&~Q(it=it))
-    liste=[]
-    for c in operateurs :
-        lis=Ru_Rg(c.it).count()
-        if lis>0:
-            liste.append(c.it)
-    resultat=Collaborateur.objects.filter(it__in=liste)
-    return (resultat)
+    ccc_exists = Collaborateur.objects.filter(
+        ru_it_id=OuterRef('it')
+    ).exclude(it=it)
+    cc_qs = Collaborateur.objects.filter(
+        ru_it_id=OuterRef('it')
+    ).exclude(it=it).annotate(
+        has_ccc=Exists(ccc_exists)
+    ).filter(has_ccc=True)
+
+    return Collaborateur.objects.filter(
+        ru_it_id=it
+    ).exclude(
+        it=it
+    ).annotate(
+        has_sub=Exists(cc_qs)
+    ).filter(has_sub=True)
+
 
 def rechercher_N2_par_N3(request):
     it = request.session.get("it")
@@ -474,17 +485,20 @@ def rechercher_N2_par_N3(request):
 #-------------------------------------------------------#
 def liste_N1_pr_N3(it):
     n2 = Rg_Dur(it)
-    rg_ids = set(n2.values_list("it", flat=True))
+    rg_ids = list(n2.values_list("it", flat=True))
+    has_sub = Collaborateur.objects.filter(
+        ru_it_id=OuterRef('it')
+    ).exclude(it=OuterRef('ru_it_id'))
 
-    n1 = set()
-    for rg in n2:
-        ru_du_rg = Ru_Rg(rg.it)
-        n1.update(ru_du_rg.values_list("it", flat=True))
+    n1_qs = Collaborateur.objects.filter(
+        ru_it_id__in=rg_ids
+    ).exclude(
+        it__in=rg_ids
+    ).annotate(
+        has_sub=Exists(has_sub)
+    ).filter(has_sub=True)
 
-    n1 -= rg_ids
-
-    return n1
-
+    return set(n1_qs.values_list("it", flat=True))
 #-------------------------------------------------------#
 #Cette fct rederige vers templete de liste des N+2 par N+3
 #-------------------------------------------------------#
