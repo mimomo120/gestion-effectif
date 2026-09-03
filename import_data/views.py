@@ -152,7 +152,6 @@ def importer_unites(df_unite, erreurs):
 # ------------------------------------------------------------------
 # IMPORT COLLABORATEURS
 # ------------------------------------------------------------------
-
 def importer_collaborateurs(df_collab, erreurs):
     departements_map = {d.abreviation: d for d in Departement.objects.all()}
     unites_map = {u.abreviation: u for u in Unite.objects.all()}
@@ -164,6 +163,7 @@ def importer_collaborateurs(df_collab, erreurs):
     a_creer = []
     a_maj = []
     ru_a_resoudre = []
+    collaborateurs_dans_fichier = set()
 
     for i, row in df_collab.iterrows():
         try:
@@ -171,6 +171,8 @@ def importer_collaborateurs(df_collab, erreurs):
             if not utilisateur_it:
                 erreurs.append(f"Collaborateurs Ligne {i+2}: Identifiant Utilisateur manquant.")
                 continue
+
+            collaborateurs_dans_fichier.add(utilisateur_it)  # Enregistrer ce collaborateur
 
             dpt_code = clean_val(row.get("DPT"))
             dpt_obj = departements_map.get(dpt_code) if dpt_code else None
@@ -218,6 +220,9 @@ def importer_collaborateurs(df_collab, erreurs):
         except Exception as e:
             erreurs.append(f"Collaborateurs Ligne {i+2}: {e}")
 
+    # Identifier les collaborateurs à supprimer (présents en DB mais pas dans le fichier)
+    collaborateurs_a_supprimer = set(collaborateurs_map.keys()) - collaborateurs_dans_fichier
+
     with transaction.atomic():
         if a_creer:
             Collaborateur.objects.bulk_create(a_creer, batch_size=500)
@@ -227,6 +232,9 @@ def importer_collaborateurs(df_collab, erreurs):
                 ["matricule", "nom_complete", "lot", "departement", "unite", "eq", "shift", "sexe"],
                 batch_size=500,
             )
+        # Supprimer les collaborateurs absents du nouveau fichier
+        if collaborateurs_a_supprimer:
+            deleted_count, _ = Collaborateur.objects.filter(it__in=collaborateurs_a_supprimer).delete()
 
     if ru_a_resoudre:
         tous_les_collabs = {
@@ -254,8 +262,7 @@ def importer_collaborateurs(df_collab, erreurs):
         if a_maj_ru:
             Collaborateur.objects.bulk_update(a_maj_ru, ["ru_it"], batch_size=500)
 
-    return len(a_creer) + len(a_maj)
-
+    return len(a_creer) + len(a_maj) + len(collaborateurs_a_supprimer)
 # ------------------------------------------------------------------
 # IMPORT CHANGEMENTS D'AFFECTATION
 # ------------------------------------------------------------------
@@ -308,7 +315,7 @@ def importer_changements(df_chg, erreurs):
 # VUE PRINCIPALE
 # ------------------------------------------------------------------
 
-@role_required(['HRBP', 'ADMIN', 'SUPER'])
+@role_required(['HRBP', 'ADMIN', 'SUPER',"PILOT"])
 def importer_fichiers_combines(request):
     role = request.session.get('role')
     template_de_base = {
@@ -334,10 +341,10 @@ def importer_fichiers_combines(request):
     f_collab = request.FILES.get("fichier_collaborateur")
     f_unite = request.FILES.get("fichier_unite")
     f_dpt = request.FILES.get("fichier_departement")
-    f_chg = request.FILES.get("fichier_changement")  
+    f_chg = request.FILES.get("fichier_changement")
 
     if not (f_collab or f_unite or f_dpt or f_chg):
-        messages.error(request, "Veuillez fournir au moins un fichier à importer.")
+        messages.error(request, "Veuillez fournir au moins un fichier à importer.", extra_tags="import")
         return render(request, "import_data/import.html", {"form": form, "template_de_base": template_de_base})
 
     erreurs = []
@@ -348,28 +355,28 @@ def importer_fichiers_combines(request):
             df_dpt = read_uploaded_file(f_dpt)
             crees_dpts = importer_departements(df_dpt, erreurs)
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Départements : {e}")
+            messages.error(request, f"Erreur de lecture du fichier Départements : {e}" ,extra_tags="import")
 
     if f_unite:
         try:
             df_unite = read_uploaded_file(f_unite)
             crees_unites = importer_unites(df_unite, erreurs)
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Unités : {e}")
+            messages.error(request, f"Erreur de lecture du fichier Unités : {e}",extra_tags="import")
 
     if f_collab:
         try:
             df_collab = read_uploaded_file(f_collab)
             crees_collabs = importer_collaborateurs(df_collab, erreurs)
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Collaborateurs : {e}")
+            messages.error(request, f"Erreur de lecture du fichier Collaborateurs : {e}" , extra_tags="import")
 
     if f_chg:
         try:
             df_chg = read_uploaded_file(f_chg)
             crees_chgs = importer_changements(df_chg, erreurs)
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Changements : {e}")
+            messages.error(request, f"Erreur de lecture du fichier Changements : {e}" ,extra_tags="import")
 
     # Construction du message récapitulatif par ligne
     resume = []
@@ -382,10 +389,10 @@ def importer_fichiers_combines(request):
     if f_chg: 
         resume.append(f"Changements d'affectation: {crees_chgs} ligne(s) importée(s) avec succès")
 
-    messages.success(request, "Importation terminée : " + " | ".join(resume))
+    messages.success(request, "Importation terminée : " + " | ".join(resume),extra_tags="import")
     
     if erreurs:
-        messages.warning(request, f"{len(erreurs)} avertissement(s) : " + " | ".join(erreurs[:5]))
+        messages.warning(request, f"{len(erreurs)} avertissement(s) : " + " | ".join(erreurs[:5]),extra_tags="import")
 
     return render(request, "import_data/import.html", {
         "form": MultipleImportForm(),
@@ -439,7 +446,7 @@ def get_collaborateurs_reels(departements):
 
     return resultats
 
-@role_required(["HRBP", "DRH", "ADMIN"])
+@role_required(["HRBP", "DRH", "ADMIN","PILOT"])
 def export_effectif_reel(request):
     it = request.session.get("it")
     role = request.session.get("role")
@@ -450,6 +457,8 @@ def export_effectif_reel(request):
         departements_qs = Departement.objects.filter(DRH_id=it)
     elif role == "ADMIN":
         departements_qs = Departement.objects.filter(ADMIN_id=it)
+    elif role == "PILOT":
+        departements_qs = Departement.objects.filter(PILOT_id=it)
     else:
         departements_qs = Departement.objects.none()
 

@@ -30,6 +30,14 @@ class Departement(models.Model):
             related_name='departements_DRH',
             verbose_name=" DRH"
         )
+    PILOT = models.ForeignKey(
+            "Collaborateur", to_field="it",
+            on_delete=models.SET_NULL,
+            null=True,
+            blank=True,
+            related_name='departements_PILOT',
+            verbose_name=" PILOT"
+        )
     def __str__(self):
         return self.nom_departement
 

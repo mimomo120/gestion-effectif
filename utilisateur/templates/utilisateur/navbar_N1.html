@@ -291,7 +291,7 @@
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'declaration_HRBP' %}active{% endif %}"
                             href="{% url 'declaration_HRBP' %}">
-                            <i class="fas fa-users me-2"></i></i>Declaration d'effectifs
+                            <i class="fas fa-users me-2"></i>Declaration d'effectifs
                         </a>
                     </li>
                 </ul>
@@ -338,6 +338,44 @@
                             <a class="nav-link  {% if request.resolver_match.url_name == 'affectation_HRBP' %}active{% endif %}"
                                 href="{% url 'affectation_HRBP' %}">
                                 <i class="fas fa-exchange-alt me-2"></i>Changement d'affectation
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+            {% endif %}
+            {% if request.session.role == "PILOT" %}
+            <nav class="sub-navbar border-top">
+                <div class="container-fluid px-4">
+                    <ul class="nav nav-tabs border-0">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'pilot' %}active{% endif %}"
+                                href="{% url 'pilot' %}">
+                                <i class="fas fa-users me-2"></i>Dasboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'importer_fichier' %}active{% endif %}"
+                                href="{% url 'importer_fichier' %}">
+                                <i class="fas fa-file-import me-2"></i></i>Importer Fichiers
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link  {% if request.resolver_match.url_name == 'affectation_PILOT' %}active{% endif %}"
+                                href="{% url 'affectation_PILOT' %}">
+                                <i class="fas fa-exchange-alt me-2"></i>Changement d'affectation
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link  {% if request.resolver_match.url_name == 'declaration' %}active{% endif %}"
+                                href="{% url 'declaration' %}">
+                                <i class="fas fa-users me-2"></i>Declaration d'effectifs
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link  {% if request.resolver_match.url_name == 'collaborateur' %}active{% endif %}"
+                                href="{% url 'collaborateur' %}">
+                                <i class="fas fa-users me-2"></i>Liste collaborateurs
                             </a>
                         </li>
                     </ul>

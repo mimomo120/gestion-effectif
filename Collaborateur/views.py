@@ -1,16 +1,16 @@
 from itertools import count
 from utilisateur.decorators import role_required
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect , get_object_or_404
 from utilisateur.models import utilisateur
 from Collaborateur.models import Departement , Collaborateur
 from django.contrib.auth.hashers import make_password , check_password
-from django.db.models import Q , Exists, OuterRef
+from django.db.models import Q , Exists, OuterRef, Subquery , Count ,Max ,F
 from django.contrib import messages
 from django.utils import timezone
 from declaration_effectif.models import declaration_effectif
-from django.http import JsonResponse
+from django.http import JsonResponse, request
 from datetime import date , datetime
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 #-------------------------------------------------------#
 #Cette fct return les operateurs d'un responsable N+1
 #-------------------------------------------------------#
@@ -604,4 +604,137 @@ def rechercher_N3_par_N4(request):
         "num_pages": paginator.num_pages,
         "has_previous": page_obj.has_previous(),
         "has_next": page_obj.has_next(),
+    })
+
+
+def get_effectif_reel_ids(departement, at_date):
+    """
+    Retourne l'ensemble des `it` (ids collaborateur) qui font partie
+    de l'effectif réel du département `departement`, calculé à partir
+    de la dernière déclaration de chaque collaborateur en date du `at_date`
+    (déclarations postérieures à `at_date` ignorées).
+    """
+    derniere_decl_id = (
+        declaration_effectif.objects
+        .filter(collaborateur_it=OuterRef('collaborateur_it'), date__lte=at_date)
+        .order_by('-date', '-id')
+        .values('id')[:1]
+    )
+    dernieres_declarations = (
+        declaration_effectif.objects
+        .filter(date__lte=at_date)
+        .annotate(latest_id=Subquery(derniere_decl_id))
+        .filter(id=F('latest_id'))
+    )
+
+    exclu1_ids = set(
+        dernieres_declarations
+        .filter(collaborateur_it__departement_id=departement, nature="D")
+        .values_list("collaborateur_it_id", flat=True)
+    )
+
+    exclu2_ids = set(
+        dernieres_declarations
+        .filter(collaborateur_it__departement_id=departement, nature="C")
+        .exclude(nv_Ru__departement_id=departement)
+        .values_list("collaborateur_it_id", flat=True)
+    )
+
+    inclu_ids = set(
+        dernieres_declarations
+        .filter(nv_Ru__departement_id=departement, nature="C")
+        .values_list("collaborateur_it_id", flat=True)
+    )
+
+    ids_departement = set(
+        Collaborateur.objects.filter(departement_id=departement).values_list("it", flat=True)
+    )
+
+    return (ids_departement - exclu1_ids - exclu2_ids) | inclu_ids
+
+PER_PAGE = 20
+def _parse_date(date_str):
+    if not date_str:
+        return timezone.now().date()
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return timezone.now().date()
+
+
+def collaborateur(request):
+    """Rendu initial de la page (page 1, date du jour, sans filtre)."""
+    it = request.session.get("it")
+    departement = get_object_or_404(Departement, PILOT_id=it)
+
+    today = timezone.now().date()
+    ids_total_r = get_effectif_reel_ids(departement, today)
+    total_r = len(ids_total_r)
+
+    collaborateurs_qs = Collaborateur.objects.filter(it__in=ids_total_r).order_by("matricule")
+
+    paginator = Paginator(collaborateurs_qs, PER_PAGE)
+    collaborateur_page = paginator.page(1)
+
+    return render(
+        request,
+        "declaration_effectif/PILOT/collaborateurs.html",
+        {
+            "collaborateur": collaborateur_page,
+            "total_r": total_r,
+            "today": today.isoformat(),
+        },
+    )
+
+
+def collaborateur_api(request):
+    """Endpoint JSON : filtres (recherche, lot, date) + pagination, appelé en AJAX."""
+    it = request.session.get("it")
+    departement = get_object_or_404(Departement, PILOT_id=it)
+
+    search = request.GET.get("q", "").strip()
+    lot = request.GET.get("lot", "").strip()
+    selected_date = _parse_date(request.GET.get("date"))
+    page_number = request.GET.get("page", 1)
+
+    ids_total_r = get_effectif_reel_ids(departement, selected_date)
+    qs = Collaborateur.objects.filter(it__in=ids_total_r)
+
+    if search:
+        qs = qs.filter(
+            Q(matricule__icontains=search) | Q(nom_complete__icontains=search)
+        )
+    if lot:
+        qs = qs.filter(lot=lot)
+
+    qs = qs.select_related("departement").order_by("matricule")
+
+    paginator = Paginator(qs, PER_PAGE)
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages) if paginator.num_pages else paginator.page(1)
+
+    results = [
+        {
+            "matricule": c.matricule,
+            "it": c.it,
+            "nom_complete": c.nom_complete,
+            "lot": c.lot,
+            "departement": c.departement.abreviation if c.departement else "",
+        }
+        for c in page_obj
+    ]
+
+    return JsonResponse({
+        "results": results,
+        "total_r": len(ids_total_r),
+        "page": page_obj.number,
+        "num_pages": paginator.num_pages,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+        "previous_page": page_obj.previous_page_number() if page_obj.has_previous() else None,
+        "next_page": page_obj.next_page_number() if page_obj.has_next() else None,
     })

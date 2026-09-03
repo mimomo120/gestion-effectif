@@ -5,7 +5,7 @@ from django.contrib.auth.hashers import make_password, check_password
 # Create your models here.
 class utilisateur(models.Model):
     password=models.CharField(max_length=277, blank=True)
-    role=models.CharField(max_length=10,null=False,choices=[("N+1","N+1"),("N+2"," N+2"),("N+3","N+3"),("N+4","N+4"),("HRBP", "Human Resources Business Partner"),("ADMIN", "admin"),("SUPER","super admin"),("DRH","Directeur des Ressources Humaines")])
+    role=models.CharField(max_length=10,null=False,choices=[("N+1","N+1"),("N+2"," N+2"),("N+3","N+3"),("N+4","N+4"),("HRBP", "Human Resources Business Partner"),("ADMIN", "admin"),("SUPER","super admin"),("DRH","Directeur des Ressources Humaines"),("PILOT","PILOT")])
     it = models.OneToOneField(
         "Collaborateur.Collaborateur",
         to_field="it",
@@ -21,6 +21,7 @@ class utilisateur(models.Model):
     ADMIN=models.IntegerField(choices=[("1",True),("0",False)])
     SUPER=models.IntegerField(choices=[("1",True),("0",False)])
     DRH=models.IntegerField(choices=[("1",True),("0",False)])
+    PILOT=models.IntegerField(choices=[("1",True),("0",False)])
     doit_changer_mdp = models.BooleanField(default=False)
     def set_password(self, raw_password):
         """Hasher le password avant stockage"""

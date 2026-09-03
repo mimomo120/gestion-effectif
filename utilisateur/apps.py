@@ -27,6 +27,7 @@ def create_super_admin(sender, **kwargs):
             "HRBP": False,
             "ADMIN": False,
             "SUPER":True,
+            "PILOT":False, "DRH": False,
         }
     )
     

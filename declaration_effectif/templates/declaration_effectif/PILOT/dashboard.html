@@ -13,6 +13,11 @@
         <div class="time">
             <h5 id="time" aria-live="polite">{{ maint }}</h5>
         </div>
+        <div class="actions-bar d-flex gap-2 align-items-center">
+            <a href="{% url 'export_effectif_reel' %}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-file-excel me-2"></i>Exporter le réel
+            </a>
+        </div>
     </header>
 
     <!-- ===== STATISTIQUES GÉNÉRALES ===== -->
@@ -88,7 +93,7 @@
                     <circle cx="11" cy="11" r="7"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <input type="text" id="recherche-ru" placeholder="Rechercher par matricule ou nom...">
+                <input type="text" id="recherche-ru" placeholder="Rechercher par utilisateur ou nom...">
             </div>
         </div>
 
@@ -109,8 +114,8 @@
                 </thead>
                 <tbody id="corps-tableau-ru">
                     {% for ru in liste_ru_stats %}
-                    <tr class="table-row-data" data-matricule="{{ ru.n1.it|default:'' }}" data-Ru="{{ ru.n1.ru_it.it|default:'' }}"
-                        data-nom="{{ ru.n1.nom_complete|default:'' }}">
+                    <tr class="table-row-data" data-matricule="{{ ru.n1.it|default:'' }}"
+                        data-Ru="{{ ru.n1.ru_it.it|default:'' }}" data-nom="{{ ru.n1.nom_complete|default:'' }}">
                         <td class="matricule">{{ ru.n1.it|default:"-" }}</td>
                         <td>{{ ru.n1.nom_complete|default:"-" }}</td>
                         <td>{{ ru.n1.lot|default:"-" }}</td>
@@ -145,7 +150,7 @@
                                 <span class="valeur-chiffre">{{ ru.maquette|default:"0" }}</span>
                             </div>
                         </td>
-                        <td  class="matricule">{{ ru.n1.ru_it.it|default:"-" }}</td>
+                        <td class="matricule">{{ ru.n1.ru_it.it|default:"-" }}</td>
                     </tr>
                     {% empty %}
                     <tr class="empty-row-initial">

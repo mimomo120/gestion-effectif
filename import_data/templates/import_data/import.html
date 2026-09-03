@@ -21,7 +21,7 @@
     <!-- Guide des structures de fichiers attendues -->
     <div class="import-guide">
         <h2 class="guide-title">💡 Format et colonnes requis pour les fichiers</h2>
-
+{% if request.session.role == "ADMIN" or request.session.role == "SUPER" or request.session.role == "HRBP" %}
         <div class="row g-3">
             <!-- Fichier Départements -->
             <div class="col-md-3">
@@ -62,6 +62,25 @@
                 </div>
             </div>
 
+            <!-- Fichier Changements d'affectation -->
+            <div class="col-md-3">
+                <div class="guide-card h-100">
+                    <div class="guide-card-header">
+                        <span class="guide-icon">🔄</span>
+                        <strong>Fichier Changements d'affectation</strong>
+                    </div>
+                    <p class="guide-text">Doit obligatoirement inclure la colonne requise (*) :</p>
+                    <div class="column-tags">
+                        <span class="tag tag-required">Nom & prénom *</span>
+                        <span class="tag">Ru (Initial)</span>
+                        <span class="tag">RU D'accueil</span>
+                        <span class="tag">Etat</span>
+                        <span class="tag">DPT</span>
+                        <span class="tag">DPT (accueil)</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             <!-- Fichier Collaborateurs -->
             <div class="col-md-3">
                 <div class="guide-card h-100">
@@ -85,43 +104,26 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Fichier Changements d'affectation -->
-            <div class="col-md-3">
-                <div class="guide-card h-100">
-                    <div class="guide-card-header">
-                        <span class="guide-icon">🔄</span>
-                        <strong>Fichier Changements d'affectation</strong>
-                    </div>
-                    <p class="guide-text">Doit obligatoirement inclure la colonne requise (*) :</p>
-                    <div class="column-tags">
-                        <span class="tag tag-required">Nom & prénom *</span>
-                        <span class="tag">Ru (Initial)</span>
-                        <span class="tag">RU D'accueil</span>
-                        <span class="tag">Etat</span>
-                        <span class="tag">DPT</span>
-                        <span class="tag">DPT (accueil)</span>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
     <!-- Feedback / Messages Django -->
-    {% if messages %}
-    <ul class="import-messages">
-        {% for message in messages %}
-        <li class="import-message import-message--{{ message.tags }}">
-            {{ message }}
-        </li>
-        {% endfor %}
-    </ul>
+{% if messages %}
+<ul class="import-messages">
+    {% for message in messages %}
+    {% if "import" in message.tags %}
+    <li class="import-message import-message--{{ message.tags }}">
+        {{ message }}
+    </li>
     {% endif %}
+    {% endfor %}
+</ul>
+{% endif %}
 
     <!-- Formulaire d'importation -->
     <form method="post" enctype="multipart/form-data" class="import-form">
         {% csrf_token %}
-
+        {% if request.session.role == "ADMIN" or request.session.role == "SUPER" or request.session.role == "HRBP" %}
         <!-- Champ 1 : Départements -->
         <div class="import-field">
             <label for="{{ form.fichier_departement.id_for_label }}">
@@ -148,18 +150,6 @@
             {% endfor %}
         </div>
 
-        <!-- Champ 3 : Collaborateurs -->
-        <div class="import-field">
-            <label for="{{ form.fichier_collaborateur.id_for_label }}">
-                👤 Fichier Collaborateurs
-            </label>
-            <div class="file-input-wrapper">
-                {{ form.fichier_collaborateur }}
-            </div>
-            {% for error in form.fichier_collaborateur.errors %}
-            <small class="import-error">{{ error }}</small>
-            {% endfor %}
-        </div>
 
         <!-- Champ 4 : Changements d'affectation -->
         <div class="import-field">
@@ -173,7 +163,19 @@
             <small class="import-error">{{ error }}</small>
             {% endfor %}
         </div>
-
+        {% endif %}
+<!-- Champ 3 : Collaborateurs -->
+<div class="import-field">
+    <label for="{{ form.fichier_collaborateur.id_for_label }}">
+        👤 Fichier Collaborateurs
+    </label>
+    <div class="file-input-wrapper">
+        {{ form.fichier_collaborateur }}
+    </div>
+    {% for error in form.fichier_collaborateur.errors %}
+    <small class="import-error">{{ error }}</small>
+    {% endfor %}
+</div>
         <button type="submit" class="import-submit">
             <i class="fas fa-file-import me-2"></i>Lancer l'importation
         </button>

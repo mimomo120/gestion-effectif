@@ -1,0 +1,331 @@
+{% extends "utilisateur/navbar_N1.html" %}
+{% load static %}
+
+{% block title %}Validation du Jour{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'declaration_effectif/css/validation.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+    <!-- En-tête de la page -->
+    <header class="header">
+        <h1>Validation des Déclarations</h1>
+    </header>
+
+    <!-- Carte de Résumé KPI -->
+    <div class="stats-summary">
+        <div class="summary-card">
+            <div class="summary-info">
+                <span>Non Validés</span>
+                <h3 id="count-ru">{{ non_valides|default:"0" }}</h3>
+            </div>
+            <div class="summary-icon warning">
+                &#9888;
+            </div>
+        </div>
+    </div>
+
+    <!-- Carte principale avec le tableau -->
+    <div class="card-table">
+
+        <!-- Barre d'outils -->
+        <div class="table-toolbar">
+            <div class="date-filter-group">
+                <label for="date">Date de déclaration :</label>
+                <input type="date" class="date-input" id="date">
+            </div>
+            <div class="search-filter-group">
+                <label for="search">Recherche :</label>
+                <input type="text" class="search-input" id="search" placeholder="Matricule, utilisateur ou nom...">
+            <button type="button" class="btn btn-outline-secondary filter-btn-reset" id="reset-btn">
+                <i class="fa-solid fa-rotate-left"></i> Effacer
+            </button>
+            </div>
+        </div>
+
+        <!-- Tableau des données -->
+        <div class="table-wrapper">
+            <table class="custom-table">
+                <thead id="titre">
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Utilisateur</th>
+                        <th>Nom & Prénom</th>
+                        <th class="text-center">Lot</th>
+                        <th class="text-center">Date</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="result">
+                    {% for operateur in resultat %}
+                    <tr>
+                        <td class="cell-mono">{{ operateur.matricule }}</td>
+                        <td class="cell-mono">{{ operateur.it }}</td>
+                        <td class="cell-name">{{ operateur.nom_complete }}</td>
+                        <td class="text-center">
+                            <span class="badge-circle">{{ operateur.lot }}</span>
+                        </td>
+                        <td class="text-center">{{ date }}</td>
+                        <td class="text-end">
+                            <button class="alert_btn" data-ru_it="{{ operateur.it }}">Alerter</button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="empty-row text-center">Aucun responsable d'unité sans validation trouvé.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                
+            </table>
+            {% if is_paginated %}
+            <nav aria-label="Pagination">
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link"
+                            href="?page={{ page_obj.previous_page_number }}&per_page={{ request.GET.per_page|default:'25' }}">Précédent</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">Précédent</span></li>
+                    {% endif %}
+            
+                    {% for num in paginator.page_range %}
+                    {% if num == page_obj.number %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}&per_page={{ request.GET.per_page|default:'25' }}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+            
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link"
+                            href="?page={{ page_obj.next_page_number }}&per_page={{ request.GET.per_page|default:'25' }}">Suivant</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">Suivant</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+    const csrftoken = getCookie('csrftoken');
+    const dateInput = document.getElementById("date");
+    const searchInput = document.getElementById("search");
+    const resetBtn = document.getElementById("reset-btn");
+    const resultContainer = document.getElementById("result");
+    const head = document.getElementById("titre");
+    const countRu = document.getElementById("count-ru");
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function setDefaultDate() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        const day = String(today.getDate()).padStart(2, "0");
+        dateInput.value = `${year}-${month}-${day}`;
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        setDefaultDate();
+        attachAlertListeners();
+    });
+
+    if (dateInput) {
+        dateInput.addEventListener("change", filterByDate);
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener("input", filterBySearch);
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener("click", function () {
+            searchInput.value = "";
+            setDefaultDate();
+            filterByDate();
+        });
+    }
+
+    function filterBySearch() {
+        const term = searchInput.value.trim().toLowerCase();
+        const rows = resultContainer.querySelectorAll("tr");
+
+        rows.forEach(function (row) {
+            // Ignore les lignes "vide"/"erreur" (colspan)
+            if (row.querySelector("td[colspan]")) {
+                row.style.display = "";
+                return;
+            }
+
+            const cellsMono = row.querySelectorAll(".cell-mono");
+            const matricule = cellsMono[0]?.textContent.toLowerCase() || "";
+            const utilisateur = cellsMono[1]?.textContent.toLowerCase() || "";
+            const nom = row.querySelector(".cell-name")?.textContent.toLowerCase() || "";
+
+            const match = matricule.includes(term) || utilisateur.includes(term) || nom.includes(term);
+            row.style.display = match ? "" : "none";
+        });
+    }
+
+    async function filterByDate() {
+        const date = dateInput.value;
+
+        if (!date) {
+            resultContainer.innerHTML = `
+            <tr>
+                <td colspan="6" class="empty-row text-center">Sélectionnez une date</td>
+            </tr>
+        `;
+            if (countRu) countRu.textContent = "0";
+            return;
+        }
+
+        try {
+            const response = await fetch(`/filter_date_DPT?time=${encodeURIComponent(date)}`);
+            if (!response.ok) throw new Error("Erreur réseau");
+
+            const data = await response.json();
+
+            if (data.resultats && data.resultats.length > 0) {
+                if (countRu) countRu.textContent = data.resultats.length;
+
+                if (data.status) {
+                    head.innerHTML = `
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Utilisateur</th>
+                        <th>Nom & Prénom</th>
+                        <th class="text-center">Lot</th>
+                        <th class="text-center">Date</th>
+                    </tr>
+                `;
+
+                    resultContainer.innerHTML = data.resultats.map(op => `
+                    <tr>
+                        <td class="cell-mono">${escapeHtml(op.matricule)}</td>
+                        <td class="cell-mono">${escapeHtml(op.it)}</td>
+                        <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                        <td class="text-center">
+                            <span class="badge-circle">${escapeHtml(op.lot || '-')}</span>
+                        </td>
+                        <td class="text-center">${escapeHtml(date)}</td>
+                    </tr>
+                `).join("");
+
+                } else {
+                    head.innerHTML = `
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Utilisateur</th>
+                        <th>Nom & Prénom</th>
+                        <th class="text-center">Lot</th>
+                        <th class="text-center">Date</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                `;
+
+                    resultContainer.innerHTML = data.resultats.map(op => `
+                    <tr>
+                        <td class="cell-mono">${escapeHtml(op.matricule)}</td>
+                        <td class="cell-mono">${escapeHtml(op.it)}</td>
+                        <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                        <td class="text-center">
+                            <span class="badge-circle">${escapeHtml(op.lot || '-')}</span>
+                        </td>
+                        <td class="text-center">${escapeHtml(date)}</td>
+                        <td class="text-end">
+                            <button class="alert_btn" data-ru_it="${escapeHtml(op.it)}">Alerter</button>
+                        </td>
+                    </tr>
+                `).join("");
+
+                    attachAlertListeners();
+                }
+
+            } else {
+                if (countRu) countRu.textContent = "0";
+                resultContainer.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty-row text-center">Aucune donnée pour cette date.</td>
+                </tr>
+            `;
+            }
+        } catch (error) {
+            console.error("Erreur lors du filtrage:", error);
+            if (countRu) countRu.textContent = "0";
+            resultContainer.innerHTML = `
+            <tr>
+                <td colspan="6" class="empty-row text-center" style="color: #ef4444;">Erreur lors du chargement des données.</td>
+            </tr>
+        `;
+        }
+
+        // Réapplique le filtre de recherche sur les nouvelles lignes chargées
+        filterBySearch();
+    }
+
+    function attachAlertListeners() {
+        const alertButtons = resultContainer.querySelectorAll(".alert_btn");
+        alertButtons.forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                const ru_it = btn.dataset.ru_it;
+                envoyerAlerte(ru_it, btn);
+            });
+        });
+    }
+
+    function envoyerAlerte(ru_it, btn) {
+        fetch("/alerter_ru/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrftoken
+            },
+            body: JSON.stringify({ ru_it: ru_it })
+        })
+            .then(response => {
+                if (!response.ok) throw new Error("Erreur serveur");
+                return response.json();
+            })
+            .then(data => {
+                btn.textContent = "Envoyé";
+                btn.classList.add("sent");
+                btn.disabled = true;
+            })
+            .catch(error => {
+                console.error("Erreur alerte:", error);
+                alert("Échec de l'envoi de l'alerte.");
+            });
+    }
+</script>
+{% endblock %}

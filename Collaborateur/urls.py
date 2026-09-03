@@ -16,4 +16,6 @@ urlpatterns = [
             path("rechercher-responsables", views.rechercher_N2_par_N3, name="rechercher_N2_par_N3"),
             path("rechercher-N1-par-N2", views.rechercher_N1_par_N2, name="rechercher_N1_par_N2"),
             path("rechercher-N3-par-N4", views.rechercher_N3_par_N4, name="rechercher_N3_par_N4"),
+            path("PILOT/collaborateurs/", views.collaborateur, name="collaborateur"),
+            path("collaborateurs/api/", views.collaborateur_api, name="collaborateur_api"),
             ]

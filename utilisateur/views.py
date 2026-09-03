@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect , get_object_or_404
 from utilisateur.models import utilisateur
 from Collaborateur.models import  Departement , Collaborateur ,Unite
 from django.contrib.auth.hashers import make_password , check_password
@@ -9,8 +9,8 @@ from declaration_effectif.models import declaration_effectif ,Alert ,historique
 from django.http import JsonResponse
 from datetime import date
 from declaration_effectif.views import difference , histo_aff
-from Collaborateur.views import rec ,Ru_Rg,liste_N1_pr_N3,Rg_Dur ,reelEff ,SystEff
-from django.db.models import Sum
+from Collaborateur.views import rec ,Ru_Rg,liste_N1_pr_N3,Rg_Dur ,reelEff ,SystEff , get_effectif_reel_ids
+from django.db.models import Sum ,F , OuterRef, Subquery
 from .decorators import role_required
 from datetime import timedelta
 import json
@@ -23,6 +23,10 @@ import secrets
 from collections import defaultdict
 import string
 from django.views.decorators.http import require_POST
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
+from django.utils.dateparse import parse_date
+
 # ============================================================
 # login_view : authentifie l'utilisateur et l'aiguille vers le
 # tableau de bord correspondant à son rôle actif (N+1 à N+4).
@@ -56,6 +60,8 @@ def login_view(request):
                     roles_disponibles.append("HRBP")
                 if utilis.DRH :
                     roles_disponibles.append("DRH")
+                if utilis.PILOT :
+                    roles_disponibles.append("PILOT")
 
                 request.session['roles_disponibles'] = roles_disponibles
                 if utilis.role == "N+1":
@@ -77,6 +83,8 @@ def login_view(request):
                     return redirect('dashboard')
                 elif utilis.role == "ADMIN":
                     return redirect('dashboard')
+                elif utilis.role == "PILOT":
+                    return redirect('pilot')
             else:
                 return render(
                     request,
@@ -144,7 +152,7 @@ def register_view(request):
         "N4": n4,
         "ADMIN": 0,
         "HRBP": 0,
-        "SUPER": 0,"DRH":0
+        "SUPER": 0,"DRH":0,"PILOT":0
     }
 )
 
@@ -636,11 +644,17 @@ def modifier_user(request, id):
 
     if not role_final:
         return JsonResponse({"error": "Impossible de déterminer un rôle pour cet utilisateur."}, status=400)
-
+    
     util.role = role_final
     util.ADMIN = 1 if role_final == "ADMIN" else 0
     util.HRBP = 1 if role_final == "HRBP" else 0
     util.SUPER = 1 if role_final == "SUPER" else 0
+    util.PILOT = 1 if role_final == "PILOT" else 0
+    util.DRH = 1 if role_final == "DRH" else 0
+    util.N1 = n1
+    util.N2 = n2
+    util.N3 = n3
+    util.N4 = n4
     util.save()
 
     return JsonResponse({
@@ -890,3 +904,169 @@ def changer_mot_de_passe(request):
     user.set_password(nouveau_password)
 
     return JsonResponse({"success": True})
+
+
+import json
+from datetime import timedelta
+
+def pilot_dashboard(request):
+    it = request.session.get("it")
+    departement = get_object_or_404(Departement, PILOT_id=it)
+
+    collab = Collaborateur.objects.filter(departement_id=departement)
+    total_syst = collab.count()
+
+    today = timezone.now().date()
+    ids_total_r = get_effectif_reel_ids(departement, today)
+    total_r = len(ids_total_r)
+    maquette_totale = departement.maquette or 0
+
+    MR = total_r - maquette_totale
+    MS = total_syst - maquette_totale
+
+    operateur = collab.exclude(ru_it_id__isnull=True).exclude(ru_it_id=F('it'))
+    ru_ids = set(operateur.values_list("ru_it", flat=True))
+    ru_ids.discard(None)
+
+    ru_declarer = set(
+        declaration_effectif.objects
+        .filter(date=today, Ru_id__in=ru_ids)
+        .values_list("Ru_id", flat=True)
+    )
+    ru_non_declarer = ru_ids - ru_declarer
+
+    # --- Statistiques par RU pour le tableau + graphique comparatif ---
+    responsables = Collaborateur.objects.filter(it__in=ru_ids).select_related(
+        'departement', 'ru_it', 'unite'
+    )
+
+    liste_ru_stats = []
+    for ru in responsables:
+        equipe = operateur.filter(ru_it_id=ru.it)
+        systeme = equipe.count()
+        reel = len(set(equipe.values_list('it', flat=True)) & set(ids_total_r))
+
+        maquette_ru = ru.unite.maquette if ru.unite else 0
+
+        liste_ru_stats.append({
+            "n1": ru,
+            "unite": ru.unite_id,
+            "systeme": systeme,
+            "ms": systeme - maquette_ru,
+            "reel": reel,
+            "mr": reel - maquette_ru,
+            "maquette": maquette_ru,
+        })
+
+    # --- Graphique d'évolution (7 derniers jours) ---
+    jours = [today - timedelta(days=i) for i in range(6, -1, -1)]
+    chart_labels = [j.strftime("%d/%m") for j in jours]
+    chart_data = [len(get_effectif_reel_ids(departement, j)) for j in jours]
+
+    context = {
+        "maint": timezone.now().date(),
+        "total_syst": total_syst,
+        "total_r": total_r,
+        "maquette_totale": maquette_totale,
+        "MR": MR,
+        "MS": MS,
+        "ru_total": len(ru_ids),
+        "ru_declarer_count": len(ru_declarer),
+        "non_valides": len(ru_non_declarer),
+        "ru_non_declarer": ru_non_declarer,
+        "liste_ru_stats": liste_ru_stats,
+        "chart_labels_json": json.dumps(chart_labels),
+        "chart_data_json": json.dumps(chart_data),
+    }
+    return render(request, "declaration_effectif/PILOT/dashboard.html", context)
+
+
+def declaration(request):
+
+    ru_non_declarer = ru_nn_valider_par_departement(request)
+
+    qs = Collaborateur.objects.filter(it__in=ru_non_declarer).order_by('it')
+
+    page_number = request.GET.get('page', 1)
+    try:
+        per_page = int(request.GET.get('per_page', 25))
+    except (TypeError, ValueError):
+        per_page = 15
+
+    paginator = Paginator(qs, per_page)
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    today = timezone.now().date()
+    context = {
+        "resultat": page_obj,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "is_paginated": page_obj.has_other_pages(),
+        "non_valides": len(ru_non_declarer),
+        "date": today.isoformat(),
+    }
+    return render(request, "declaration_effectif/PILOT/declaration.html", context)
+
+def ru_nn_valider_par_departement(request, date=None):
+    it = request.session.get("it")
+    departement = get_object_or_404(Departement, PILOT_id=it)
+    if date is None:
+        date = timezone.now().date()
+
+    operateur = Collaborateur.objects.filter(
+        departement_id=departement
+    ).exclude(ru_it_id__isnull=True).exclude(ru_it_id=F('it'))
+
+    ru = set(operateur.values_list("ru_it", flat=True))
+    ru.discard(None)
+
+    ru_declarer = set(
+        declaration_effectif.objects
+        .filter(date=date, Ru_id__in=ru)
+        .values_list("Ru_id", flat=True)
+    )
+
+    ru_non_declarer = ru - ru_declarer
+    return ru_non_declarer
+
+
+def filter_date_DPT(request):
+    date_str = request.GET.get('time')
+    if not date_str:
+        return JsonResponse({"resultats": [], "status": False})
+
+    date_obj = parse_date(date_str)
+    if date_obj is None:
+        return JsonResponse({"resultats": [], "status": False})
+
+    is_today = (date_obj == timezone.localdate())
+
+    it = request.session.get("it")
+    departement = get_object_or_404(Departement, PILOT_id=it)
+
+    operateur = Collaborateur.objects.filter(
+        departement_id=departement
+    ).exclude(ru_it_id__isnull=True).exclude(ru_it_id=F('it'))
+
+    ru = set(operateur.values_list("ru_it", flat=True))
+    ru.discard(None)
+
+    ru_declarer = set(
+        declaration_effectif.objects
+        .filter(date=date_obj, Ru_id__in=ru)
+        .values_list("Ru_id", flat=True)
+    )
+
+    ru_non_declarer = ru - ru_declarer
+    status = not is_today
+
+    resultats = list(
+        Collaborateur.objects.filter(it__in=ru_non_declarer)
+        .values("it", "matricule", "nom_complete", "departement_id", "unite_id", "lot")
+    )
+    return JsonResponse({"resultats": resultats, "status": status})

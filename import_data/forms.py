@@ -15,3 +15,9 @@ class MultipleImportForm(forms.Form):
     )
     fichier_changement = forms.FileField(required=False, label="Fichier changement",
             widget=forms.FileInput(attrs={'class': 'form-control'}))
+    mode_import_collaborateur = forms.ChoiceField(
+    choices=[("fusion", "Fusion"), ("remplacement", "Remplacement")],
+    initial="fusion",
+    required=False,
+    widget=forms.RadioSelect,
+)

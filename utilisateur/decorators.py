@@ -15,7 +15,7 @@ def role_required(*roles_autorises):
             role = request.session.get("role")
             if role not in roles_autorises:
                 messages.error(request, "Vous n'avez pas les droits pour accéder à cette page.")
-                return redirect("login") 
+                return redirect("login")
             return vue_fn(request, *args, **kwargs)
         return wrapper
     return decorateur

@@ -17,7 +17,7 @@ from Collaborateur.views import rec , Ru_Rg, liste_N1_par_N2, Rg_Dur,liste_N1_pr
 from django.views.decorators.http import require_POST
 from utilisateur.decorators import role_required
 from django.utils.dateparse import parse_date
-from django.core.paginator import Paginator
+from django.core.paginator import PageNotAnInteger, Paginator
 import bisect
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.cache import never_cache
@@ -999,7 +999,6 @@ def affectation_HRBP(request):
         affectation = affectation.filter(
             Q(dpt_init__abreviation=dpt_filtre) | Q(dpt_acceuil__abreviation=dpt_filtre)
         )
-
     # --- Pagination ---
     paginator = Paginator(affectation, 20)
     page_number = request.GET.get("page")
@@ -1195,3 +1194,45 @@ def validation_date_N4(request):
         "resultats": resultats,
         "status": status
     })
+
+def changement_dpt(request):
+    it = request.session.get("it")
+    departement = get_object_or_404(Departement, PILOT_id=it)
+
+    status = request.GET.get("status", "all")
+    page_number = request.GET.get("page", 1)
+
+    changement = (
+        historique.objects
+        .filter(Q(dpt_init=departement) | Q(dpt_acceuil=departement))
+        .exclude(etat="Terminé")
+        .order_by("-id")  # ordre stable requis pour la pagination
+    )
+
+    if status == "valide":
+        changement = changement.filter(etat__icontains="valid")
+    elif status == "refuse":
+        changement = changement.filter(etat__icontains="refus")
+    elif status == "non_demarrer":
+        changement = changement.filter(etat__icontains="non démarr")
+
+    nbr = changement.count()
+
+    paginator = Paginator(changement, 20) 
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages) if paginator.num_pages else paginator.page(1)
+
+    return render(
+        request,
+        "declaration_effectif/PILOT/affectation.html",
+        {
+            "info": page_obj,
+            "page_obj": page_obj,
+            "nbr": nbr,
+            "status": status,
+        },
+    )
