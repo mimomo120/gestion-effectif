@@ -1,6 +1,6 @@
-{% extends template_de_base %}
-
+{% extends 'utilisateur/navbar_N1.html' %}
 {% load static %}
+
 
 {% block title %}Importer{% endblock %}
 
@@ -11,47 +11,70 @@
 {% endblock %}
 
 {% block content %}
+
 <div class="import-container">
-    <h1 class="import-title">Importation des Fichiers</h1>
+
+    <h1 class="import-title">Importation des fichiers</h1>
+
     <p class="import-subtitle">
-        Veuillez charger les fichiers des Départements, des Unités, des Collaborateurs et des Changements d'affectation
+        Veuillez charger les fichiers des départements, des unités,
+        des collaborateurs et des changements d'affectation
         (.xlsx, .xls, .csv).
     </p>
 
-    <!-- Guide des structures de fichiers attendues -->
-    <div class="import-guide">
-        <h2 class="guide-title">💡 Format et colonnes requis pour les fichiers</h2>
-{% if request.session.role == "ADMIN" or request.session.role == "SUPER" or request.session.role == "HRBP" %}
+    <!-- Guide des structures de fichiers -->
+    <div class="import-guide mb-4">
+
+        <h2 class="guide-title">
+            💡 Format et colonnes requis pour les fichiers
+        </h2>
+
         <div class="row g-3">
+
             <!-- Fichier Départements -->
-            <div class="col-md-3">
+            <div class="col-12 col-md-6 col-xl-3">
                 <div class="guide-card h-100">
+
                     <div class="guide-card-header">
                         <span class="guide-icon">📂</span>
                         <strong>Fichier Départements</strong>
                     </div>
-                    <p class="guide-text">Doit obligatoirement inclure la colonne requise (*) :</p>
+
+                    <p class="guide-text">
+                        Doit obligatoirement inclure la colonne requise (*) :
+                    </p>
+
                     <div class="column-tags">
-                        <span class="tag tag-required">Abreviation *</span>
+                        <span class="tag tag-required">
+                            Abréviation *
+                        </span>
                         <span class="tag">nom_departement</span>
                         <span class="tag">HRBP</span>
                         <span class="tag">ADMIN</span>
                         <span class="tag">DRH</span>
                         <span class="tag">Maquette</span>
                     </div>
+
                 </div>
             </div>
 
             <!-- Fichier Unités -->
-            <div class="col-md-3">
+            <div class="col-12 col-md-6 col-xl-3">
                 <div class="guide-card h-100">
+
                     <div class="guide-card-header">
                         <span class="guide-icon">📊</span>
                         <strong>Fichier Unités</strong>
                     </div>
-                    <p class="guide-text">Doit contenir au minimum la colonne principale :</p>
+
+                    <p class="guide-text">
+                        Doit contenir au minimum la colonne principale :
+                    </p>
+
                     <div class="column-tags">
-                        <span class="tag tag-required">Abreviation *</span>
+                        <span class="tag tag-required">
+                            Abréviation *
+                        </span>
                         <span class="tag">Nom</span>
                         <span class="tag">Maquette</span>
                         <span class="tag">T</span>
@@ -59,36 +82,50 @@
                         <span class="tag">P</span>
                         <span class="tag">C</span>
                     </div>
+
                 </div>
             </div>
 
             <!-- Fichier Changements d'affectation -->
-            <div class="col-md-3">
+            <div class="col-12 col-md-6 col-xl-3">
                 <div class="guide-card h-100">
+
                     <div class="guide-card-header">
                         <span class="guide-icon">🔄</span>
-                        <strong>Fichier Changements d'affectation</strong>
+                        <strong>Changements d'affectation</strong>
                     </div>
-                    <p class="guide-text">Doit obligatoirement inclure la colonne requise (*) :</p>
+
+                    <p class="guide-text">
+                        Doit obligatoirement inclure la colonne requise (*) :
+                    </p>
+
                     <div class="column-tags">
-                        <span class="tag tag-required">Nom & prénom *</span>
+                        <span class="tag tag-required">
+                            Nom &amp; prénom *
+                        </span>
                         <span class="tag">Ru (Initial)</span>
                         <span class="tag">RU D'accueil</span>
                         <span class="tag">Etat</span>
                         <span class="tag">DPT</span>
                         <span class="tag">DPT (accueil)</span>
                     </div>
+
                 </div>
             </div>
-            {% endif %}
+
             <!-- Fichier Collaborateurs -->
-            <div class="col-md-3">
+            <div class="col-12 col-md-6 col-xl-3">
                 <div class="guide-card h-100">
+
                     <div class="guide-card-header">
                         <span class="guide-icon">👥</span>
                         <strong>Fichier Collaborateurs</strong>
                     </div>
-                    <p class="guide-text">Doit obligatoirement inclure les colonnes requises (*) :</p>
+
+                    <p class="guide-text">
+                        Doit obligatoirement inclure les colonnes requises (*) :
+                    </p>
+
                     <div class="column-tags">
                         <span class="tag tag-required">Utilisateur *</span>
                         <span class="tag tag-required">Nom *</span>
@@ -96,89 +133,363 @@
                         <span class="tag tag-required">Lot *</span>
                         <span class="tag">Matricule</span>
                         <span class="tag">DPT</span>
-                        <span class="tag">Unite</span>
-                        <span class="tag">Equipe</span>
+                        <span class="tag">Unité</span>
+                        <span class="tag">Équipe</span>
                         <span class="tag">Shift</span>
                         <span class="tag">Sexe</span>
                         <span class="tag">RU</span>
                     </div>
+
                 </div>
             </div>
+
         </div>
     </div>
 
-    <!-- Feedback / Messages Django -->
-{% if messages %}
-<ul class="import-messages">
-    {% for message in messages %}
-    {% if "import" in message.tags %}
-    <li class="import-message import-message--{{ message.tags }}">
-        {{ message }}
-    </li>
-    {% endif %}
-    {% endfor %}
-</ul>
-{% endif %}
-
     <!-- Formulaire d'importation -->
-    <form method="post" enctype="multipart/form-data" class="import-form">
+    <form method="post" enctype="multipart/form-data" class="import-form mb-5">
+
         {% csrf_token %}
-        {% if request.session.role == "ADMIN" or request.session.role == "SUPER" or request.session.role == "HRBP" %}
-        <!-- Champ 1 : Départements -->
+
+        <!-- Départements -->
         <div class="import-field">
+
             <label for="{{ form.fichier_departement.id_for_label }}">
                 📂 Fichier Départements
             </label>
+
             <div class="file-input-wrapper">
                 {{ form.fichier_departement }}
             </div>
+
             {% for error in form.fichier_departement.errors %}
-            <small class="import-error">{{ error }}</small>
+            <small class="import-error">
+                {{ error }}
+            </small>
             {% endfor %}
+
         </div>
 
-        <!-- Champ 2 : Unités -->
+        <!-- Unités -->
         <div class="import-field">
+
             <label for="{{ form.fichier_unite.id_for_label }}">
                 📊 Fichier Unités
             </label>
+
             <div class="file-input-wrapper">
                 {{ form.fichier_unite }}
             </div>
+
             {% for error in form.fichier_unite.errors %}
-            <small class="import-error">{{ error }}</small>
+            <small class="import-error">
+                {{ error }}
+            </small>
             {% endfor %}
+
         </div>
 
-
-        <!-- Champ 4 : Changements d'affectation -->
+        <!-- Changements d'affectation -->
         <div class="import-field">
+
             <label for="{{ form.fichier_changement.id_for_label }}">
                 🔄 Fichier Changements d'affectation
             </label>
+
             <div class="file-input-wrapper">
                 {{ form.fichier_changement }}
             </div>
+
             {% for error in form.fichier_changement.errors %}
-            <small class="import-error">{{ error }}</small>
+            <small class="import-error">
+                {{ error }}
+            </small>
             {% endfor %}
+
         </div>
-        {% endif %}
-<!-- Champ 3 : Collaborateurs -->
-<div class="import-field">
-    <label for="{{ form.fichier_collaborateur.id_for_label }}">
-        👤 Fichier Collaborateurs
-    </label>
-    <div class="file-input-wrapper">
-        {{ form.fichier_collaborateur }}
-    </div>
-    {% for error in form.fichier_collaborateur.errors %}
-    <small class="import-error">{{ error }}</small>
-    {% endfor %}
-</div>
+
+        <!-- Collaborateurs -->
+        <div class="import-field">
+
+            <label for="{{ form.fichier_collaborateur.id_for_label }}">
+                👤 Fichier Collaborateurs
+            </label>
+
+            <div class="file-input-wrapper">
+                {{ form.fichier_collaborateur }}
+            </div>
+
+            {% for error in form.fichier_collaborateur.errors %}
+            <small class="import-error">
+                {{ error }}
+            </small>
+            {% endfor %}
+
+        </div>
+
         <button type="submit" class="import-submit">
-            <i class="fas fa-file-import me-2"></i>Lancer l'importation
+            <i class="fas fa-file-import me-2"></i>
+            Lancer l'importation
         </button>
+
     </form>
+
+    <!-- Historique des imports -->
+    <div class="card shadow-sm border-0">
+
+        <div class="card-header bg-dark text-white
+                    d-flex justify-content-between align-items-center">
+
+            <h5 class="mb-0">
+                <i class="fas fa-history me-2"></i>
+                Historique des récents imports
+            </h5>
+
+        </div>
+
+        <div class="card-body p-0">
+
+            <div class="table-responsive">
+
+                <table class="table table-hover align-middle mb-0">
+
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Fichier</th>
+                            <th>Auteur</th>
+                            <th>Créés</th>
+                            <th>Modifiés</th>
+                            <th>Supprimés</th>
+                            <th>Erreurs</th>
+                            <th>Statut</th>
+                            <th class="text-center">Détails</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for item in historique_imports %}
+
+                        <tr>
+
+                            <td>
+                                <strong>#{{ item.id }}</strong>
+                            </td>
+
+                            <td class="text-nowrap">
+                                <i class="fas fa-file-excel
+                                              me-1 text-success"></i>
+                                {{ item.nom_fichier }}
+                            </td>
+
+                            <td>
+                                {{ item.utilisateur|default:"Inconnu" }}
+                            </td>
+
+                            <td>
+                                <span class="badge bg-success">
+                                    {{ item.depar|default:0 }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="badge bg-warning text-dark">
+                                    {{ item.modif|default:0 }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="badge bg-danger">
+                                    {{ item.supprime|default:0 }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="badge bg-secondary">
+                                    {{ item.erreur|default:0 }}
+                                </span>
+                            </td>
+
+                            <td>
+
+                                {% if item.statut == "SUCCES" %}
+
+                                <span class="badge bg-success-subtle
+                                                     text-success
+                                                     border border-success">
+                                    Succès
+                                </span>
+
+                                {% elif item.statut == "PARTIEL" %}
+
+                                <span class="badge bg-warning-subtle
+                                                     text-warning
+                                                     border border-warning">
+                                    Partiel
+                                </span>
+
+                                {% elif item.statut == "ECHEC" %}
+
+                                <span class="badge bg-danger-subtle
+                                                     text-danger
+                                                     border border-danger">
+                                    Échec
+                                </span>
+
+                                {% else %}
+
+                                <span class="badge bg-info-subtle
+                                                     text-info
+                                                     border border-info">
+                                    {{ item.statut }}
+                                </span>
+
+                                {% endif %}
+
+                            </td>
+
+                            <td class="text-center">
+
+                                <button type="button" class="btn btn-sm
+                                                btn-outline-primary" data-bs-toggle="modal"
+                                    data-bs-target="#modalDetails{{ item.id }}" aria-label="Afficher les détails">
+
+                                    <i class="fas fa-eye"></i>
+
+                                </button>
+
+                            </td>
+
+                        </tr>
+
+                        {% empty %}
+
+                        <tr>
+                            <td colspan="9" class="text-center py-4 text-muted">
+
+                                <i class="fas fa-folder-open
+                                            mb-2 d-block fa-2x"></i>
+
+                                Aucun historique d'import disponible.
+
+                            </td>
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
 </div>
+
+
+<!-- Modales des détails -->
+<!-- Elles sont volontairement placées en dehors du tableau -->
+
+{% for item in historique_imports %}
+
+<div class="modal fade" id="modalDetails{{ item.id }}" tabindex="-1" aria-labelledby="label{{ item.id }}"
+    aria-hidden="true">
+
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5 class="modal-title" id="label{{ item.id }}">
+
+                    Détails de l'import #{{ item.id }}
+                    - {{ item.nom_fichier }}
+
+                </h5>
+
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer">
+                </button>
+
+            </div>
+
+            <div class="modal-body p-0">
+                <table class="table table-striped mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Action</th>
+                            <th>IT</th>
+                            <th>Matricule</th>
+                            <th>Nom complet</th>
+                            <th>Champ</th>
+                            <th>Ancienne Val.</th>
+                            <th>Nouvelle Val.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailsBody{{ item.id }}">
+                        <tr>
+                            <td colspan="7" class="text-center py-3 text-muted">Chargement...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="modal-footer">
+
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+
+                    Fermer
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endfor %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const URL = "{% url 'import_details_json' 0 %}";
+
+    document.querySelectorAll('[id^="modalDetails"]').forEach(modal => {
+        modal.addEventListener('show.bs.modal', function () {
+            const importId = this.id.replace('modalDetails', '');
+            const tbody = document.getElementById('detailsBody' + importId);
+
+            const url = URL.replace('/0/', '/' + importId + '/');
+
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.details.length) {
+                        tbody.innerHTML =
+                            '<tr><td colspan="7" class="text-center py-3 text-muted">Aucun détail enregistré pour cet import.</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = data.details.map(d => `
+                        <tr>
+                            <td><span class="badge bg-secondary">${d.action}</span></td>
+                            <td>${d.it || '-'}</td>
+                            <td>${d.matricule || '-'}</td>
+                            <td>${d.nom_complete || '-'}</td>
+                            <td>${d.champ_modifie || '-'}</td>
+                            <td class="text-muted"><small>${d.ancienne_valeur || '-'}</small></td>
+                            <td class="fw-bold"><small>${d.nouvelle_valeur || '-'}</small></td>
+                        </tr>
+                    `).join('');
+                });
+        });
+    });
+</script>
 {% endblock %}
+

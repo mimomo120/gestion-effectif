@@ -351,13 +351,16 @@ def dashboard_N2(request):
     it = request.session.get("it")
     liste_ru = Ru_Rg(it)
     ru_its = set(liste_ru.values_list("it", flat=True))
+    operateur=Collaborateur.objects.filter(ru_it=it,lot__in=["A","O","P"]).exclude(it__in=ru_its)
+    nbr_RU=liste_ru.count()
+    nbr_op=operateur.count()
+
     unite_abrs = set(liste_ru.values_list("unite_id", flat=True))
     maint = timezone.localdate()
     today = timezone.now().date()
     dates = [today - timedelta(days=i) for i in range(6, -1, -1)]
     labels_list = [d.strftime('%d %b') for d in dates]
 
-    # Somme des effectifs réels de tous les RU, pour chaque date
     data_list = []
     for d in dates:
         total_jour = 0
@@ -365,13 +368,11 @@ def dashboard_N2(request):
             total_jour += reelEff(ru, date_reference=d).values('it').distinct().count()
         data_list.append(total_jour)
 
-    # 1. Déclarations du jour
     liste_declares = set(
         declaration_effectif.objects.filter(date=maint, Ru_id__in=ru_its)
         .values_list("Ru_id", flat=True)
     )
 
-    # 2. RU n'ayant pas encore effectué leur déclaration
     liste_ru_avec_operateurs = set(
         Collaborateur.objects.filter(ru_it_id__in=ru_its)
         .values_list("ru_it_id", flat=True)
@@ -382,15 +383,12 @@ def dashboard_N2(request):
         .exclude(it__in=liste_declares)
         .count()
     )
-
-    # 3. Récupération des Unités (Maquette) sous forme de dictionnaire {abreviation: maquette}
     unites_map = {
         u.abreviation: (u.maquette or 0)
         for u in Unite.objects.filter(abreviation__in=unite_abrs)
     }
     maquette_total = sum(unites_map.values())
 
-    # 4. Effectifs système par RU en 1 seule requête SQL
     systeme_counts = dict(
         Collaborateur.objects.filter(ru_it_id__in=ru_its)
         .values('ru_it_id')
@@ -398,7 +396,6 @@ def dashboard_N2(request):
         .values_list('ru_it_id', 'total')
     )
 
-    # 5. Dernières dates de déclaration par RU en 1 seule requête SQL
     dernieres_dates = dict(
         declaration_effectif.objects.filter(Ru_id__in=ru_its)
         .values('Ru_id')
@@ -406,7 +403,6 @@ def dashboard_N2(request):
         .values_list('Ru_id', 'max_date')
     )
 
-    # 6. Effectifs réels (nature 'A' ou 'V') correspondant aux dernières dates par RU
     q_conditions = Q()
     for ru_id, max_date in dernieres_dates.items():
         if max_date:
@@ -420,8 +416,6 @@ def dashboard_N2(request):
             .annotate(total=Count('id'))
             .values_list('Ru_id', 'total')
         )
-
-    # 6bis. Derniers mouvements (Départ / Changement / Ajout) pour tous les RU en 1 seule requête
     NB_MOUVEMENTS_PAR_RU = 5
 
     toutes_declarations = (
@@ -446,7 +440,6 @@ def dashboard_N2(request):
                 "date": d.date.strftime("%d/%m/%Y"),
             })
 
-    # 7. Construction de la liste des résultats sans requêtes SQL supplémentaires
     liste_ru_stats = []
     effectif_syste = 0
     effectif_reel = 0
@@ -475,7 +468,6 @@ def dashboard_N2(request):
             "derniers_mouvements": mouvements_par_ru.get(a.it, []),
         })
 
-    # Calcul des écarts globaux
     MR = effectif_reel - maquette_total
     MS = effectif_syste - maquette_total
 
@@ -561,7 +553,7 @@ def ajouter_user(request):
     try:
         data = json.loads(request.body)
         it_val = data.get("it")
-        role_form = data.get("role")  # Peut être vide désormais
+        role_form = data.get("role")
 
         if not it_val:
             return JsonResponse({"error": "Champs manquants."}, status=400)
@@ -595,6 +587,7 @@ def ajouter_user(request):
                 "ADMIN": 1 if role_final == "ADMIN" else 0,
                 "HRBP": 1 if role_final == "HRBP" else 0,
                 "SUPER": 1 if role_final == "SUPER" else 0,"DRH": 1 if role_final == "DRH" else 0,
+                "PILOT": 1 if role_final == "PILOT" else 0
             }
         )
 
@@ -906,18 +899,15 @@ def changer_mot_de_passe(request):
     return JsonResponse({"success": True})
 
 
-import json
-from datetime import timedelta
-
 def pilot_dashboard(request):
     it = request.session.get("it")
     departement = get_object_or_404(Departement, PILOT_id=it)
-
-    collab = Collaborateur.objects.filter(departement_id=departement)
+    departement_ids = [departement.abreviation]
+    collab = Collaborateur.objects.filter(departement_id=departement.abreviation)
     total_syst = collab.count()
 
     today = timezone.now().date()
-    ids_total_r = get_effectif_reel_ids(departement, today)
+    ids_total_r = get_effectif_reel_ids(departement_ids, today)
     total_r = len(ids_total_r)
     maquette_totale = departement.maquette or 0
 
@@ -947,7 +937,6 @@ def pilot_dashboard(request):
         reel = len(set(equipe.values_list('it', flat=True)) & set(ids_total_r))
 
         maquette_ru = ru.unite.maquette if ru.unite else 0
-
         liste_ru_stats.append({
             "n1": ru,
             "unite": ru.unite_id,
@@ -961,7 +950,7 @@ def pilot_dashboard(request):
     # --- Graphique d'évolution (7 derniers jours) ---
     jours = [today - timedelta(days=i) for i in range(6, -1, -1)]
     chart_labels = [j.strftime("%d/%m") for j in jours]
-    chart_data = [len(get_effectif_reel_ids(departement, j)) for j in jours]
+    chart_data = [len(get_effectif_reel_ids(departement_ids, j)) for j in jours]
 
     context = {
         "maint": timezone.now().date(),
@@ -979,7 +968,6 @@ def pilot_dashboard(request):
         "chart_data_json": json.dumps(chart_data),
     }
     return render(request, "declaration_effectif/PILOT/dashboard.html", context)
-
 
 def declaration(request):
 

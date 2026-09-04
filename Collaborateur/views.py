@@ -11,6 +11,7 @@ from declaration_effectif.models import declaration_effectif
 from django.http import JsonResponse, request
 from datetime import date , datetime
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from import_data.views import get_collaborateurs_reels
 #-------------------------------------------------------#
 #Cette fct return les operateurs d'un responsable N+1
 #-------------------------------------------------------#
@@ -606,14 +607,8 @@ def rechercher_N3_par_N4(request):
         "has_next": page_obj.has_next(),
     })
 
-
-def get_effectif_reel_ids(departement, at_date):
-    """
-    Retourne l'ensemble des `it` (ids collaborateur) qui font partie
-    de l'effectif réel du département `departement`, calculé à partir
-    de la dernière déclaration de chaque collaborateur en date du `at_date`
-    (déclarations postérieures à `at_date` ignorées).
-    """
+def get_effectif_reel_ids(departement_ids, at_date):
+    print(f"Departement IDs: {departement_ids}")
     derniere_decl_id = (
         declaration_effectif.objects
         .filter(collaborateur_it=OuterRef('collaborateur_it'), date__lte=at_date)
@@ -629,30 +624,32 @@ def get_effectif_reel_ids(departement, at_date):
 
     exclu1_ids = set(
         dernieres_declarations
-        .filter(collaborateur_it__departement_id=departement, nature="D")
+        .filter(collaborateur_it__departement_id__in=departement_ids, nature="D")
         .values_list("collaborateur_it_id", flat=True)
     )
 
     exclu2_ids = set(
         dernieres_declarations
-        .filter(collaborateur_it__departement_id=departement, nature="C")
-        .exclude(nv_Ru__departement_id=departement)
+        .filter(collaborateur_it__departement_id__in=departement_ids, nature="C")
+        .exclude(nv_Ru__departement_id__in=departement_ids)
         .values_list("collaborateur_it_id", flat=True)
     )
 
     inclu_ids = set(
         dernieres_declarations
-        .filter(nv_Ru__departement_id=departement, nature="C")
+        .filter(nv_Ru__departement_id__in=departement_ids, nature="C")
         .values_list("collaborateur_it_id", flat=True)
     )
 
     ids_departement = set(
-        Collaborateur.objects.filter(departement_id=departement).values_list("it", flat=True)
+        Collaborateur.objects.filter(departement_id__in=departement_ids).values_list("it", flat=True)
     )
-
     return (ids_departement - exclu1_ids - exclu2_ids) | inclu_ids
 
+
 PER_PAGE = 20
+
+
 def _parse_date(date_str):
     if not date_str:
         return timezone.now().date()
@@ -662,13 +659,28 @@ def _parse_date(date_str):
         return timezone.now().date()
 
 
-def collaborateur(request):
-    """Rendu initial de la page (page 1, date du jour, sans filtre)."""
-    it = request.session.get("it")
-    departement = get_object_or_404(Departement, PILOT_id=it)
+FIELD_BY_ROLE = {
+    "HRBP": "HRBP_id",
+    "DRH": "DRH_id",
+    "ADMIN": "ADMIN_id",
+    "PILOT": "PILOT_id",
+}
 
+
+def get_departement_ids_for_role(role, it):
+    field = FIELD_BY_ROLE.get(role)
+    if not field:
+        return []
+    return list(Departement.objects.filter(**{field: it}).values_list("id", flat=True))
+
+
+def collaborateur(request):
+    it = request.session.get("it")
+    role = request.session.get("role")
+
+    departement_ids = get_departement_ids_for_role(role, it)
     today = timezone.now().date()
-    ids_total_r = get_effectif_reel_ids(departement, today)
+    ids_total_r =  get_effectif_reel_ids([dept.abreviation for dept in Departement.objects.filter(id__in=departement_ids)], today)
     total_r = len(ids_total_r)
 
     collaborateurs_qs = Collaborateur.objects.filter(it__in=ids_total_r).order_by("matricule")
@@ -690,14 +702,18 @@ def collaborateur(request):
 def collaborateur_api(request):
     """Endpoint JSON : filtres (recherche, lot, date) + pagination, appelé en AJAX."""
     it = request.session.get("it")
-    departement = get_object_or_404(Departement, PILOT_id=it)
+    role = request.session.get("role")
+
+    departement_ids = get_departement_ids_for_role(role, it)
+    if not departement_ids:
+        raise Http404("Aucun département trouvé pour cet utilisateur.")
 
     search = request.GET.get("q", "").strip()
     lot = request.GET.get("lot", "").strip()
     selected_date = _parse_date(request.GET.get("date"))
     page_number = request.GET.get("page", 1)
 
-    ids_total_r = get_effectif_reel_ids(departement, selected_date)
+    ids_total_r = get_effectif_reel_ids([dept.abreviation for dept in Departement.objects.filter(id__in=departement_ids)], selected_date)
     qs = Collaborateur.objects.filter(it__in=ids_total_r)
 
     if search:

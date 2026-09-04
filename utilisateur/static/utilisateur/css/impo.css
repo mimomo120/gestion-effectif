@@ -1,216 +1,496 @@
 :root {
-    --modula-bg-body: #e9ecef;
-    --modula-card-bg: #ffffff;
-    --modula-border: #d1d5db;
-    --modula-text-dark: #0f172a;
-    --modula-text-muted: #64748b;
-    --modula-blue: #2563eb;
-    --modula-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    --page-bg: #eef2f5;
+    --card-bg: #ffffff;
+    --card-kpi-bg: #e5e9f0;
+    --text-title: #1e293b;
+    --text-sub: #64748b;
+    --border-light: #e2e8f0;
+
+    /* Dynamic status colors */
+    --green-badge-bg: #cbf2d6;
+    --green-badge-text: #1b7a37;
+    --blue-badge-bg: #cfe2ff;
+    --blue-badge-text: #084298;
+
+    --success-bg: #cbf2d6;
+    --success: #1b7a37;
+    --danger-bg: #fbdada;
+    --danger: #c0292c;
 }
 
 body {
-    background-color: var(--modula-bg-body);
-    color: var(--modula-text-dark);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-/* ==========================================================================
-   STYLE MODULA - PAGE IMPORTATION
-   ========================================================================== */
-.import-field {
-    margin-bottom: 1.25rem;
+    background-color: var(--page-bg) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-title);
 }
 
-.import-field label {
-    display: block;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #0f172a;
-    margin-bottom: 0.5rem;
-}
-
-/* Ciblage universel de tous les inputs de fichiers du formulaire */
-.import-form input[type="file"] {
-    display: block;
-    width: 100%;
-    padding: 0.45rem 0.75rem;
-    font-size: 0.875rem;
-    color: #334155;
-    background-color: #f8fafc;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    box-sizing: border-box;
-}
-
-.import-form input[type="file"]:focus {
-    border-color: #2563eb;
-    background-color: #ffffff;
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
 .import-container {
-    max-width: 1100px;
-    margin: 2rem auto;
-    padding: 0 1rem;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
 }
+
+
+/* ================================
+   Titres
+================================ */
 
 .import-title {
-    font-size: 1.6rem;
+    margin: 0 0 10px;
+    color: #212529;
+    font-size: 2rem;
     font-weight: 700;
-    color: #0f172a;
-    margin-bottom: 0.25rem;
 }
 
 .import-subtitle {
-    color: #64748b;
-    font-size: 0.9rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 30px;
+    color: #6c757d;
+    font-size: 1rem;
+    line-height: 1.6;
 }
 
-/* Guide & Cartes */
+/* ================================
+   Guide des fichiers
+================================ */
+
 .import-guide {
-    background-color: #ffffff;
-    border-radius: 12px;
-    padding: 1.25rem;
-    border: 1px solid #d1d5db;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    margin-bottom: 1.5rem;
+    width: 100%;
+    margin-bottom: 30px;
+    padding: 25px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #f8f9fa;
 }
 
 .guide-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #0f172a;
-    margin-bottom: 1rem;
+    margin-bottom: 22px;
+    color: #212529;
+    font-size: 1.35rem;
+    font-weight: 700;
 }
 
 .guide-card {
-    background-color: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 1rem;
+    height: 100%;
+    padding: 20px;
+    border: 1px solid #e1e5e9;
+    border-radius: 12px;
+    background-color: #ffffff;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.guide-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 7px 18px rgba(0, 0, 0, 0.10);
 }
 
 .guide-card-header {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
-    color: #0f172a;
+    gap: 9px;
+    min-height: 45px;
+    margin-bottom: 14px;
+    color: #212529;
+    font-size: 1rem;
+}
+
+.guide-icon {
+    font-size: 1.35rem;
 }
 
 .guide-text {
-    font-size: 0.8rem;
-    color: #64748b;
-    margin-bottom: 0.75rem;
+    min-height: 44px;
+    margin-bottom: 15px;
+    color: #6c757d;
+    font-size: 0.9rem;
+    line-height: 1.5;
 }
+
+/* ================================
+   Étiquettes des colonnes
+================================ */
 
 .column-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem;
+    gap: 7px;
 }
 
 .tag {
-    font-size: 0.72rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    background-color: #e2e8f0;
-    color: #334155;
-    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 9px;
+    border: 1px solid #dee2e6;
+    border-radius: 20px;
+    background-color: #f1f3f5;
+    color: #495057;
+    font-size: 0.78rem;
+    line-height: 1.2;
 }
 
 .tag-required {
-    background-color: #dbeafe;
-    color: #1e40af;
-    font-weight: 600;
+    border-color: #ffda6a;
+    background-color: #fff3cd;
+    color: #856404;
+    font-weight: 700;
 }
 
-/* Formulaire */
+/* ================================
+   Messages Django
+================================ */
+
+.import-messages {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.import-message {
+    margin-bottom: 12px;
+    padding: 13px 17px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+.import-message--success {
+    border: 1px solid #badbcc;
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.import-message--error {
+    border: 1px solid #f1aeb5;
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.import-message--warning {
+    border: 1px solid #ffda6a;
+    background-color: #fff3cd;
+    color: #664d03;
+}
+
+.import-message--info {
+    border: 1px solid #9ec5fe;
+    background-color: #cfe2ff;
+    color: #084298;
+}
+
+/* ================================
+   Formulaire d'importation
+================================ */
+
 .import-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+    padding: 25px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
     background-color: #ffffff;
-    border-radius: 12px;
-    padding: 1.5rem;
-    border: 1px solid #d1d5db;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
 }
 
 .import-field {
-    margin-bottom: 1.25rem;
+    display: flex;
+    flex-direction: column;
 }
 
 .import-field label {
     display: block;
-    font-size: 0.875rem;
+    margin-bottom: 8px;
+    color: #212529;
     font-weight: 600;
-    color: #0f172a;
-    margin-bottom: 0.5rem;
+}
+
+.file-input-wrapper {
+    width: 100%;
 }
 
 .file-input-wrapper input[type="file"] {
-    display: block;
     width: 100%;
-    padding: 0.55rem 0.85rem;
-    font-size: 0.85rem;
-    color: #0f172a;
-    background-color: #f8fafc;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    transition: all 0.2s ease;
+    min-height: 45px;
+    padding: 9px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    background-color: #ffffff;
+    color: #495057;
+    cursor: pointer;
+    transition: border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.file-input-wrapper input[type="file"]:hover {
+    border-color: #86b7fe;
 }
 
 .file-input-wrapper input[type="file"]:focus {
-    border-color: #2563eb;
-    background-color: #ffffff;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    border-color: #86b7fe;
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
 }
 
 .import-error {
-    color: #dc2626;
-    font-size: 0.78rem;
-    margin-top: 0.35rem;
     display: block;
+    margin-top: 6px;
+    color: #dc3545;
+    font-size: 0.85rem;
 }
 
+/* Bouton d'importation */
+
 .import-submit {
-    background-color: #2563eb;
-    color: #ffffff;
-    border: none;
-    padding: 0.65rem 1.25rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
+    grid-column: 1 / -1;
     width: 100%;
+    margin-top: 5px;
+    padding: 13px 22px;
+    border: none;
+    border-radius: 8px;
+    background-color: #212529;
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease,
+        transform 0.2s ease;
 }
 
 .import-submit:hover {
-    background-color: #1d4ed8;
+    background-color: #343a40;
+    transform: translateY(-1px);
 }
 
-/* Messages Feedback */
-.import-messages {
-    list-style: none;
-    padding: 0;
-    margin-bottom: 1.5rem;
+.import-submit:active {
+    transform: translateY(0);
 }
 
-.import-message {
-    padding: 0.75rem 1rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    margin-bottom: 0.5rem;
+/* ================================
+   Historique des imports
+================================ */
+
+.card {
+    overflow: hidden;
+    border-radius: 14px !important;
 }
 
-.import-message--success {
-    background-color: #dcfce7;
-    color: #166534;
-    border: 1px solid #bbf7d0;
+.card-header {
+    min-height: 60px;
+    padding: 16px 20px;
 }
 
-.import-message--error {
-    background-color: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
+.card-header h5 {
+    font-size: 1.1rem;
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.table {
+    min-width: 950px;
+    margin-bottom: 0;
+}
+
+.table th {
+    padding: 14px 12px;
+    color: #343a40;
+    font-size: 0.88rem;
+    font-weight: 700;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.table td {
+    padding: 13px 12px;
+    font-size: 0.88rem;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.table .badge {
+    padding: 6px 9px;
+    font-size: 0.75rem;
+}
+
+/* ================================
+   Fenêtres modales
+================================ */
+
+.modal-content {
+    overflow: hidden;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+    padding: 16px 20px;
+    background-color: #212529;
+    color: #ffffff;
+}
+
+.modal-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.modal-header .btn-close {
+    filter: invert(1);
+    opacity: 0.9;
+}
+
+.modal-header .btn-close:hover {
+    opacity: 1;
+}
+
+.modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.modal-body .table {
+    min-width: 900px;
+}
+
+.modal-body .table th {
+    background-color: #212529;
+    color: #ffffff;
+}
+
+.modal-footer {
+    padding: 13px 20px;
+}
+
+/* ================================
+   Responsive tablette
+================================ */
+
+@media (max-width: 992px) {
+    .import-container {
+        padding: 30px 18px;
+    }
+
+    .import-guide {
+        padding: 20px;
+    }
+
+    .guide-title {
+        font-size: 1.2rem;
+    }
+
+    .import-form {
+        gap: 18px;
+    }
+}
+
+/* ================================
+   Responsive mobile
+================================ */
+
+@media (max-width: 768px) {
+    .import-container {
+        padding: 22px 12px;
+    }
+
+    .import-title {
+        font-size: 1.6rem;
+    }
+
+    .import-subtitle {
+        font-size: 0.9rem;
+    }
+
+    .import-guide {
+        padding: 16px;
+    }
+
+    .guide-title {
+        font-size: 1.1rem;
+        line-height: 1.4;
+    }
+
+    .guide-card {
+        padding: 16px;
+    }
+
+    .guide-text {
+        min-height: auto;
+    }
+
+    .import-form {
+        grid-template-columns: 1fr;
+        padding: 18px;
+    }
+
+    .import-submit {
+        grid-column: auto;
+    }
+
+    .card-header {
+        align-items: flex-start !important;
+    }
+
+    .card-header h5 {
+        font-size: 0.95rem;
+        line-height: 1.4;
+    }
+
+    .modal-dialog {
+        margin: 10px;
+    }
+
+    .modal-title {
+        padding-right: 15px;
+        font-size: 0.95rem;
+    }
+}
+
+/* ================================
+   Très petits écrans
+================================ */
+
+@media (max-width: 480px) {
+    .import-container {
+        padding: 18px 8px;
+    }
+
+    .import-title {
+        font-size: 1.4rem;
+    }
+
+    .import-guide {
+        padding: 12px;
+    }
+
+    .import-form {
+        padding: 14px;
+    }
+
+    .guide-card {
+        padding: 14px;
+    }
+
+    .file-input-wrapper input[type="file"] {
+        font-size: 0.8rem;
+    }
+
+    .import-submit {
+        padding: 11px 15px;
+        font-size: 0.9rem;
+    }
+
+    .table th,
+    .table td {
+        padding: 10px 8px;
+        font-size: 0.8rem;
+    }
 }

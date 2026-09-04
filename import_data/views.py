@@ -5,12 +5,15 @@ from django.db import transaction
 from .forms import MultipleImportForm
 from Collaborateur.models import Collaborateur, Departement, Unite
 from declaration_effectif.models import historique
+from .models import  histo_import, histo_import_detail
 from utilisateur.decorators import role_required
 from declaration_effectif.models import declaration_effectif
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from django.utils import timezone
 from django.http import HttpResponse
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 # ------------------------------------------------------------------
 # FONCTIONS AUXILIAIRES
 # ------------------------------------------------------------------
@@ -39,7 +42,7 @@ def read_uploaded_file(fichier):
     return df
 
 # ------------------------------------------------------------------
-# IMPORT DÉPARTEMENTS
+# IMPORT DÉPARTEMENTS  (inchangé)
 # ------------------------------------------------------------------
 
 def importer_departements(df_dpt, erreurs):
@@ -104,7 +107,7 @@ def importer_departements(df_dpt, erreurs):
     return len(a_creer) + len(a_maj)
 
 # ------------------------------------------------------------------
-# IMPORT UNITÉS
+# IMPORT UNITÉS  (inchangé)
 # ------------------------------------------------------------------
 
 def importer_unites(df_unite, erreurs):
@@ -150,9 +153,21 @@ def importer_unites(df_unite, erreurs):
     return len(a_creer) + len(a_maj)
 
 # ------------------------------------------------------------------
-# IMPORT COLLABORATEURS
+# IMPORT COLLABORATEURS — avec suivi détaillé
 # ------------------------------------------------------------------
-def importer_collaborateurs(df_collab, erreurs):
+
+# Champs à comparer pour détecter une "vraie" modification
+CHAMPS_SUIVIS = ["matricule", "nom_complete", "lot", "departement", "unite", "eq", "shift", "sexe"]
+
+def _val_affichable(v):
+    """Convertit une valeur (y compris FK) en texte lisible pour le détail d'import."""
+    if v is None:
+        return ""
+    if hasattr(v, "abreviation"):
+        return v.abreviation
+    return str(v)
+
+def importer_collaborateurs(df_collab, erreurs, import_log=None):
     departements_map = {d.abreviation: d for d in Departement.objects.all()}
     unites_map = {u.abreviation: u for u in Unite.objects.all()}
     collaborateurs_map = {c.it: c for c in Collaborateur.objects.all()}
@@ -164,6 +179,7 @@ def importer_collaborateurs(df_collab, erreurs):
     a_maj = []
     ru_a_resoudre = []
     collaborateurs_dans_fichier = set()
+    details_a_creer = []  # histo_import_detail en attente
 
     for i, row in df_collab.iterrows():
         try:
@@ -172,7 +188,7 @@ def importer_collaborateurs(df_collab, erreurs):
                 erreurs.append(f"Collaborateurs Ligne {i+2}: Identifiant Utilisateur manquant.")
                 continue
 
-            collaborateurs_dans_fichier.add(utilisateur_it)  # Enregistrer ce collaborateur
+            collaborateurs_dans_fichier.add(utilisateur_it)
 
             dpt_code = clean_val(row.get("DPT"))
             dpt_obj = departements_map.get(dpt_code) if dpt_code else None
@@ -195,7 +211,7 @@ def importer_collaborateurs(df_collab, erreurs):
                 departement=dpt_obj,
                 unite=unite_obj,
                 eq=str(row.get("Equipe", "") or ""),
-                shift=row.get("Shift"),
+                shift=clean_val(row.get("Shift")),
                 sexe=clean_int(row.get("Sexe"), default=1),
             )
 
@@ -203,6 +219,24 @@ def importer_collaborateurs(df_collab, erreurs):
 
             if utilisateur_it in collaborateurs_map:
                 obj = collaborateurs_map[utilisateur_it]
+
+                # --- Détection champ par champ des vraies modifications ---
+                if import_log is not None:
+                    for champ in CHAMPS_SUIVIS:
+                        ancienne = getattr(obj, champ)
+                        nouvelle = data[champ]
+                        if ancienne != nouvelle:
+                            details_a_creer.append(histo_import_detail(
+                                import_parent=import_log,
+                                action="MODIFICATION",
+                                matricule=matricule_val,
+                                it=utilisateur_it,
+                                nom_complete=data["nom_complete"],
+                                champ_modifie=champ,
+                                ancienne_valeur=_val_affichable(ancienne),
+                                nouvelle_valeur=_val_affichable(nouvelle),
+                            ))
+
                 for k, v in data.items():
                     setattr(obj, k, v)
                 a_maj.append(obj)
@@ -210,6 +244,15 @@ def importer_collaborateurs(df_collab, erreurs):
                 obj = Collaborateur(it=utilisateur_it, **data)
                 a_creer.append(obj)
                 collaborateurs_map[utilisateur_it] = obj
+
+                if import_log is not None:
+                    details_a_creer.append(histo_import_detail(
+                        import_parent=import_log,
+                        action="CREATION",
+                        matricule=matricule_val,
+                        it=utilisateur_it,
+                        nom_complete=data["nom_complete"],
+                    ))
 
             if matricule_val:
                 collaborateurs_par_matricule[matricule_val] = utilisateur_it
@@ -219,9 +262,26 @@ def importer_collaborateurs(df_collab, erreurs):
 
         except Exception as e:
             erreurs.append(f"Collaborateurs Ligne {i+2}: {e}")
+            if import_log is not None:
+                details_a_creer.append(histo_import_detail(
+                    import_parent=import_log,
+                    action="ERREUR",
+                    message_erreur=str(e),
+                ))
 
-    # Identifier les collaborateurs à supprimer (présents en DB mais pas dans le fichier)
+    # Collaborateurs présents en base mais absents du nouveau fichier
     collaborateurs_a_supprimer = set(collaborateurs_map.keys()) - collaborateurs_dans_fichier
+
+    if import_log is not None:
+        for it_supp in collaborateurs_a_supprimer:
+            c = collaborateurs_map[it_supp]
+            details_a_creer.append(histo_import_detail(
+                import_parent=import_log,
+                action="SUPPRESSION",
+                matricule=c.matricule,
+                it=it_supp,
+                nom_complete=c.nom_complete,
+            ))
 
     with transaction.atomic():
         if a_creer:
@@ -232,9 +292,10 @@ def importer_collaborateurs(df_collab, erreurs):
                 ["matricule", "nom_complete", "lot", "departement", "unite", "eq", "shift", "sexe"],
                 batch_size=500,
             )
-        # Supprimer les collaborateurs absents du nouveau fichier
         if collaborateurs_a_supprimer:
-            deleted_count, _ = Collaborateur.objects.filter(it__in=collaborateurs_a_supprimer).delete()
+            Collaborateur.objects.filter(it__in=collaborateurs_a_supprimer).delete()
+        if details_a_creer:
+            histo_import_detail.objects.bulk_create(details_a_creer, batch_size=500)
 
     if ru_a_resoudre:
         tous_les_collabs = {
@@ -262,9 +323,18 @@ def importer_collaborateurs(df_collab, erreurs):
         if a_maj_ru:
             Collaborateur.objects.bulk_update(a_maj_ru, ["ru_it"], batch_size=500)
 
+    # Mise à jour des compteurs sur le log si fourni
+    if import_log is not None:
+        import_log.depar = len(a_creer)
+        import_log.modif = len([d for d in details_a_creer if d.action == "MODIFICATION"])
+        import_log.supprime = len(collaborateurs_a_supprimer)
+        import_log.erreur = len(erreurs)
+        import_log.save(update_fields=["depar", "modif", "supprime", "erreur"])
+
     return len(a_creer) + len(a_maj) + len(collaborateurs_a_supprimer)
+
 # ------------------------------------------------------------------
-# IMPORT CHANGEMENTS D'AFFECTATION
+# IMPORT CHANGEMENTS D'AFFECTATION  (inchangé)
 # ------------------------------------------------------------------
 
 def importer_changements(df_chg, erreurs):
@@ -314,29 +384,39 @@ def importer_changements(df_chg, erreurs):
 # ------------------------------------------------------------------
 # VUE PRINCIPALE
 # ------------------------------------------------------------------
-
-@role_required(['HRBP', 'ADMIN', 'SUPER',"PILOT"])
+@role_required(['SUPER', "DRH"])
 def importer_fichiers_combines(request):
     role = request.session.get('role')
     template_de_base = {
-        "HRBP":  "utilisateur/navbar_N1.html",
-        "ADMIN": "utilisateur/navbar_N1.html",
         "SUPER": "utilisateur/navbar_N1.html",
+        "DRH": "utilisateur/navbar_N1.html",
     }.get(role, "utilisateur/navbar_N1.html")
+
+    # Récupération de l'historique des imports avec préchargement des détails associés
+    historique_imports = (
+        histo_import.objects
+        .prefetch_related('details')  # adaptez le nom de la relation inversée si défini différemment (ex: histo_import_detail_set)
+        .order_by('-date')[:10]
+    )
 
     if request.method != "POST":
         storage = messages.get_messages(request)
         for _ in storage:
             pass
-        
+
         return render(request, "import_data/import.html", {
             "form": MultipleImportForm(),
             "template_de_base": template_de_base,
+            "historique_imports": historique_imports,
         })
 
     form = MultipleImportForm(request.POST, request.FILES)
     if not form.is_valid():
-        return render(request, "import_data/import.html", {"form": form, "template_de_base": template_de_base})
+        return render(request, "import_data/import.html", {
+            "form": form,
+            "template_de_base": template_de_base,
+            "historique_imports": historique_imports,
+        })
 
     f_collab = request.FILES.get("fichier_collaborateur")
     f_unite = request.FILES.get("fichier_unite")
@@ -345,64 +425,87 @@ def importer_fichiers_combines(request):
 
     if not (f_collab or f_unite or f_dpt or f_chg):
         messages.error(request, "Veuillez fournir au moins un fichier à importer.", extra_tags="import")
-        return render(request, "import_data/import.html", {"form": form, "template_de_base": template_de_base})
+        return render(request, "import_data/import.html", {
+            "form": form,
+            "template_de_base": template_de_base,
+            "historique_imports": historique_imports,
+        })
 
     erreurs = []
     crees_dpts = crees_unites = crees_collabs = crees_chgs = 0
+    import_log = None
 
     if f_dpt:
         try:
             df_dpt = read_uploaded_file(f_dpt)
             crees_dpts = importer_departements(df_dpt, erreurs)
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Départements : {e}" ,extra_tags="import")
+            messages.error(request, f"Erreur de lecture du fichier Départements : {e}", extra_tags="import")
 
     if f_unite:
         try:
             df_unite = read_uploaded_file(f_unite)
             crees_unites = importer_unites(df_unite, erreurs)
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Unités : {e}",extra_tags="import")
+            messages.error(request, f"Erreur de lecture du fichier Unités : {e}", extra_tags="import")
 
     if f_collab:
         try:
             df_collab = read_uploaded_file(f_collab)
-            crees_collabs = importer_collaborateurs(df_collab, erreurs)
+            import_log = histo_import.objects.create(
+                utilisateur=request.session.get("it"),
+                nom_fichier=f_collab.name,
+                statut="EN_COURS",
+            )
+            crees_collabs = importer_collaborateurs(df_collab, erreurs, import_log=import_log)
+            import_log.statut = "SUCCES" if not erreurs else "PARTIEL"
+            import_log.save(update_fields=["statut"])
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Collaborateurs : {e}" , extra_tags="import")
+            if import_log is not None:
+                import_log.statut = "ECHEC"
+                import_log.save(update_fields=["statut"])
+            messages.error(request, f"Erreur de lecture du fichier Collaborateurs : {e}", extra_tags="import")
 
     if f_chg:
         try:
             df_chg = read_uploaded_file(f_chg)
             crees_chgs = importer_changements(df_chg, erreurs)
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Changements : {e}" ,extra_tags="import")
+            messages.error(request, f"Erreur de lecture du fichier Changements : {e}", extra_tags="import")
 
-    # Construction du message récapitulatif par ligne
     resume = []
-    if f_dpt: 
+    if f_dpt:
         resume.append(f"Départements: {crees_dpts} ligne(s) importée(s) avec succès")
-    if f_unite: 
+    if f_unite:
         resume.append(f"Unités: {crees_unites} ligne(s) importée(s) avec succès")
-    if f_collab: 
-        resume.append(f"Collaborateurs: {crees_collabs} ligne(s) importée(s) avec succès")
-    if f_chg: 
+    if f_collab:
+        detail_msg = f"Collaborateurs: {crees_collabs} ligne(s) traitée(s)"
+        if import_log:
+            detail_msg += f" ({import_log.depar} créé(s), {import_log.modif} modifié(s), {import_log.supprime} supprimé(s))"
+        resume.append(detail_msg)
+    if f_chg:
         resume.append(f"Changements d'affectation: {crees_chgs} ligne(s) importée(s) avec succès")
 
-    messages.success(request, "Importation terminée : " + " | ".join(resume),extra_tags="import")
-    
+    messages.success(request, "Importation terminée : " + " | ".join(resume), extra_tags="import")
+
     if erreurs:
-        messages.warning(request, f"{len(erreurs)} avertissement(s) : " + " | ".join(erreurs[:5]),extra_tags="import")
+        messages.warning(request, f"{len(erreurs)} avertissement(s) : " + " | ".join(erreurs[:5]), extra_tags="import")
+
+    # Rafraîchir l'historique après l'opération d'import
+    historique_imports = (
+        histo_import.objects
+        .order_by('-date')[:10]
+    )
 
     return render(request, "import_data/import.html", {
         "form": MultipleImportForm(),
         "template_de_base": template_de_base,
+        "historique_imports": historique_imports,
     })
+# ============================================================
+# (le reste du fichier : get_collaborateurs_reels, export_effectif_reel — inchangé)
+# ============================================================
 
-# ============================================================
-# Récupère les collaborateurs "réels" (hors départs) avec leur RU d'affichage
-# (RU d'accueil si changement, sinon RU habituel)
-# ============================================================
 def get_collaborateurs_reels(departements):
     collaborateurs = (
         Collaborateur.objects
@@ -412,7 +515,6 @@ def get_collaborateurs_reels(departements):
 
     ids = list(collaborateurs.values_list("it", flat=True))
 
-    # Dernière déclaration pertinente (C, D, A, V) par collaborateur
     declarations = (
         declaration_effectif.objects
         .filter(collaborateur_it_id__in=ids, nature__in=["C", "D", "A", "V"])
@@ -430,7 +532,6 @@ def get_collaborateurs_reels(departements):
     for c in collaborateurs:
         d = dernier_par_collab.get(c.it)
 
-        # Exclusion des départs
         if d and d.nature == "D":
             continue
 
@@ -446,7 +547,7 @@ def get_collaborateurs_reels(departements):
 
     return resultats
 
-@role_required(["HRBP", "DRH", "ADMIN","PILOT"])
+@role_required(["HRBP", "DRH", "ADMIN", "PILOT"])
 def export_effectif_reel(request):
     it = request.session.get("it")
     role = request.session.get("role")
@@ -503,3 +604,15 @@ def export_effectif_reel(request):
     wb.save(response)
 
     return response
+
+
+
+
+@role_required(['SUPER', "DRH"])
+def import_details_json(request, import_id):
+    import_log = get_object_or_404(histo_import, pk=import_id)
+    details = import_log.details.all().values(
+        "action", "it", "matricule", "nom_complete",
+        "champ_modifie", "ancienne_valeur", "nouvelle_valeur",
+    )
+    return JsonResponse({"details": list(details)})

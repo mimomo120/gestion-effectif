@@ -47,7 +47,6 @@ class Departement(models.Model):
 class Unite(models.Model):
     nom = models.CharField(max_length=50)
     abreviation = models.CharField(max_length=20, unique=True)
-
     maquette = models.IntegerField(default=0)
     A = models.IntegerField(default=0)# A+O
     P = models.IntegerField(default=0)
@@ -66,7 +65,6 @@ class Collaborateur(models.Model):
 
     it = models.CharField(max_length=8, primary_key=True) # it=utilisateur
     matricule = models.CharField(max_length=20, unique=True, null=True, blank=True)
-    cin = models.CharField(max_length=8, unique=True, null=True, blank=True)
 
     nom_complete = models.CharField(max_length=80)
 
@@ -98,7 +96,6 @@ class Collaborateur(models.Model):
     )
 
     sexe = models.IntegerField(choices=SEXE_CHOICES)
-
     ru_it = models.ForeignKey(
         "self",
         to_field="it",
