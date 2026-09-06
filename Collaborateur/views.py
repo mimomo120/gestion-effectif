@@ -8,27 +8,83 @@ from django.db.models import Q , Exists, OuterRef, Subquery , Count ,Max ,F
 from django.contrib import messages
 from django.utils import timezone
 from declaration_effectif.models import declaration_effectif
-from django.http import JsonResponse, request
+from django.http import JsonResponse, request, Http404
 from datetime import date , datetime
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.cache import cache
 from import_data.views import get_collaborateurs_reels
+
+# ============================================================
+# CACHE — hiérarchie & managers
+# ============================================================
+# Ces caches évitent de refaire un scan complet de la table
+# Collaborateur (ou de declaration_effectif) à chaque appel de
+# SystEff/reelEff/get_tous_les_it_sous/get_tous_les_n1, qui sont
+# appelées en boucle dans les dashboards N+2/N+3/N+4 et à chaque
+# frappe clavier dans les recherches AJAX.
+
+CACHE_TTL = 120  # secondes
+
+
+def get_managers_its():
+    """
+    Ensemble des 'it' qui sont responsables d'au moins un collaborateur.
+    Calculé UNE fois (1 requête) puis mis en cache, au lieu d'être
+    recalculé à chaque appel de SystEff/reelEff.
+    """
+    managers = cache.get("managers_its")
+    if managers is None:
+        managers = set(
+            Collaborateur.objects.exclude(ru_it_id__isnull=True)
+            .values_list("ru_it_id", flat=True)
+            .distinct()
+        )
+        cache.set("managers_its", managers, CACHE_TTL)
+    return managers
+
+
+def get_hierarchie_map():
+    """
+    Construit, en UNE seule requête, la map {ru_it_id: [it_enfants]}
+    pour toute la table Collaborateur. Permet ensuite de parcourir
+    n'importe quelle sous-hiérarchie EN MÉMOIRE (0 requête), au lieu
+    de faire une requête par nœud comme le faisait l'ancienne version
+    récursive de get_tous_les_it_sous / get_tous_les_n1.
+    """
+    mapping = cache.get("hierarchie_map")
+    if mapping is None:
+        mapping = {}
+        paires = Collaborateur.objects.exclude(ru_it_id__isnull=True).values_list("it", "ru_it_id")
+        for it_c, ru_it_id in paires:
+            if ru_it_id != it_c:
+                mapping.setdefault(ru_it_id, []).append(it_c)
+        cache.set("hierarchie_map", mapping, CACHE_TTL)
+    return mapping
+
+
+def invalider_cache_hierarchie():
+    """
+    À appeler après toute création/modification de déclaration ou de
+    rattachement (ru_it), pour que les caches ci-dessus reflètent le
+    nouvel état. Appelé notamment depuis declaration_effectif.views.valider().
+    """
+    cache.delete_many(["managers_its", "hierarchie_map", "ru_reel_et_departs"])
+
+
 #-------------------------------------------------------#
 #Cette fct return les operateurs d'un responsable N+1
 #-------------------------------------------------------#
 def rec(request):
     it = request.session.get("it")
-
     der = (
         declaration_effectif.objects
         .filter(Q(Ru_id=it) | Q(nv_Ru_id=it, nature="C"))
         .order_by("-date")
         .first()
     )
-    operateurs = SystEff(it)
-
+    operateurs = SystEff(it).exclude(it=it)
     if der:
         derniere = der.date
-
         historique = (
             declaration_effectif.objects
             .filter(
@@ -38,7 +94,6 @@ def rec(request):
             )
             .order_by("collaborateur_it_id", "-date", "-id")
         )
-
         dernier_etat_par_collab = {}
         for decl in historique:
             cid = decl.collaborateur_it_id
@@ -61,15 +116,23 @@ def rec(request):
         ).exclude(it=it)
     else:
         operateurs_finaux = operateurs
-
+    operateurs_finaux = operateurs_finaux.exclude(lot__in=["C", "E"])
     return operateurs_finaux
 
 #----------------------------------------------------------------------#
 #Cette fct return les operateurs reel d'un responsable N+1  ds un jour
 #----------------------------------------------------------------------#
-def reelEff(it, date_reference=None):
+def reelEff(it, date_reference=None, managers_its=None):
+    """
+    'managers_its' peut être passé par l'appelant (calculé une seule
+    fois en dehors d'une boucle) pour éviter que cette fonction ne
+    recalcule elle-même la liste de TOUS les managers à chaque appel.
+    """
     if not it:
         return Collaborateur.objects.none()
+
+    if managers_its is None:
+        managers_its = get_managers_its()
 
     qs_declarations = declaration_effectif.objects.filter(Ru_id=it)
     if date_reference:
@@ -90,46 +153,29 @@ def reelEff(it, date_reference=None):
 
         base_qs = Collaborateur.objects.filter(ru_it_id=it)
 
-        # Base : opérateurs déjà rattachés en BDD, hors ceux partis/changés
         operateurs_qs = base_qs.filter(~Q(it__in=liste_ch)).exclude(it=it)
-
-        # Ajoutés :
         ajout_qs = Collaborateur.objects.filter(it__in=liste_a).exclude(it=it)
-
-        # Validés :
         valide_qs = Collaborateur.objects.filter(it__in=liste_v).exclude(it=it)
 
-        # Union des trois ensembles, dédupliquée
         operateurs_qs = (operateurs_qs | ajout_qs | valide_qs).distinct()
     else:
         operateurs_qs = Collaborateur.objects.filter(ru_it_id=it).exclude(it=it)
 
-    try:
-        ru_it_field = Collaborateur._meta.get_field("ru_it")
-    except Exception:
-        ru_it_field = None
-
-    if ru_it_field is not None and getattr(ru_it_field, "is_relation", False):
-        managers_qs = Collaborateur.objects.exclude(ru_it_id__isnull=True).values_list("ru_it_id", flat=True).distinct()
-        operateurs_finaux = operateurs_qs.exclude(pk__in=managers_qs)
-    else:
-        managers_vals = Collaborateur.objects.exclude(ru_it__isnull=True).values_list("ru_it", flat=True).distinct()
-        operateurs_finaux = operateurs_qs.exclude(it__in=managers_vals)
-
+    operateurs_finaux = operateurs_qs.exclude(pk__in=managers_its)
     return operateurs_finaux
+
 #-------------------------------------------------------#
 #Cette fct return les operateurs  systeme d'un responsable N+1
 #-------------------------------------------------------#
-def SystEff(it):
+def SystEff(it, managers_its=None):
+    """
+    'managers_its' peut être passé par l'appelant (voir reelEff).
+    """
     if not it:
         return Collaborateur.objects.none()
 
-    managers_its = (
-        Collaborateur.objects
-        .exclude(ru_it_id__isnull=True)
-        .values_list('ru_it_id', flat=True)
-        .distinct()
-    )
+    if managers_its is None:
+        managers_its = get_managers_its()
 
     operateur_syst = (
         Collaborateur.objects
@@ -149,20 +195,15 @@ def operateurs(request):
     operateurs_list = reelEff(it)
     count = operateurs_list.count()
 
-    # Définition du nombre d'éléments par page
     items_per_page = 10
     paginator = Paginator(operateurs_list, items_per_page)
-
-    # Récupération du numéro de page depuis l'URL (?page=1)
     page_number = request.GET.get('page', 1)
 
     try:
         operateurs_finaux = paginator.page(page_number)
     except PageNotAnInteger:
-        # Si la page n'est pas un entier, afficher la première page
         operateurs_finaux = paginator.page(1)
     except EmptyPage:
-        # Si la page est hors limites, afficher la dernière page
         operateurs_finaux = paginator.page(paginator.num_pages)
 
     context = {
@@ -237,7 +278,6 @@ def filter_validation(request):
 
     operateurs = rec(request)
 
-    # --- Exclusion des managers, identique à validation_view ---
     direct_ids = list(
         Collaborateur.objects.filter(ru_it__it=it).exclude(it=it).values_list('it', flat=True)
     )
@@ -281,7 +321,7 @@ def filter_validation(request):
 
 def operateur(request):
     it = request.GET.get('q', '').strip()
-    utilisateur = request.session.get("it")
+    utilisateur_it = request.session.get("it")
 
     try:
         op = Collaborateur.objects.get(it=it)
@@ -290,7 +330,7 @@ def operateur(request):
     except Collaborateur.MultipleObjectsReturned:
         return JsonResponse({"error": "Plusieurs opérateurs trouvés."}, status=409)
 
-    if it == utilisateur:
+    if it == utilisateur_it:
         return JsonResponse({"error": "Vous ne pouvez pas utiliser votre utilisateur."}, status=404)
     derniere_decl = (
         declaration_effectif.objects
@@ -299,7 +339,7 @@ def operateur(request):
         .first()
     )
     a_declare_depart = derniere_decl is not None and derniere_decl.nature == "D"
-    if not a_declare_depart and op.ru_it_id == utilisateur:
+    if not a_declare_depart and op.ru_it_id == utilisateur_it:
         return JsonResponse({"error": "Cet opérateur appartient déjà à votre lot."}, status=400)
 
     operateur_count = Collaborateur.objects.filter(ru_it_id=it).count()
@@ -346,7 +386,6 @@ def liste_par_jour(request):
 #-------------------------------------------------------#
 #Cette fct return la liste des N+1 d'un N+2
 #-------------------------------------------------------#
-
 def Ru_Rg(it):
     a_des_subordonnes = Collaborateur.objects.filter(
         ru_it_id=OuterRef('it')
@@ -362,30 +401,77 @@ def Ru_Rg(it):
 
 
 #-------------------------------------------------------#
-#Cette fct rederige vers templete de liste des N+1 par N+2
+# Page : liste des collaborateurs directs + RU du N2
 #-------------------------------------------------------#
 
 def liste_N1_par_N2(request):
-    it=request.session.get("it")
-    operat=Ru_Rg(it)
-    n1=set(operat.values_list("it",flat=True))
-    col=Collaborateur.objects.filter(ru_it_id=it).exclude(it__in=n1)
-    return render(request, "Collaborateur/N2/liste_N1.html", {"operateurs": operat,"col":col})
+    it = request.session.get("it")
+    ru_list = Ru_Rg(it)
+    ru_its = set(ru_list.values_list("it", flat=True))
+
+    col = Collaborateur.objects.filter(ru_it_id=it).exclude(it__in=ru_its)
+
+    return render(
+        request,
+        "Collaborateur/N2/liste_N1.html",
+        {"operateurs": ru_list, "col": col},
+    )
+
+
+#-------------------------------------------------------#
+# Endpoint AJAX : collaborateurs directs d'un RU donné
+#-------------------------------------------------------#
+
+def collaborateurs_par_ru(request, ru_it):
+    it = request.session.get("it")
+
+    ru = Ru_Rg(it).filter(it=ru_it).first()
+    if not ru:
+        return JsonResponse({"error": "Responsable introuvable"}, status=404)
+
+    collaborateurs = Collaborateur.objects.filter(
+        ru_it_id=ru_it
+    ).exclude(it=ru_it)
+
+    data = [
+        {
+            "matricule": c.matricule,
+            "it": c.it,
+            "nom_complete": c.nom_complete,
+            "lot": c.lot,
+        }
+        for c in collaborateurs
+    ]
+
+    return JsonResponse({
+        "ru_nom": ru.nom_complete,
+        "count": len(data),
+        "collaborateurs": data,
+    })
 
 def rechercher_N1_par_N2(request):
+    """
+    FIX PERF : l'ancienne version faisait un .count() en base pour
+    CHAQUE collaborateur direct du N+2 (N+1 requêtes). On calcule
+    maintenant en 2 requêtes l'ensemble des 'it' qui ont eux-mêmes
+    des subordonnés.
+    """
     it = request.session.get("it")
     q = request.GET.get("q", "").strip()
     lot = request.GET.get("choix", "").strip()
     page_number = request.GET.get("page", 1)
 
-    # Même logique que Ru_Rg, en queryset filtrable
     collab = Collaborateur.objects.filter(ru_it_id=it).exclude(it=it)
-    liste = []
-    for c in collab:
-        if Collaborateur.objects.filter(Q(ru_it_id=c.it) & ~Q(it=it)).count() > 0:
-            liste.append(c.it)
+    collab_ids = list(collab.values_list("it", flat=True))
 
-    resultat = Collaborateur.objects.filter(it__in=liste)
+    ids_avec_subordonnes = set(
+        Collaborateur.objects.filter(ru_it_id__in=collab_ids)
+        .exclude(ru_it_id=it)
+        .values_list("ru_it_id", flat=True)
+        .distinct()
+    )
+
+    resultat = Collaborateur.objects.filter(it__in=ids_avec_subordonnes)
 
     if q:
         resultat = resultat.filter(
@@ -438,20 +524,72 @@ def Rg_Dur(it):
     ).filter(has_sub=True)
 
 
+#-------------------------------------------------------#
+#Cette fct return TOUS les 'it' sous 'it' donné, quel que soit
+#le nombre de niveaux.
+#
+#FIX PERF : ancienne version = 1 requête PAR nœud de la hiérarchie
+#(récursion en base). Nouvelle version = 1 requête pour TOUTE la
+#table (via get_hierarchie_map, mise en cache), puis parcours en
+#mémoire pur (0 requête supplémentaire).
+#-------------------------------------------------------#
+def get_tous_les_it_sous(it):
+    mapping = get_hierarchie_map()
+    vus = set()
+    a_visiter = list(mapping.get(it, []))
+    while a_visiter:
+        courant = a_visiter.pop()
+        if courant in vus:
+            continue
+        vus.add(courant)
+        a_visiter.extend(mapping.get(courant, []))
+    return vus
+
+
+#-------------------------------------------------------#
+#Cette fct rederige vers templete de liste des N+2 par N+3
+#-------------------------------------------------------#
+def liste_N2_par_N3(request):
+    it = request.session.get("it")
+
+    tous_les_it = get_tous_les_it_sous(it)
+    tous_ru_it = get_managers_its()
+
+    tous = Collaborateur.objects.filter(it__in=tous_les_it).select_related("ru_it")
+
+    liste_finale = [
+        {
+            "matricule": c.matricule,
+            "it": c.it,
+            "nom_complete": c.nom_complete,
+            "lot": c.lot,
+            "est_responsable": c.it in tous_ru_it,
+            "ru_nom": c.ru_it.nom_complete if c.ru_it else "-",
+        }
+        for c in tous
+    ]
+
+    return render(request, "Collaborateur/N3/liste_N2.html", {
+        "operateurs": liste_finale,
+        "count": len(liste_finale),
+    })
+
+
+#-------------------------------------------------------#
+#Endpoint AJAX : recherche + filtre lot + filtre rôle,
+#sur TOUS les niveaux sous le N+3 connecté, avec le RU de chacun
+#-------------------------------------------------------#
 def rechercher_N2_par_N3(request):
     it = request.session.get("it")
     q = request.GET.get("q", "").strip()
     lot = request.GET.get("choix", "").strip()
+    role = request.GET.get("role", "").strip()
     page_number = request.GET.get("page", 1)
 
-    # Même logique que Rg_Dur, mais en queryset filtrable
-    sous_it = Collaborateur.objects.filter(Q(ru_it_id=it) & ~Q(it=it))
-    liste = []
-    for c in sous_it:
-        if Ru_Rg(c.it).count() > 0:
-            liste.append(c.it)
+    tous_les_it = get_tous_les_it_sous(it)
+    tous_ru_it = get_managers_its()
 
-    resultat = Collaborateur.objects.filter(it__in=liste)
+    resultat = Collaborateur.objects.filter(it__in=tous_les_it).select_related("ru_it")
 
     if q:
         resultat = resultat.filter(
@@ -459,6 +597,13 @@ def rechercher_N2_par_N3(request):
         )
     if lot:
         resultat = resultat.filter(lot=lot)
+
+    if role == "responsable":
+        resultat = resultat.filter(it__in=tous_ru_it)
+    elif role == "operateur":
+        resultat = resultat.exclude(it__in=tous_ru_it)
+
+    resultat = resultat.order_by("matricule")
 
     paginator = Paginator(resultat, 15)
     page_obj = paginator.get_page(page_number)
@@ -469,6 +614,8 @@ def rechercher_N2_par_N3(request):
             "it": op.it,
             "nom_complete": op.nom_complete,
             "lot": op.lot,
+            "est_responsable": op.it in tous_ru_it,
+            "ru_nom": op.ru_it.nom_complete if op.ru_it else "-",
         }
         for op in page_obj
     ]
@@ -500,61 +647,259 @@ def liste_N1_pr_N3(it):
     ).filter(has_sub=True)
 
     return set(n1_qs.values_list("it", flat=True))
-#-------------------------------------------------------#
-#Cette fct rederige vers templete de liste des N+2 par N+3
-#-------------------------------------------------------#
 
-def liste_N2_par_N3(request):
-    it=request.session.get("it")
-    operat=Rg_Dur(it)
-    col=Collaborateur.objects.filter(Q(ru_it_id=it)& ~Q(it__in=set(operat.values_list("it",flat=True))))
-    nbr=operat.count()
-    return render(request,"Collaborateur/N3/liste_N2.html",{"operateurs":operat,"nbr":nbr,"col":col})
 
 #-------------------------------------------------------#
 #Cette fct return la liste des N+3 d'un N+4
 #-------------------------------------------------------#
-
-
 def liste_N3_N4(it):
-    candidats_N3 = Collaborateur.objects.filter(Q(ru_it_id=it)&~Q(it=it))
-    n3_valides_ids = [
-            c.it for c in candidats_N3 if a_deux_niveaux(c.it)
-        ]
-    return n3_valides_ids
+    """
+    FIX PERF : a_deux_niveaux() faisait 2 requêtes par candidat.
+    Utilise maintenant la map en cache (0 requête par candidat).
+    """
+    mapping = get_hierarchie_map()
+    candidats = mapping.get(it, [])
+    return [c for c in candidats if a_deux_niveaux(c)]
 
 #-------------------------------------------------------#
 # Verifie que un respo c'est un N+3
 #-------------------------------------------------------#
 
 def a_deux_niveaux(it):
-    # Niveau 1 en dessous de it (ex: les N2)
-    niveau_moins_1 = Collaborateur.objects.filter(ru_it_id=it)
-    if not niveau_moins_1.exists():
+    """
+    FIX PERF : utilise la map en cache au lieu de 2 requêtes SQL.
+    """
+    mapping = get_hierarchie_map()
+    enfants = mapping.get(it, [])
+    if not enfants:
         return False
+    return any(mapping.get(e) for e in enfants)
 
-    niveau_moins_1_ids = set(niveau_moins_1.values_list("it", flat=True))
-
-    # Niveau 2 en dessous de it (ex: les N1)
-    niveau_moins_2 = Collaborateur.objects.filter(ru_it_id__in=niveau_moins_1_ids)
-    if not niveau_moins_2.exists():
-        return False
-
-    return True
 
 #-------------------------------------------------------#
-#Cette fct rederige vers templete de liste des N+3 par N+4
+#Cette fct return TOUS les "vrais" N+1 sous 'it', peu importe
+#leur profondeur.
+#
+#FIX PERF : ancienne version = requêtes récursives en base.
+#Nouvelle version = parcours en mémoire de get_hierarchie_map().
 #-------------------------------------------------------#
+def get_tous_les_n1(it, tous_ru_it=None):
+    if tous_ru_it is None:
+        tous_ru_it = get_managers_its()
+    mapping = get_hierarchie_map()
+    resultat = set()
+
+    def _recurse(noeud):
+        for enfant in mapping.get(noeud, []):
+            if enfant not in tous_ru_it:
+                continue
+            sous_managers = [c for c in mapping.get(enfant, []) if c in tous_ru_it]
+            if sous_managers:
+                _recurse(enfant)
+            else:
+                resultat.add(enfant)
+
+    _recurse(it)
+    return resultat
+
+
+def get_n1_et_n2_sous(it, tous_ru_it=None):
+    """
+    FIX PERF : même principe, entièrement en mémoire via la map.
+    """
+    if tous_ru_it is None:
+        tous_ru_it = get_managers_its()
+    mapping = get_hierarchie_map()
+    n1_ids = set()
+    n2_ids = set()
+
+    def _recurse(noeud):
+        for enfant in mapping.get(noeud, []):
+            if enfant not in tous_ru_it:
+                continue
+            sous_managers = [c for c in mapping.get(enfant, []) if c in tous_ru_it]
+            if sous_managers:
+                n2_ids.add(enfant)
+                _recurse(enfant)
+            else:
+                n1_ids.add(enfant)
+
+    _recurse(it)
+    return n1_ids, n2_ids
+
+
+#-------------------------------------------------------#
+#Effectif RÉEL basé sur les déclarations (dernier état connu)
+#-------------------------------------------------------#
+def get_dernieres_declarations():
+    derniers_ids = (
+        declaration_effectif.objects
+        .values("collaborateur_it")
+        .annotate(dernier_id=Max("id"))
+        .values_list("dernier_id", flat=True)
+    )
+    declarations = (
+        declaration_effectif.objects
+        .filter(id__in=derniers_ids)
+        .select_related("collaborateur_it", "Ru", "nv_Ru")
+    )
+    return {d.collaborateur_it_id: d for d in declarations if d.collaborateur_it_id}
+
+
+def get_ru_reel_et_departs():
+    """
+    FIX PERF : mis en cache. Cette fonction scanne toute la table
+    declaration_effectif + toute la table Collaborateur ; elle était
+    appelée à chaque frappe clavier dans rechercher_N3_par_N4.
+    Invalider via invalider_cache_hierarchie() après toute nouvelle
+    déclaration (voir declaration_effectif.views.valider()).
+    """
+    cached = cache.get("ru_reel_et_departs")
+    if cached is not None:
+        return cached
+
+    dernieres = get_dernieres_declarations()
+    ru_reel = {}
+    departs = set()
+
+    for it_collab, decl in dernieres.items():
+        if decl.nature == "D":
+            departs.add(it_collab)
+        elif decl.nature == "C" and decl.nv_Ru_id:
+            ru_reel[it_collab] = decl.nv_Ru_id
+        elif decl.Ru_id:
+            ru_reel[it_collab] = decl.Ru_id
+
+    resultat = (ru_reel, departs)
+    cache.set("ru_reel_et_departs", resultat, CACHE_TTL)
+    return resultat
+
+
+def get_tous_les_it_sous_reel(it):
+    ru_reel, departs = get_ru_reel_et_departs()
+
+    enfants_par_ru = {}
+    for c in Collaborateur.objects.exclude(it__in=departs):
+        ru_effectif = ru_reel.get(c.it, c.ru_it_id)
+        if ru_effectif:
+            enfants_par_ru.setdefault(ru_effectif, []).append(c.it)
+
+    def _recurse(it_courant, vus):
+        niveau = set(enfants_par_ru.get(it_courant, [])) - vus
+        if not niveau:
+            return set()
+        vus |= niveau
+        tous = set(niveau)
+        for sous_it in niveau:
+            tous |= _recurse(sous_it, vus)
+        return tous
+
+    return _recurse(it, set())
+
+
+# Collaborateur/views.py
 
 def respo_N4(request):
     it = request.session.get("it")
     if not it:
         return redirect("login")
-    n3_valides_ids = liste_N3_N4(it)
-    N3 = Collaborateur.objects.filter(it__in=n3_valides_ids)
-    nbr = N3.count()
 
-    return render(request, "Collaborateur/N4/liste_N3.html", {"N3": N3, "nbr": nbr})
+    tous_les_it = get_tous_les_it_sous_reel(it)
+    tous_ru_it = get_managers_its()
+
+    N3_qs = Collaborateur.objects.filter(it__in=tous_les_it).order_by("nom_complete")
+    nbr = N3_qs.count()
+
+    ru_it_ids = (
+        N3_qs.exclude(ru_it_id__isnull=True)
+        .values_list("ru_it_id", flat=True)
+        .distinct()
+    )
+    responsables = Collaborateur.objects.filter(it__in=ru_it_ids).values("it", "nom_complete")
+    paginator = Paginator(N3_qs, 10)
+    page_obj = paginator.get_page(1)
+
+    ru_ids_page = [c.ru_it_id for c in page_obj.object_list if c.ru_it_id]
+    noms_par_it = dict(
+        Collaborateur.objects.filter(it__in=ru_ids_page).values_list("it", "nom_complete")
+    )
+
+    N3 = [
+        {
+            "matricule": c.matricule,
+            "it": c.it,
+            "nom_complete": c.nom_complete,
+            "lot": c.lot,
+            "est_responsable": c.it in tous_ru_it,
+            "ru_nom": noms_par_it.get(c.ru_it_id, "-"),
+        }
+        for c in page_obj.object_list
+    ]
+
+    return render(request, "Collaborateur/N4/liste_N3.html", {
+        "N3": N3,
+        "nbr": nbr,
+        "responsables": responsables,
+    })
+
+def rechercher_N3_par_N4(request):
+    """
+    FIX PERF : noms_par_it ne charge plus TOUTE la table Collaborateur
+    à chaque appel AJAX — seulement les RU réellement présents sur la
+    page courante.
+    """
+    it = request.session.get("it")
+    if not it:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+
+    q = request.GET.get("q", "").strip()
+    lot = request.GET.get("choix", "").strip()
+    ru_it = request.GET.get("ru_it", "").strip()
+    page_number = request.GET.get("page", 1)
+
+    tous_les_it = get_tous_les_it_sous_reel(it)
+    queryset = Collaborateur.objects.filter(it__in=tous_les_it)
+
+    if q:
+        queryset = queryset.filter(
+            Q(matricule__icontains=q) | Q(nom_complete__icontains=q)
+        )
+    if lot:
+        queryset = queryset.filter(lot=lot)
+    if ru_it:
+        queryset = queryset.filter(ru_it_id=ru_it)
+
+    tous_ru_it = get_managers_its()
+
+    paginator = Paginator(queryset.order_by("nom_complete"), 10)
+    page_obj = paginator.get_page(page_number)
+
+    ru_ids_page = [c.ru_it_id for c in page_obj.object_list if c.ru_it_id]
+    noms_par_it = dict(
+        Collaborateur.objects.filter(it__in=ru_ids_page).values_list("it", "nom_complete")
+    )
+
+    results = [
+        {
+            "matricule": c.matricule,
+            "it": c.it,
+            "nom_complete": c.nom_complete,
+            "lot": c.lot,
+            "est_responsable": c.it in tous_ru_it,
+            "ru_nom": noms_par_it.get(c.ru_it_id, "-"),
+        }
+        for c in page_obj.object_list
+    ]
+
+    return JsonResponse({
+        "results": results,
+        "count": paginator.count,
+        "page": page_obj.number,
+        "num_pages": paginator.num_pages,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+    })
+
 
 def verifier(request):
     nv = request.GET.get("q", "").strip()
@@ -569,46 +914,7 @@ def verifier(request):
     return JsonResponse({"valide": True})
 
 
-def rechercher_N3_par_N4(request):
-    it = request.session.get("it")
-    q = request.GET.get("q", "").strip()
-    lot = request.GET.get("choix", "").strip()
-    page_number = request.GET.get("page", 1)
-
-    n3_valides_ids = liste_N3_N4(it)
-    resultat = Collaborateur.objects.filter(it__in=n3_valides_ids)
-
-    if q:
-        resultat = resultat.filter(
-            Q(matricule__icontains=q) | Q(nom_complete__icontains=q)
-        )
-    if lot:
-        resultat = resultat.filter(lot=lot)
-
-    paginator = Paginator(resultat, 15)
-    page_obj = paginator.get_page(page_number)
-
-    results = [
-        {
-            "matricule": op.matricule,
-            "it": op.it,
-            "nom_complete": op.nom_complete,
-            "lot": op.lot,
-        }
-        for op in page_obj
-    ]
-
-    return JsonResponse({
-        "results": results,
-        "count": paginator.count,
-        "page": page_obj.number,
-        "num_pages": paginator.num_pages,
-        "has_previous": page_obj.has_previous(),
-        "has_next": page_obj.has_next(),
-    })
-
 def get_effectif_reel_ids(departement_ids, at_date):
-    print(f"Departement IDs: {departement_ids}")
     derniere_decl_id = (
         declaration_effectif.objects
         .filter(collaborateur_it=OuterRef('collaborateur_it'), date__lte=at_date)
@@ -680,7 +986,7 @@ def collaborateur(request):
 
     departement_ids = get_departement_ids_for_role(role, it)
     today = timezone.now().date()
-    ids_total_r =  get_effectif_reel_ids([dept.abreviation for dept in Departement.objects.filter(id__in=departement_ids)], today)
+    ids_total_r = get_effectif_reel_ids([dept.abreviation for dept in Departement.objects.filter(id__in=departement_ids)], today)
     total_r = len(ids_total_r)
 
     collaborateurs_qs = Collaborateur.objects.filter(it__in=ids_total_r).order_by("matricule")
@@ -700,7 +1006,6 @@ def collaborateur(request):
 
 
 def collaborateur_api(request):
-    """Endpoint JSON : filtres (recherche, lot, date) + pagination, appelé en AJAX."""
     it = request.session.get("it")
     role = request.session.get("role")
 

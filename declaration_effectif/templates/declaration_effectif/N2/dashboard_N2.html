@@ -1,10 +1,32 @@
 {% extends 'utilisateur/navbar_N1.html' %}
 {% load static %}
 
-{% block title %}Tableau de bord{% endblock %}
+{% block title %}Tableau de bord N2{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'utilisateur/css/N2/dashboard.css' %}">
+<style>
+    /* Ajustements CSS pour la grille des graphiques */
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .ru-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 1.25rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .chart-container {
+        position: relative;
+        height: 280px;
+        width: 100%;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -12,35 +34,38 @@
     <header class="dashboard-header d-flex justify-content-between align-items-center mb-4">
         <h1 class="dashboard-title">Tableau de bord</h1>
         <div class="date-picker-badge">
-            <span>{{ date|default:"Aug. 26, 2026" }}</span>
+            <span>{{ maint|date:"d M Y" }}</span>
             <i class="far fa-calendar ms-2"></i>
         </div>
     </header>
+
     <!-- ===== STATISTIQUES GÉNÉRALES ===== -->
     <div class="statistique-cards">
-        <div class="stat-card card-reel">
+        <div class="stat-card">
             <h3>Effectif réel</h3>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ effectif_reel|default:"0" }}</span>
                 <span class="unite">opérateurs</span>
             </div>
-            {% if MR > 0 %} <span class="badge-vs positive">&#9650; +{{ MR }} vs maquette</span>
+            {% if MR > 0 %}
+            <span class="badge-vs positive">&#9650; +{{ MR }} vs maquette</span>
             {% elif MR < 0 %} <span class="badge-vs negative">&#9660; {{ MR }} vs maquette</span>
                 {% endif %}
         </div>
 
-        <div class="stat-card card-systeme">
+        <div class="stat-card">
             <h3>Effectif système</h3>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ effectif_syste|default:"0" }}</span>
                 <span class="unite">opérateurs</span>
             </div>
-            {% if MS > 0 %} <span class="badge-vs positive">&#9650; +{{ MS }} vs maquette</span>
+            {% if MS > 0 %}
+            <span class="badge-vs positive">&#9650; +{{ MS }} vs maquette</span>
             {% elif MS < 0 %} <span class="badge-vs negative">&#9660; {{ MS }} vs maquette</span>
                 {% endif %}
         </div>
 
-        <div class="stat-card card-maquette">
+        <div class="stat-card">
             <h3>Effectif maquette</h3>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ maquette_total|default:"0" }}</span>
@@ -48,20 +73,30 @@
             </div>
         </div>
 
-        <div class="stat-card card-warning">
-            <h3>RU non validés</h3>
+        <div class="stat-card">
+            <h3>RU Total</h3>
             <div class="stat-valeur-group">
-                <span class="valeur">{{ non_valides|default:"0" }}</span>
+                <span class="valeur">{{ nbr_RU|default:"0" }}</span>
                 <span class="unite">responsables</span>
             </div>
+            <small class="text-danger fw-bold">{{ non_valides|default:"0" }} non valide(s)</small>
+        </div>
+
+        <div class="stat-card">
+            <h3>Collaborateurs directs</h3>
+            <div class="stat-valeur-group">
+                <span class="valeur">{{ nbr_op|default:"0" }}</span>
+                <span class="unite">collab.</span>
+            </div>
+            <small class="text-muted">{{ nbr_cadre }} cadre(s), {{ op }} opérateur(s)</small>
         </div>
     </div>
 
-    <!-- ===== CONTENU GRAPHIQUES & TABLEAU ===== -->
-    <div class="contenue">
+    <!-- ===== CONTENU GRAPHIQUES ===== -->
+    <div class="contenue mt-4">
         <div class="charts-grid">
             <div class="ru-card">
-                <h4>Évolution Réel</h4>
+                <h4>Évolution Réel (7 derniers jours)</h4>
                 <div class="chart-container">
                     <canvas id="chart-global"></canvas>
                 </div>
@@ -72,28 +107,29 @@
                     <canvas id="chart-comparatif"></canvas>
                 </div>
             </div>
+            <div class="ru-card">
+                <h4>Réel vs Système vs Maquette par Lot</h4>
+                <div class="chart-container">
+                    <canvas id="chart-lot"></canvas>
+                </div>
+            </div>
         </div>
 
         <!-- Données JSON pour JS -->
         {{ liste_ru_stats|json_script:"donnees-ru" }}
 
         <!-- ===== STATISTIQUES PAR RU ===== -->
-        <div class="section">
-            <div class="section-header">
+        <div class="section mt-4">
+            <div class="section-header d-flex justify-content-between align-items-center mb-3">
                 <h2>Statistiques par responsable d'unité</h2>
                 <div class="recherche-ru">
-                    <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="7"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <input type="text" id="recherche-ru" name="search-nofill"  autocomplete="off" data-lpignore="true"
-                        placeholder="Rechercher par Id ou nom..." >
+                    <input type="text" id="recherche-ru" class="form-control" placeholder="Rechercher par ID ou nom..."
+                        autocomplete="off">
                 </div>
             </div>
 
             <div class="table-container">
-                <table class="table-ru">
+                <table class="table-ru table table-striped align-middle">
                     <thead>
                         <tr>
                             <th>Utilisateur</th>
@@ -138,51 +174,49 @@
                             </td>
                             <td class="text-center">
                                 {% if ru.derniers_mouvements %}
-                                <button type="button" class="btn-mouvements" data-it="{{ ru.it }}"
-                                    title="Voir les derniers mouvements">
+                                <button type="button" class="btn btn-sm btn-outline-primary btn-mouvements"
+                                    data-it="{{ ru.it }}" title="Voir les derniers mouvements">
                                     <i class="fas fa-history"></i>
-                                    <span class="badge-count">{{ ru.derniers_mouvements|length }}</span>
+                                    <span class="badge bg-secondary ms-1">{{ ru.derniers_mouvements|length }}</span>
                                 </button>
                                 {% else %}
-                                <span class="no-mouvement">—</span>
+                                <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="9" class="empty-row">Aucune donnée disponible</td>
+                            <td colspan="9" class="text-center py-4">Aucune donnée disponible</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
 
-            <div class="pagination-bar" id="pagination-bar">
+            <div class="pagination-bar d-flex justify-content-between align-items-center mt-3" id="pagination-bar">
                 <span class="pagination-info" id="pagination-info"></span>
                 <div class="pagination-controls">
-                    <button type="button" id="page-prec" class="pagination-btn">&laquo; Précédent</button>
-                    <span class="pagination-pages" id="pagination-pages"></span>
-                    <button type="button" id="page-suiv" class="pagination-btn">Suivant &raquo;</button>
+                    <button type="button" id="page-prec" class="btn btn-sm btn-secondary">&laquo; Précédent</button>
+                    <span class="pagination-pages mx-2" id="pagination-pages"></span>
+                    <button type="button" id="page-suiv" class="btn btn-sm btn-secondary">Suivant &raquo;</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ===== MODAL PARTAGÉ - DERNIERS MOUVEMENTS D'UN RU ===== -->
-<div class="modal fade" id="modal-mouvements-ru" tabindex="-1" aria-labelledby="modalMouvementsRuLabel"
-    aria-hidden="true">
+<!-- ===== MODAL MOUVEMENTS ===== -->
+<div class="modal fade" id="modal-mouvements-ru" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalMouvementsRuLabel">
+                <h5 class="modal-title">
                     <i class="fas fa-history me-2"></i>Derniers mouvements — <span id="mouvement-ru-nom"></span>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
             <div class="modal-body">
-                <ul class="liste-mouvements" id="liste-mouvements-body">
-                </ul>
+                <ul class="list-group" id="liste-mouvements-body"></ul>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
@@ -191,15 +225,22 @@
     </div>
 </div>
 {% endblock %}
+
 {% block script %}
 {{ block.super }}
-<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
 <script>
-    new Chart(document.getElementById("chart-global"), {
-        type: "line",
-        data: {
-            labels: {{ chart_labels| safe }},
+    document.addEventListener("DOMContentLoaded", function () {
+        /* =========================================================
+           1. GRAPHIQUE 1 : ÉVOLUTION RÉEL
+        ========================================================= */
+        const ctxGlobal = document.getElementById("chart-global");
+        if (ctxGlobal) {
+            new Chart(ctxGlobal, {
+                type: "line",
+                data: {
+                    labels: {{ chart_labels| safe }},
         datasets: [{
             label: "Évolution Réel",
             data: {{ chart_data| safe }},
@@ -208,233 +249,184 @@
         fill: true,
         tension: 0.3,
         pointBackgroundColor: "#2563eb",
-        pointRadius: 4,
-            }]
-        },
+        pointRadius: 4
+                    }]
+                },
         options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true } }
     }
-    });
-</script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-
-        /* =========================================================
-        0. RÉFÉRENCES COMMUNES
-        ========================================================= */
-        const rechercheInput = document.getElementById("recherche-ru");
-        const tbody = document.getElementById("corps-tableau-ru");
-        if (!rechercheInput || !tbody) return;
-
-        function reinitialiserChamp() {
-            rechercheInput.setAttribute("name", "recherche-ru-" + Date.now());
-            rechercheInput.value = "";
-            rechercheInput.setAttribute("autocomplete", "off");
+            });
         }
-        reinitialiserChamp();
 
-        /* =========================================================
-        1. GRAPHIQUE CHART.JS
-        ========================================================= */
-        const donneesRuEl = document.getElementById("donnees-ru");
-        let donneesRu = [];
-        if (donneesRuEl) {
-            donneesRu = JSON.parse(donneesRuEl.textContent || "[]");
+    /* =========================================================
+       2. GRAPHIQUE 2 : COMPARATIF PAR RU
+    ========================================================= */
+    const donneesRuEl = document.getElementById("donnees-ru");
+    let donneesRu = [];
+    if (donneesRuEl) {
+        donneesRu = JSON.parse(donneesRuEl.textContent || "[]");
+        const labels = donneesRu.map(r => r.nom_complete || "Inconnu");
+        const reel = donneesRu.map(r => r.reel || 0);
+        const systeme = donneesRu.map(r => r.systeme || 0);
+        const maquette = donneesRu.map(r => r.maquette || 0);
 
-            const labels = donneesRu.map(r => r.nom_complete || "Inconnu");
-            const reel = donneesRu.map(r => r.reel || 0);
-            const systeme = donneesRu.map(r => r.systeme || 0);
-            const maquette = donneesRu.map(r => r.maquette || 0);
-
-            const ctx = document.getElementById("chart-comparatif");
-            if (ctx) {
-                new Chart(ctx, {
-                    type: "bar",
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            { label: "Réel", data: reel, backgroundColor: "#3b82f6" },
-                            { label: "Système", data: systeme, backgroundColor: "#16a34a" },
-                            { label: "Maquette", data: maquette, backgroundColor: "#f59e0b" }
-                        ]
+        const ctxComp = document.getElementById("chart-comparatif");
+        if (ctxComp) {
+            new Chart(ctxComp, {
+                type: "bar",
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: "Réel", data: reel, backgroundColor: "#3b82f6" },
+                        { label: "Système", data: systeme, backgroundColor: "#16a34a" },
+                        { label: "Maquette", data: maquette, backgroundColor: "#f59e0b" }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    barThickness: 18,
+                    plugins: {
+                        legend: { position: "top" },
+                        tooltip: { mode: "index", intersect: false }
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false, barThickness: 20,
-                        plugins: {
-                            legend: { position: "top" },
-                            tooltip: { mode: "index", intersect: false }
-                        },
-                        scales: {
-                            x: { ticks: { autoSkip: false, maxRotation: 45, minRotation: 0 } },
-                            y: { beginAtZero: true, ticks: { precision: 0 } }
-                        }
+                    scales: {
+                        x: { ticks: { autoSkip: false, maxRotation: 45 } },
+                        y: { beginAtZero: true, ticks: { precision: 0 } }
                     }
-                });
-            }
-        }
-
-        /* =========================================================
-        2. MODAL DERNIERS MOUVEMENTS
-        ========================================================= */
-        const modalMouvementsEl = document.getElementById("modal-mouvements-ru");
-        const modalMouvements = (typeof bootstrap !== "undefined" && modalMouvementsEl)
-            ? new bootstrap.Modal(modalMouvementsEl) : null;
-        const nomSpan = document.getElementById("mouvement-ru-nom");
-        const listeBody = document.getElementById("liste-mouvements-body");
-
-        const badgeClasses = {
-            "A": "badge-ajout",
-            "D": "badge-depart",
-            "C": "badge-changement",
-            "V": "badge-valide"
-        };
-        const badgeIcons = {
-            "A": "fa-arrow-down",
-            "D": "fa-arrow-up",
-            "C": "fa-exchange-alt",
-            "V": "fa-check-circle"
-        };
-
-        document.querySelectorAll(".btn-mouvements").forEach(function (btn) {
-            btn.addEventListener("click", function () {
-                rechercheInput.blur();
-
-                const it = btn.dataset.it;
-                const ru = donneesRu.find(r => r.it === it);
-                if (!ru) return;
-
-                nomSpan.textContent = ru.nom_complete || it;
-                listeBody.innerHTML = "";
-
-                (ru.derniers_mouvements || []).forEach(function (m) {
-                    const li = document.createElement("li");
-                    li.className = "mouvement-item";
-
-                    const badgeClass = badgeClasses[m.nature] || "badge-default";
-                    const icon = badgeIcons[m.nature] || "fa-circle";
-
-                    let detail = m.collaborateur
-                        ? `${m.collaborateur} (${m.collaborateur_it || "-"})`
-                        : "-";
-                    if (m.nature === "C" && m.nouveau_responsable) {
-                        detail += ` → vers ${m.nouveau_responsable }`;
-                    }
-
-                    li.innerHTML = `
-                        <div class="mouvement-header">
-                            <span class="mouvement-badge ${badgeClass}">
-                                <i class="fas ${icon}"></i> ${m.nature_display}
-                            </span>
-                            <span class="mouvement-date">${m.date}</span>
-                        </div>
-                        <div class="mouvement-detail">${detail}</div>
-                    `;
-                    listeBody.appendChild(li);
-                });
-
-                if ((ru.derniers_mouvements || []).length === 0) {
-                    listeBody.innerHTML = '<li class="mouvement-item mouvement-vide">Aucun mouvement récent.</li>';
                 }
-
-                if (modalMouvements) modalMouvements.show();
-            });
-        });
-
-        /* =========================================================
-           3. RECHERCHE ET PAGINATION DYNAMIQUES
-        ========================================================= */
-        const LIGNES_PAR_PAGE = 10;
-        const toutesLesLignes = Array.from(tbody.querySelectorAll("tr[data-it]"));
-        let pageActuelle = 1;
-
-        const btnPrec = document.getElementById("page-prec");
-        const btnSuiv = document.getElementById("page-suiv");
-        const infoEl = document.getElementById("pagination-info");
-        const pagesEl = document.getElementById("pagination-pages");
-        const barreEl = document.getElementById("pagination-bar");
-
-        function normaliser(texte) {
-            return String(texte)
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "");
-        }
-
-        function lignesCorrespondantes() {
-            const requete = normaliser(rechercheInput.value.trim());
-            if (requete === "") return toutesLesLignes;
-            return toutesLesLignes.filter(function (ligne) {
-                const it = normaliser(ligne.dataset.it || "");
-                const nom = normaliser(ligne.dataset.nom || "");
-                return it.includes(requete) || nom.includes(requete);
             });
         }
+    }
 
-        function afficher() {
-            const ligneVideExistante = tbody.querySelector(".empty-row-recherche");
-            if (ligneVideExistante) ligneVideExistante.remove();
-
-            const correspondances = lignesCorrespondantes();
-            const total = correspondances.length;
-            const totalPages = Math.max(1, Math.ceil(total / LIGNES_PAR_PAGE));
-
-            if (pageActuelle > totalPages) pageActuelle = totalPages;
-            if (pageActuelle < 1) pageActuelle = 1;
-
-            const debut = (pageActuelle - 1) * LIGNES_PAR_PAGE;
-            const fin = debut + LIGNES_PAR_PAGE;
-            const aAfficher = new Set(correspondances.slice(debut, fin));
-
-            toutesLesLignes.forEach(function (ligne) {
-                ligne.style.display = aAfficher.has(ligne) ? "" : "none";
+    /* =========================================================
+       3. GRAPHIQUE 3 : COMPARATIF PAR LOT
+    ========================================================= */
+    const ctxLot = document.getElementById("chart-lot");
+    if (ctxLot) {
+        new Chart(ctxLot, {
+            type: "bar",
+            data: {
+                labels: {{ lot_labels| safe }},
+    datasets: [
+        { label: "Réel", data: {{ lot_reel_data| safe }}, backgroundColor: "#3b82f6" },
+        { label: "Système", data: {{ lot_systeme_data| safe }}, backgroundColor: "#16a34a" },
+        { label: "Maquette", data: {{ lot_maquette_data| safe }}, backgroundColor: "#f59e0b" }
+    ]
+                },
+    options: {
+        responsive: true,
+            maintainAspectRatio: false,
+                barThickness: 22,
+                    plugins: {
+            legend: { position: "top" },
+            tooltip: { mode: "index", intersect: false }
+        },
+        scales: {
+            x: { title: { display: true, text: 'Lots' } },
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+    }
             });
+        }
 
-            if (total === 0) {
-                const ligneVide = document.createElement("tr");
-                ligneVide.className = "empty-row-recherche";
-                ligneVide.innerHTML = '<td colspan="9" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
-                tbody.appendChild(ligneVide);
-            }
+    /* =========================================================
+       4. MODAL DERNIERS MOUVEMENTS
+       (correction : le bouton n'avait aucun gestionnaire de clic)
+    ========================================================= */
+    const modalMouvementsEl = document.getElementById("modal-mouvements-ru");
+    const modalMouvements = modalMouvementsEl ? new bootstrap.Modal(modalMouvementsEl) : null;
+    const modalRuNom = document.getElementById("mouvement-ru-nom");
+    const listeMouvementsBody = document.getElementById("liste-mouvements-body");
 
-            if (total > 0) {
-                infoEl.textContent = `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}`;
+    document.querySelectorAll(".btn-mouvements").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            const it = btn.dataset.it;
+            const ru = donneesRu.find(r => String(r.it) === String(it));
+            if (!ru) return;
+
+            modalRuNom.textContent = ru.nom_complete || "-";
+            listeMouvementsBody.innerHTML = "";
+
+            if (!ru.derniers_mouvements || ru.derniers_mouvements.length === 0) {
+                listeMouvementsBody.innerHTML = '<li class="list-group-item text-muted">Aucun mouvement récent</li>';
             } else {
-                infoEl.textContent = "";
+                ru.derniers_mouvements.forEach(function (mvt) {
+                    const li = document.createElement("li");
+                    li.className = "list-group-item d-flex justify-content-between align-items-center";
+
+                    let texte = `<strong>${mvt.nature_display || mvt.nature}</strong> — ${mvt.collaborateur || "-"}`;
+                    if (mvt.nouveau_responsable) {
+                        texte += ` → ${mvt.nouveau_responsable}`;
+                    }
+
+                    li.innerHTML = `<span>${texte}</span><small class="text-muted ms-2">${mvt.date}</small>`;
+                    listeMouvementsBody.appendChild(li);
+                });
             }
-            pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
-            btnPrec.disabled = pageActuelle <= 1;
-            btnSuiv.disabled = pageActuelle >= totalPages;
-            barreEl.style.display = (total <= LIGNES_PAR_PAGE) ? "none" : "flex";
-        }
 
-        rechercheInput.addEventListener("input", function () {
-            pageActuelle = 1;
-            afficher();
-        });
-
-        btnPrec.addEventListener("click", function () {
-            pageActuelle -= 1;
-            afficher();
-        });
-
-        btnSuiv.addEventListener("click", function () {
-            pageActuelle += 1;
-            afficher();
-        });
-
-        afficher();
-
-        window.addEventListener("pageshow", function (event) {
-            if (event.persisted) {
-                reinitialiserChamp();
-                pageActuelle = 1;
-                afficher();
+            if (modalMouvements) {
+                modalMouvements.show();
             }
         });
+    });
+
+    /* =========================================================
+       5. RECHERCHE ET PAGINATION
+    ========================================================= */
+    const rechercheInput = document.getElementById("recherche-ru");
+    const tbody = document.getElementById("corps-tableau-ru");
+    if (!rechercheInput || !tbody) return;
+
+    const LIGNES_PAR_PAGE = 10;
+    const toutesLesLignes = Array.from(tbody.querySelectorAll("tr[data-it]"));
+    let pageActuelle = 1;
+
+    const btnPrec = document.getElementById("page-prec");
+    const btnSuiv = document.getElementById("page-suiv");
+    const infoEl = document.getElementById("pagination-info");
+    const pagesEl = document.getElementById("pagination-pages");
+    const barreEl = document.getElementById("pagination-bar");
+
+    function normaliser(texte) {
+        return String(texte).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function afficher() {
+        const requete = normaliser(rechercheInput.value.trim());
+        const correspondances = toutesLesLignes.filter(function (ligne) {
+            const it = normaliser(ligne.dataset.it || "");
+            const nom = normaliser(ligne.dataset.nom || "");
+            return it.includes(requete) || nom.includes(requete);
+        });
+
+        const total = correspondances.length;
+        const totalPages = Math.max(1, Math.ceil(total / LIGNES_PAR_PAGE));
+
+        if (pageActuelle > totalPages) pageActuelle = totalPages;
+        if (pageActuelle < 1) pageActuelle = 1;
+
+        const debut = (pageActuelle - 1) * LIGNES_PAR_PAGE;
+        const fin = debut + LIGNES_PAR_PAGE;
+        const aAfficher = new Set(correspondances.slice(debut, fin));
+
+        toutesLesLignes.forEach(l => l.style.display = aAfficher.has(l) ? "" : "none");
+
+        infoEl.textContent = total > 0 ? `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}` : "Aucun résultat";
+        pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
+        btnPrec.disabled = pageActuelle <= 1;
+        btnSuiv.disabled = pageActuelle >= totalPages;
+        barreEl.style.display = total <= LIGNES_PAR_PAGE ? "none" : "flex";
+    }
+
+    rechercheInput.addEventListener("input", function () { pageActuelle = 1; afficher(); });
+    btnPrec.addEventListener("click", function () { pageActuelle--; afficher(); });
+    btnSuiv.addEventListener("click", function () { pageActuelle++; afficher(); });
+
+    afficher();
     });
 </script>
 {% endblock %}

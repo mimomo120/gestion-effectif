@@ -87,7 +87,7 @@
             <div class="kpi-content">
                 <span class="kpi-title">Total Départs</span>
                 <div class="kpi-val-group">
-                    <span class="kpi-value">{{ depart_TOT|default:"5" }}</span>
+                    <span class="kpi-value">{{ depart_TOT|default:"0" }}</span>
                 </div>
             </div>
         </div>
@@ -119,11 +119,10 @@
                         <tr>
                             <th>Département</th>
                             <th>Réel / Maquette</th>
-                            <th>MR</th>
+                            <th>MR</th><!-- maquette - reel -->
                             <th>Syst.</th>
-                            <th>Réel / Systeme</th>
                             <th>Dép.</th>
-                            <th>MS</th>
+                            <th>MS</th> <!-- maquette - systeme -->
                         </tr>
                     </thead>
                     <tbody>
@@ -141,9 +140,6 @@
                                 {% endif %}
                             </td>
                             <td class="text-muted">{{ d.syst }}</td>
-                            <td class="dept-values">
-                                <span class="fw-bold">{{ d.reel }}</span> <span class="text-muted">/ {{ d.syst }}</span>
-                            </td>
                             <td>
                                 {% if d.nb_depart > 0 %}
                                 <span class="text-danger fw-bold">{{ d.nb_depart }}</span>

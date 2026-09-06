@@ -33,6 +33,13 @@
                 <option value="C">Lot C</option>
             </select>
 
+            <select class="filter-select" id="ru_it_filter" data-filter-param="ru_it">
+                <option value="">Tous les responsables</option>
+                {% for r in responsables %}
+                <option value="{{ r.it }}">{{ r.it }} - {{ r.nom_complete }}</option>
+                {% endfor %}
+            </select>
+
             <button class="btn btn-reset" id="resetBtn">
                 <i class="fas fa-redo me-2"></i>Réinitialiser
             </button>
@@ -48,19 +55,23 @@
                     <th>Utilisateur</th>
                     <th>Nom & Prénom</th>
                     <th>Lot</th>
+                    <th>Statut</th>
+                    <th>Responsable</th>
                 </tr>
             </thead>
             <tbody id="result">
                 {% for operateur in N3 %}
-                <tr class="table-row">
+                <tr class="table-row" data-role="{{ operateur.est_responsable|yesno:'responsable,operateur' }}">
                     <td class="cell-matricule">{{ operateur.matricule|default:"-" }}</td>
                     <td class="cell-utilisateur">{{ operateur.it|default:"-" }}</td>
                     <td class="cell-nom">{{ operateur.nom_complete|default:"-" }}</td>
                     <td class="cell-lot">{{ operateur.lot|default:"-" }}</td>
+                    <td class="cell-lot">{{ operateur.est_responsable|yesno:"Responsable,Opérateur" }}</td>
+                    <td class="cell-utilisateur">{{ operateur.ru_nom|default:"-" }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="empty-row">
+                    <td colspan="6" class="empty-row">
                         <i class="fas fa-inbox"></i> Aucun responsable d'unité trouvé
                     </td>
                 </tr>

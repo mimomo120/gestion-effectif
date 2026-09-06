@@ -13,13 +13,16 @@ import json
 from datetime import date , datetime , timedelta
 from django.db import transaction, IntegrityError
 from django.views.decorators.csrf import ensure_csrf_cookie
-from Collaborateur.views import rec , Ru_Rg, liste_N1_par_N2, Rg_Dur,liste_N1_pr_N3 ,liste_N3_N4 ,SystEff, reelEff
+from Collaborateur.views import (
+    rec, Ru_Rg, liste_N1_par_N2, Rg_Dur, liste_N1_pr_N3, liste_N3_N4,
+    SystEff, reelEff, get_tous_les_it_sous, get_tous_les_n1,
+    get_n1_et_n2_sous, get_managers_its, invalider_cache_hierarchie,
+)
 from django.views.decorators.http import require_POST
 from utilisateur.decorators import role_required
 from django.utils.dateparse import parse_date
-from django.core.paginator import PageNotAnInteger, Paginator
+from django.core.paginator import PageNotAnInteger, Paginator, EmptyPage
 import bisect
-from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.cache import never_cache
 
 @ensure_csrf_cookie
@@ -67,6 +70,11 @@ def valider(request):
     except (IntegrityError, KeyError, Collaborateur.DoesNotExist) as e:
         return JsonResponse({"error": "Erreur lors de l'enregistrement.", "status": "erreur"}, status=400)
 
+    # FIX PERF : les caches (managers_its, hierarchie_map, ru_reel_et_departs)
+    # sont maintenant potentiellement obsolètes puisqu'on vient de créer des
+    # déclarations qui peuvent changer l'effectif réel. On les invalide.
+    invalider_cache_hierarchie()
+
     return JsonResponse({"status": "valider"})
 
 # ============================================================
@@ -81,44 +89,34 @@ def validation_view(request):
             "operateurs_finaux": [], "nbr": 0, "status": False, "date": timezone.localdate()
         })
 
-    # 1) calculer les directs du RU (objets Collaborateur)
     directs_qs = Collaborateur.objects.filter(ru_it__it=it).exclude(it=it)
-
-    # ids des directs (PK)
     direct_ids = list(directs_qs.values_list('it', flat=True))
 
-    # 2) parmi ces directs, lesquels sont référencés comme managers (ru_it_id) par d'autres ?
-    # -> ids des directs qui sont managers
     manager_direct_ids = set(
         Collaborateur.objects.filter(ru_it_id__in=direct_ids)
         .values_list('ru_it_id', flat=True)
         .distinct()
     )
 
-    # 3) récupérer les "it" correspondants à ces directs-managers pour comparaison avec declaration_effectif.collaborateur_it_id
     manager_direct_its = set(
         Collaborateur.objects.filter(it__in=manager_direct_ids)
         .values_list('it', flat=True)
     )
 
-    # 4) si il y a une déclaration aujourd'hui, prendre ses lignes puis exclure les managers
     aujourdhui = timezone.localdate()
     der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
 
     if der and der.date == aujourdhui:
-        # déclarations du jour pour ce RU
         operateurs_finaux_qs = declaration_effectif.objects.filter(Ru_id=it, date=aujourdhui)
-        # exclure les entrées dont collaborateur_it_id correspond à un manager direct
         operateurs_finaux_qs = operateurs_finaux_qs.exclude(collaborateur_it_id__in=manager_direct_its)
         status = True
-        operateurs_finaux = operateurs_finaux_qs
+        operateurs_finaux = operateurs_finaux_qs.exclude(collaborateur_it__lot__in=["C", "E"])
     else:
         candidats = rec(request)
 
         if hasattr(candidats, 'exclude'):
             operateurs_finaux = candidats.exclude(it__in=manager_direct_its)
         else:
-            
             operateurs_finaux = [c for c in candidats if getattr(c, 'it', None) not in manager_direct_its]
         status = False
     if hasattr(operateurs_finaux, 'count'):
@@ -143,13 +141,8 @@ def validation_view(request):
 def difference(request):
     it = request.session.get("it")
 
-    der = declaration_effectif.objects.filter(
-        Ru_id=it
-    ).order_by("-date").first()
-
     operateur_systeme = SystEff(it)
     liste_s = set(operateur_systeme.values_list("it", flat=True))
-
 
     operateur_reel = reelEff(it)
     if  operateur_reel :
@@ -175,7 +168,6 @@ def difference(request):
 # recupere la liste des affectations d'un collaborateur
 # ============================================================
 def histo(ut):
-    # Si 'ut' est vide/None ou si le collaborateur n'existe pas
     if not ut:
         return {"declarations": [], "nbr": 0}
 
@@ -191,6 +183,26 @@ def histo(ut):
 
     return {"declarations": declarations, "nbr": nbr}
 
+
+def historique_pour(liste_its):
+    """
+    FIX PERF : remplace la boucle qui appelait histo() (donc plusieurs
+    requêtes) pour CHAQUE manager de la liste, par une seule requête
+    groupée sur les noms de tous les managers concernés.
+    """
+    liste_its = list(liste_its)
+    if not liste_its:
+        return historique.objects.none()
+
+    noms = set(
+        Collaborateur.objects.filter(it__in=liste_its).values_list("nom_complete", flat=True)
+    )
+    if not noms:
+        return historique.objects.none()
+
+    return historique.objects.filter(initial__in=noms).exclude(etat="Terminé")
+
+
 # ============================================================
 # rederiger vers la page des affectations avec  les affectations
 # ============================================================
@@ -198,7 +210,7 @@ def histo(ut):
 def histo_aff(request):
     util = request.session.get("it")
     changements = histo(util)
-    declarations = changements["declarations"]  # QuerySet
+    declarations = changements["declarations"]
 
     status = request.GET.get("status", "all")
 
@@ -235,6 +247,7 @@ def supprimer(request):
 
     if der:
         declaration_effectif.objects.filter(Ru_id=it, date=der.date).delete()
+        invalider_cache_hierarchie()
         return JsonResponse({"status": "supprimer"})
 
     return JsonResponse({"status": "erreur", "error": "Aucune déclaration à supprimer"}, status=404)
@@ -262,20 +275,16 @@ def liste_N1_non_valides_N2(request):
     liste_ru = Ru_Rg(it)
     liste_n1_ids=set(liste_ru.values_list("it",flat=True))
 
-    # RU ayant fait une déclaration aujourd'hui
     declaration = declaration_effectif.objects.filter(date=maint, Ru_id__in=liste_n1_ids)
     liste_Ru = set(declaration.values_list("Ru_id", flat=True))
 
-    # RU qui ont au moins un opérateur (collaborateur)
     liste_ru_avec_operateurs = set(
             Collaborateur.objects.filter(ru_it_id__in=liste_n1_ids)
             .values_list("ru_it_id", flat=True)
             .distinct())
 
-    # RU non validés = ont des opérateurs MAIS pas de déclaration aujourd'hui
     ru_non_valides_ids = liste_ru_avec_operateurs - liste_Ru
 
-    # On récupère les RU eux-mêmes (pas les collaborateurs)
     non_valides = liste_ru.filter(it__in=ru_non_valides_ids).distinct()
 
     return render(
@@ -291,170 +300,49 @@ def liste_N1_non_valides_N2(request):
 @role_required('N+2')
 def affectation_N1(request):
     util = request.session.get("it")
-    
-    # Récupération du paramètre status depuis la requête GET
-    status = request.GET.get("status", "all")
 
-    # 1. Chargement des données brutes N+2
+    status = request.GET.get("status", "all")
+    ru_init = request.GET.get("ru_init", "").strip()
+    ru_acceuil = request.GET.get("ru_acceuil", "").strip()
+
     changements = histo(util)
     toutes_declarations_N2 = list(changements["declarations"])
 
-    # 2. Chargement des données brutes N+1
-    toutes_declarations = []
     n1 = Ru_Rg(util)
+    n1_ids = list(n1.values_list("it", flat=True))
+    # FIX PERF : une seule requête groupée au lieu d'une par N+1
+    toutes_declarations = list(historique_pour(n1_ids))
 
-    for n in n1:
-        changements_n = histo(n.it)
-        toutes_declarations.extend(changements_n["declarations"])
+    tab_actif = request.GET.get("tab", "tab-mes")
+    ensemble_onglet = toutes_declarations if tab_actif == "tab-toutes" else toutes_declarations_N2
+    ru_initiaux = sorted({d.initial for d in ensemble_onglet if d.initial})
+    ru_acceuils = sorted({d.acceuil for d in ensemble_onglet if d.acceuil})
 
-    # Appliquer le filtrage par statut sur les listes Python
     if status == "valide":
-        toutes_declarations_N2 = [
-            d for d in toutes_declarations_N2 
-            if d.etat and "valid" in str((d.etat)).lower()
-        ]
-        toutes_declarations = [
-            d for d in toutes_declarations 
-            if d.etat and "valid" in str((d.etat)).lower()
-        ]
+        toutes_declarations_N2 = [d for d in toutes_declarations_N2 if d.etat and "valid" in str(d.etat).lower()]
+        toutes_declarations = [d for d in toutes_declarations if d.etat and "valid" in str(d.etat).lower()]
     elif status == "refuse":
-        toutes_declarations_N2 = [
-            d for d in toutes_declarations_N2 
-            if d.etat and "refus" in str(d.etat).lower()
-        ]
-        toutes_declarations = [
-            d for d in toutes_declarations 
-            if d.etat and "refus" in str((d.etat)).lower()
-        ]
-
-    # Recalcul des totaux après filtrage
-    total_nbr2 = len(toutes_declarations_N2)
-    total_nbr = len(toutes_declarations)
-
-    # 3. Pagination pour l'onglet N+1 ("info")
-    paginator_n1 = Paginator(toutes_declarations, 10)
-    page_n1 = request.GET.get("page_n1", 1)
-    page_obj_n1 = paginator_n1.get_page(page_n1)
-
-    # 4. Pagination pour l'onglet N+2 ("n2")
-    paginator_n2 = Paginator(toutes_declarations_N2, 10)
-    page_n2 = request.GET.get("page_n2", 1)
-    page_obj_n2 = paginator_n2.get_page(page_n2)
-
-    context = {
-        "n2": page_obj_n2,
-        "page_obj_n2": page_obj_n2,
-        "info": page_obj_n1,
-        "page_obj_n1": page_obj_n1,
-        "nbr": total_nbr,
-        "nbr2": total_nbr2,
-        "status": status,  # Transmis au template pour maintenir l'option sélectionnée
-    }
-
-    return render(request, "declaration_effectif/N2/affectation.html", context)
-
-# ============================================================
-# rederiger vers la page des respo N+1 ss validation pr N+3
-# ============================================================
-@role_required('N+3')
-def liste_N1_non_valides_N3(request):
-    maint = timezone.localdate()
-    it = request.session.get("it")
-    n1=liste_N1_pr_N3(it)
-    declaration = declaration_effectif.objects.filter(
-        date=maint,
-        Ru_id__in=n1,
-    )
-    liste_declares = set(declaration.values_list("Ru_id", flat=True))
-    liste_ru_avec_operateurs = set(
-            Collaborateur.objects.filter(ru_it_id__in=n1)
-            .values_list("ru_it_id", flat=True)
-            .distinct()
-        )
-
-    # RU n'ayant pas encore effectué leur déclaration
-    non_valides = Collaborateur.objects.filter(
-        it__in=liste_ru_avec_operateurs
-    ).exclude(it__in=liste_declares)
-
-    return render(
-        request,
-        "declaration_effectif/N3/validation.html",
-        {"non_valides": non_valides,"date": maint}
-    )
-# ============================================================
-# # rederiger vers la page des affectations de N+2 et c'est N+1 ,N+2
-# ============================================================
-@role_required('N+3')
-def affectation_N3(request):
-    util = request.session.get("it")
-
-    # Récupération du paramètre status depuis la requête GET
-    status = request.GET.get("status", "all")
-
-    def collecter(it, deja_vus=None):
-        if deja_vus is None:
-            deja_vus = set()
-        if it in deja_vus:
-            return
-        deja_vus.add(it)
-
-        changements_it = histo(it)
-        toutes_declarations.extend(changements_it["declarations"])
-
-        n0 = Ru_Rg(it)
-        for e in n0:
-            collecter(e.it, deja_vus)
-
-    # 1. Chargement des données brutes N+2
-    changements = histo(util)
-    toutes_declarations_N2 = list(changements["declarations"])
-
-    # 2. Chargement des données brutes N+1 (et en dessous, récursivement)
-    toutes_declarations = []
-    n1 = Rg_Dur(util)
-    for n in n1:
-        collecter(n.it)
-
-    # Appliquer le filtrage par statut sur les listes Python
-    if status == "valide":
-        toutes_declarations_N2 = [
-            d for d in toutes_declarations_N2
-            if d.etat and "valid" in str(d.etat).lower()
-        ]
-        toutes_declarations = [
-            d for d in toutes_declarations
-            if d.etat and "valid" in str(d.etat).lower()
-        ]
-    elif status == "refuse":
-        toutes_declarations_N2 = [
-            d for d in toutes_declarations_N2
-            if d.etat and "refus" in str(d.etat).lower()
-        ]
-        toutes_declarations = [
-            d for d in toutes_declarations
-            if d.etat and "refus" in str(d.etat).lower()
-        ]
+        toutes_declarations_N2 = [d for d in toutes_declarations_N2 if d.etat and "refus" in str(d.etat).lower()]
+        toutes_declarations = [d for d in toutes_declarations if d.etat and "refus" in str(d.etat).lower()]
     elif status == "non_demarrer":
-        toutes_declarations_N2 = [
-        d for d in toutes_declarations_N2
-        if d.etat and "non démarr" in str(d.etat).lower()
-    ]
-        toutes_declarations = [
-        d for d in toutes_declarations
-        if d.etat and "non démarr" in str(d.etat).lower()
-    ]
+        toutes_declarations_N2 = [d for d in toutes_declarations_N2 if d.etat and "non démarr" in str(d.etat).lower()]
+        toutes_declarations = [d for d in toutes_declarations if d.etat and "non démarr" in str(d.etat).lower()]
 
-    # Recalcul des totaux après filtrage
+    if ru_init:
+        toutes_declarations_N2 = [d for d in toutes_declarations_N2 if d.initial == ru_init]
+        toutes_declarations = [d for d in toutes_declarations if d.initial == ru_init]
+
+    if ru_acceuil:
+        toutes_declarations_N2 = [d for d in toutes_declarations_N2 if d.acceuil == ru_acceuil]
+        toutes_declarations = [d for d in toutes_declarations if d.acceuil == ru_acceuil]
+
     total_nbr2 = len(toutes_declarations_N2)
     total_nbr = len(toutes_declarations)
 
-    # 3. Pagination pour l'onglet N+1 ("info")
     paginator_n1 = Paginator(toutes_declarations, 10)
     page_n1 = request.GET.get("page_n1", 1)
     page_obj_n1 = paginator_n1.get_page(page_n1)
 
-    # 4. Pagination pour l'onglet N+2 ("n2")
     paginator_n2 = Paginator(toutes_declarations_N2, 10)
     page_n2 = request.GET.get("page_n2", 1)
     page_obj_n2 = paginator_n2.get_page(page_n2)
@@ -467,10 +355,110 @@ def affectation_N3(request):
         "nbr": total_nbr,
         "nbr2": total_nbr2,
         "status": status,
+        "ru_init": ru_init,
+        "ru_acceuil": ru_acceuil,
+        "ru_initiaux": ru_initiaux,
+        "ru_acceuils": ru_acceuils,
     }
 
     return render(request, "declaration_effectif/N2/affectation.html", context)
-    
+
+# ============================================================
+# rederiger vers la page des respo N+1 ss validation pr N+3
+# ============================================================
+@role_required('N+3')
+def liste_N1_non_valides_N3(request):
+    maint = timezone.localdate()
+    it = request.session.get("it")
+
+    n1_ids = get_tous_les_n1(it)
+
+    declaration = declaration_effectif.objects.filter(
+        date=maint,
+        Ru_id__in=n1_ids,
+    )
+    liste_declares = set(declaration.values_list("Ru_id", flat=True))
+
+    non_valides = Collaborateur.objects.filter(
+        it__in=n1_ids
+    ).exclude(it__in=liste_declares)
+
+    return render(
+        request,
+        "declaration_effectif/N3/validation.html",
+        {"non_valides": non_valides, "date": maint}
+    )
+
+
+# ============================================================
+# rederiger vers la page des affectations de N+2 et c'est N+1 ,N+2
+# ============================================================
+@role_required('N+3')
+def affectation_N3(request):
+    util = request.session.get("it")
+    status = request.GET.get("status", "all")
+    ru_init = request.GET.get("ru_init", "").strip()
+    ru_acceuil = request.GET.get("ru_acceuil", "").strip()
+
+    n1_ids, n2_ids = get_n1_et_n2_sous(util)
+
+    # FIX PERF : historique_pour() fait maintenant UNE requête par
+    # ensemble (n2_ids, n1_ids) au lieu d'une par manager.
+    toutes_declarations_N2 = list(historique_pour(n2_ids))
+    toutes_declarations = list(historique_pour(n1_ids))
+
+    tab_actif = request.GET.get("tab", "tab-mes")
+    ensemble_onglet = toutes_declarations if tab_actif == "tab-toutes" else toutes_declarations_N2
+    ru_initiaux = sorted({d.initial for d in ensemble_onglet if d.initial})
+    ru_acceuils = sorted({d.acceuil for d in ensemble_onglet if d.acceuil})
+
+    def filtrer(liste, mot_cle):
+        return [d for d in liste if d.etat and mot_cle in str(d.etat).lower()]
+
+    if status == "valide":
+        toutes_declarations_N2 = filtrer(toutes_declarations_N2, "valid")
+        toutes_declarations = filtrer(toutes_declarations, "valid")
+    elif status == "refuse":
+        toutes_declarations_N2 = filtrer(toutes_declarations_N2, "refus")
+        toutes_declarations = filtrer(toutes_declarations, "refus")
+    elif status == "non_demarrer":
+        toutes_declarations_N2 = filtrer(toutes_declarations_N2, "non démarr")
+        toutes_declarations = filtrer(toutes_declarations, "non démarr")
+
+    if ru_init:
+        toutes_declarations_N2 = [d for d in toutes_declarations_N2 if d.initial == ru_init]
+        toutes_declarations = [d for d in toutes_declarations if d.initial == ru_init]
+
+    if ru_acceuil:
+        toutes_declarations_N2 = [d for d in toutes_declarations_N2 if d.acceuil == ru_acceuil]
+        toutes_declarations = [d for d in toutes_declarations if d.acceuil == ru_acceuil]
+
+    total_nbr2 = len(toutes_declarations_N2)
+    total_nbr = len(toutes_declarations)
+
+    paginator_n1 = Paginator(toutes_declarations, 10)
+    page_n1 = request.GET.get("page_n1", 1)
+    page_obj_n1 = paginator_n1.get_page(page_n1)
+
+    paginator_n2 = Paginator(toutes_declarations_N2, 10)
+    page_n2 = request.GET.get("page_n2", 1)
+    page_obj_n2 = paginator_n2.get_page(page_n2)
+
+    context = {
+        "n2": page_obj_n2,
+        "page_obj_n2": page_obj_n2,
+        "info": page_obj_n1,
+        "page_obj_n1": page_obj_n1,
+        "nbr": total_nbr,
+        "nbr2": total_nbr2,
+        "status": status,
+        "ru_init": ru_init,
+        "ru_acceuil": ru_acceuil,
+        "ru_initiaux": ru_initiaux,
+        "ru_acceuils": ru_acceuils,
+    }
+
+    return render(request, "declaration_effectif/N2/affectation.html", context)
 # ============================================================
 # fct pr engregistrer les alerts envoier
 # ============================================================
@@ -503,18 +491,75 @@ def envoyer_alert(request):
 # ============================================================
 # # rederiger vers dashboard de N+3
 # ============================================================
+
+def _collecter_n1_feuilles(managers, tous_ru_it):
+    resultat = []
+    for m in managers:
+        sous_directs = Collaborateur.objects.filter(ru_it_id=m.it)
+        sous_managers = [c for c in sous_directs if c.it in tous_ru_it]
+        if sous_managers:
+            resultat.extend(_collecter_n1_feuilles(sous_managers, tous_ru_it))
+        else:
+            resultat.append(m)
+    return resultat
+
 @role_required('N+3')
-def dashboard_N3 (request):
+def dashboard_N3(request):
     it_session_original = request.session.get("it")
     if not it_session_original:
         return redirect("login")
 
-    it_n1 = liste_N1_pr_N3(it_session_original)
-    if not it_n1:
+    # FIX PERF : calculé une seule fois via le cache, plutôt qu'une
+    # requête complète sur toute la table Collaborateur ici même.
+    tous_ru_it = get_managers_its()
+
+    directs_n3 = Collaborateur.objects.filter(ru_it_id=it_session_original).select_related('unite')
+    managers_directs_n3 = [c for c in directs_n3 if c.it in tous_ru_it]
+    operateurs_directs_n3 = [c for c in directs_n3 if c.it not in tous_ru_it]
+
+    n1_directs = []
+    n2_list = []
+    n2_to_n1 = {}
+    n2_to_operateurs = {}
+
+    for m in managers_directs_n3:
+        sous_directs = Collaborateur.objects.filter(ru_it_id=m.it)
+        sous_managers = [c for c in sous_directs if c.it in tous_ru_it]
+        sous_operateurs = [c for c in sous_directs if c.it not in tous_ru_it]
+        if sous_managers:
+            n2_list.append(m)
+            n2_to_n1[m.it] = _collecter_n1_feuilles(sous_managers, tous_ru_it)
+            n2_to_operateurs[m.it] = sous_operateurs
+        else:
+            n1_directs.append(m)
+
+    it_n2_set = {n2.it for n2 in n2_list}
+    n1_directs = [c for c in n1_directs if c.it not in it_n2_set]
+    for n2_it, sous_n1 in n2_to_n1.items():
+        n2_to_n1[n2_it] = [c for c in sous_n1 if c.it not in it_n2_set]
+
+    it_n1_set = set(c.it for c in n1_directs)
+    for sous_managers in n2_to_n1.values():
+        it_n1_set.update(c.it for c in sous_managers)
+    it_n1 = list(it_n1_set)
+
+    nbr_n1_total = len(it_n1)
+    nbr_n2_total = len(n2_list)
+    it_n2 = [n2.it for n2 in n2_list]
+
+    total_operateurs_directs_n2 = sum(len(v) for v in n2_to_operateurs.values())
+
+    if not it_n1 and not operateurs_directs_n3 and not total_operateurs_directs_n2:
         return render(request, "declaration_effectif/N3/dashboard.html", {
             "liste_ru_stats": [], "total_r": 0, "total_syst": 0, "MR": 0, "MS": 0,
             "maquette_totale": 0, "maint": timezone.localdate(),
-            "chart_labels_json": json.dumps([]), "chart_data_json": json.dumps([]), "non_valides": 0
+            "non_valides": 0,
+            "operateurs_directs_n3": 0,
+            "n1_directs": [], "n2_list": [], "nbr_n1_total": 0, "nbr_n2_total": 0,
+            "chart_labels": [], "chart_data": [],
+            "labels_ru": [], "data_reel": [], "data_systeme": [], "data_maquette": [],
+            "lot_labels": [], "lot_reel": [], "lot_systeme": [], "lot_maquette": [],
+            "lot_details": {},
         })
 
     today = timezone.now().date()
@@ -522,102 +567,110 @@ def dashboard_N3 (request):
     dates = [start + timedelta(days=i) for i in range(7)]
     labels_list = [d.strftime('%d %b') for d in dates]
 
-    collaborateurs_n1 = Collaborateur.objects.filter(it__in=it_n1).select_related('unite')
+    collaborateurs_n1 = Collaborateur.objects.filter(it__in=it_n1).exclude(it__in=it_n2).select_related('unite')
 
-    # 1) Calcul des stats par RU en utilisant SystEff et reelEff
     liste_ru_stats = []
-    total_syst = 0
-    total_r = 0
     maquette_totale = 0
     maint_global = None
-
     seen_unite_ids = set()
 
-    try:
-        for collab in collaborateurs_n1:
-            ru_it = collab.it
+    # FIX PERF : suppression des manipulations de request.session["it"]
+    # dans la boucle — SystEff/reelEff prennent 'it' en paramètre direct
+    # et n'utilisent jamais la session ; ce code était inutile et coûteux.
+    # 'tous_ru_it' est calculé une seule fois (ci-dessus) et transmis à
+    # chaque appel au lieu d'être recalculé à chaque itération.
+    for collab in collaborateurs_n1:
+        ru_it = collab.it
 
-            # Injection temporaire du RU dans la session pour exécuter vos 2 fonctions
-            request.session["it"] = ru_it
+        systeme = SystEff(collab.it, managers_its=tous_ru_it).values('it').distinct().count()
+        reel = reelEff(collab.it, managers_its=tous_ru_it).values('it').distinct().count()
 
-            # Effectif système issu de SystEff(request)
-            qs_syst = SystEff(collab.it)
-            systeme = qs_syst.values('it').distinct().count()
+        last_decl = (
+            declaration_effectif.objects
+            .filter(Ru_id=ru_it, nature__in=["A", "V"])
+            .order_by("-date")
+            .first()
+        )
+        date_ref = last_decl.date if last_decl else None
 
-            # Effectif réel issu de reelEff(request)
-            qs_reel = reelEff(collab.it)
-            reel = qs_reel.values('it').distinct().count()
+        maquette_dedup = 0
+        unit_key = getattr(collab, "unite_id", None)
+        if unit_key and unit_key not in seen_unite_ids:
+            maquette_dedup = getattr(collab.unite, "maquette", 0) or 0
+            seen_unite_ids.add(unit_key)
 
-            # Récupération de la dernière date de déclaration (A/V) pour ce RU
-            last_decl = (
-                declaration_effectif.objects
-                .filter(Ru_id=ru_it, nature__in=["A", "V"])
-                .order_by("-date")
-                .first()
-            )
-            date_ref = last_decl.date if last_decl else None
+        maquette_brute = getattr(collab.unite, "maquette", 0) or 0
 
-            # --- calcul de la maquette (éviter les doublons par unité) ---
-            maquette = 0
-            unit_key = getattr(collab, "unite_id", None)
-            if unit_key and unit_key not in seen_unite_ids:
-                # collab.unite est select_related, mais on protège l'accès
-                maquette = getattr(collab.unite, "maquette", 0) or 0
-                seen_unite_ids.add(unit_key)
+        liste_ru_stats.append({
+            "n1": collab,
+            "matricule": getattr(collab, "matricule", None),
+            "nom_complete": getattr(collab, "nom_complete", ""),
+            "unite": getattr(collab, 'unite_id', None),
+            "reel": reel,
+            "systeme": systeme,
+            "maquette": maquette_brute,
+            "maquette_dedup": maquette_dedup,
+            "mr": reel - maquette_brute,
+            "ms": systeme - maquette_brute,
+            "last_decl_date": date_ref,
+        })
 
-            liste_ru_stats.append({
-                "n1": collab,
-                "matricule": getattr(collab, "matricule", None),
-                "nom_complete": getattr(collab, "nom_complete", ""),
-                "unite": getattr(collab, 'unite_id', None),
-                "reel": reel,
-                "systeme": systeme,
-                "maquette": getattr(collab.unite, "maquette", 0) or 0,
-                "mr": reel - getattr(collab.unite, "maquette", 0) or 0,
-                "ms": systeme - getattr(collab.unite, "maquette", 0) or 0,
-                "last_decl_date": date_ref,
-            })
-
-            total_r += reel
-            total_syst += systeme
-            maquette_totale += maquette
-            if date_ref and (maint_global is None or date_ref > maint_global):
-                maint_global = date_ref
-
-    finally:
-        # Restauration systématique du RU original dans la session
-        request.session["it"] = it_session_original
+        maquette_totale += maquette_dedup
+        if date_ref and (maint_global is None or date_ref > maint_global):
+            maint_global = date_ref
 
     if maint_global is None:
         maint_global = timezone.localdate()
 
-    # 2) Calcul des RU non validés aujourd'hui
+    tous_les_ru_ids = list(set(it_n1))
     liste_declares_today = set(
         declaration_effectif.objects
-        .filter(date=today, Ru_id__in=it_n1)
+        .filter(date=today, Ru_id__in=tous_les_ru_ids)
         .values_list('Ru_id', flat=True)
     )
-    non_valides = sum(1 for stat in liste_ru_stats if stat["systeme"] > 0 and stat["n1"].it not in liste_declares_today)
+    non_valides = sum(
+        1 for stat in liste_ru_stats
+        if stat["systeme"] > 0 and stat["n1"].it not in liste_declares_today
+    )
 
-    # 3) Données de la session courante (N+3)
-    operateurs_systeme_session = SystEff(it_session_original)
+    total_r = (
+        sum(stat["reel"] for stat in liste_ru_stats)
+        + len(operateurs_directs_n3)
+        + total_operateurs_directs_n2
+        + nbr_n1_total
+        + nbr_n2_total
+    )
+    total_syst = (
+        sum(stat["systeme"] for stat in liste_ru_stats)
+        + len(operateurs_directs_n3)
+        + total_operateurs_directs_n2
+        + nbr_n1_total
+        + nbr_n2_total
+    )
+
+    operateurs_systeme_session = SystEff(it_session_original, managers_its=tous_ru_it)
     syste_session = operateurs_systeme_session.values('it').distinct().count()
 
-    # 4) Série temporelle pour le graphique sur 7 jours
     decl_window_qs = (
         declaration_effectif.objects
         .filter(Ru_id__in=it_n1, nature__in=["A", "V"], date__gte=start, date__lte=today)
         .values('Ru_id', 'date')
         .annotate(total=Count('collaborateur_it_id', distinct=True))
     )
-
     decls_by_ru = {}
     for r in decl_window_qs:
         decls_by_ru.setdefault(r['Ru_id'], []).append((r['date'], r['total']))
     for ru_key in decls_by_ru:
         decls_by_ru[ru_key].sort()
 
-    data_totale_par_jour = [0] * len(dates)
+    part_fixe_par_jour = (
+        len(operateurs_directs_n3)
+        + total_operateurs_directs_n2
+        + nbr_n1_total
+        + nbr_n2_total
+    )
+
+    data_totale_par_jour = [part_fixe_par_jour] * len(dates)
     stat_dict = {stat["n1"].it: stat["systeme"] for stat in liste_ru_stats}
 
     for ru_it_key in [c.it for c in collaborateurs_n1]:
@@ -625,7 +678,6 @@ def dashboard_N3 (request):
         ru_system = stat_dict.get(ru_it_key, 0)
         ru_dates = [dt for dt, _ in ru_decls]
         ru_totals = [t for _, t in ru_decls]
-
         for idx, d in enumerate(dates):
             if ru_dates:
                 pos = bisect.bisect_right(ru_dates, d) - 1
@@ -634,121 +686,378 @@ def dashboard_N3 (request):
                     continue
             data_totale_par_jour[idx] += ru_system
 
+    stats_by_it = {stat["n1"].it: stat for stat in liste_ru_stats}
+    n1_directs_stats = [stats_by_it[c.it] for c in n1_directs if c.it in stats_by_it]
+
+    n2_groups = []
+    for n2 in n2_list:
+        sous_managers = n2_to_n1.get(n2.it, [])
+        sous_operateurs = n2_to_operateurs.get(n2.it, [])
+        n1_stats_n2 = [stats_by_it[c.it] for c in sous_managers if c.it in stats_by_it]
+        n2_groups.append({
+            "n2": n2,
+            "n1_stats": n1_stats_n2,
+            "directs": {"liste": sous_operateurs, "reel": len(sous_operateurs)},
+            "nbr_collabs_total": sum(s["reel"] for s in n1_stats_n2) + len(sous_operateurs),
+        })
+
+    lot_stats = {}
+
+    def add_to_lot(lot_value, reel=0, systeme=0, maquette=0):
+        lot_key = lot_value or "Non défini"
+        if lot_key not in lot_stats:
+            lot_stats[lot_key] = {"reel": 0, "systeme": 0, "maquette": 0}
+        lot_stats[lot_key]["reel"] += reel
+        lot_stats[lot_key]["systeme"] += systeme
+        lot_stats[lot_key]["maquette"] += maquette
+
+    for stat in liste_ru_stats:
+        add_to_lot(
+            getattr(stat["n1"], "lot", None),
+            reel=stat["reel"],
+            systeme=stat["systeme"],
+            maquette=stat["maquette_dedup"],
+        )
+
+    for op in operateurs_directs_n3:
+        add_to_lot(getattr(op, "lot", None), reel=1, systeme=1, maquette=0)
+
+    for sous_operateurs in n2_to_operateurs.values():
+        for op in sous_operateurs:
+            add_to_lot(getattr(op, "lot", None), reel=1, systeme=1, maquette=0)
+
+    lot_labels = list(lot_stats.keys())
+    lot_reel_data = [lot_stats[l]["reel"] for l in lot_labels]
+    lot_systeme_data = [lot_stats[l]["systeme"] for l in lot_labels]
+    lot_maquette_data = [lot_stats[l]["maquette"] for l in lot_labels]
+
+    lot_details = {}
+
+    def add_detail(lot_value, nom, reel=0, systeme=0, maquette=0):
+        lot_key = lot_value or "Non défini"
+        lot_details.setdefault(lot_key, []).append({
+            "nom": nom, "reel": reel, "systeme": systeme, "maquette": maquette
+        })
+
+    for stat in liste_ru_stats:
+        add_detail(
+            getattr(stat["n1"], "lot", None),
+            getattr(stat["n1"], "nom_complete", stat["n1"].it),
+            reel=stat["reel"], systeme=stat["systeme"], maquette=stat["maquette_dedup"],
+        )
+    for op in operateurs_directs_n3:
+        add_detail(getattr(op, "lot", None), getattr(op, "nom_complete", op.it), reel=1, systeme=1)
+    for sous_operateurs in n2_to_operateurs.values():
+        for op in sous_operateurs:
+            add_detail(getattr(op, "lot", None), getattr(op, "nom_complete", op.it), reel=1, systeme=1)
+
+    labels_ru_liste = [s["n1"].nom_complete for s in liste_ru_stats]
+    data_reel_liste = [s["reel"] for s in liste_ru_stats]
+    data_systeme_liste = [s["systeme"] for s in liste_ru_stats]
+    data_maquette_liste = [s["maquette"] for s in liste_ru_stats]
+
     context = {
         "liste_ru_stats": liste_ru_stats,
         "total_r": total_r,
+        "total_syst": total_syst,
         "MR": total_r - maquette_totale,
         "MS": total_syst - maquette_totale,
-        "total_syst": total_syst,
         "maquette_totale": maquette_totale,
         "maint": maint_global,
-        "chart_labels_json": json.dumps(labels_list),
-        "chart_data_json": json.dumps(data_totale_par_jour),
         "non_valides": non_valides,
         "operateurs_systeme_session": operateurs_systeme_session,
         "syste_session": syste_session,
+        "directs_n3": {"liste": operateurs_directs_n3, "reel": len(operateurs_directs_n3)},
+        "operateurs_directs_n3": len(operateurs_directs_n3),
+        "n1_directs": n1_directs,
+        "n1_directs_stats": n1_directs_stats,
+        "n2_list": n2_list,
+        "n2_groups": n2_groups,
+        "nbr_n1_total": nbr_n1_total,
+        "nbr_n2_total": nbr_n2_total,
+        "chart_labels": labels_list,
+        "chart_data": data_totale_par_jour,
+        "labels_ru": labels_ru_liste,
+        "data_reel": data_reel_liste,
+        "data_systeme": data_systeme_liste,
+        "data_maquette": data_maquette_liste,
+        "lot_labels": lot_labels,
+        "lot_reel": lot_reel_data,
+        "lot_systeme": lot_systeme_data,
+        "lot_maquette": lot_maquette_data,
+        "lot_details": lot_details,
     }
     return render(request, "declaration_effectif/N3/dashboard.html", context)
-# ============================================================
-# # rederiger vers dashboard de N+4
-# ============================================================
+
+
+def _niveau_manager(it, tous_ru_it, cache):
+    if it in cache:
+        return cache[it]
+    enfants_managers = list(
+        Collaborateur.objects.filter(ru_it_id=it, it__in=tous_ru_it)
+    )
+    if not enfants_managers:
+        niveau = 1
+    else:
+        niveau = 1 + max(_niveau_manager(c.it, tous_ru_it, cache) for c in enfants_managers)
+    cache[it] = niveau
+    return niveau
+
+
 @role_required('N+4')
 def page_N4(request):
-    it = request.session.get("it")
-    if not it:
+    it_session_original = request.session.get("it")
+    if not it_session_original:
         return redirect("login")
 
-    maint = timezone.localdate()
+    tous_les_it = get_tous_les_it_sous(it_session_original)
 
-    dep = set(
-        Collaborateur.objects.filter(it=it)
-        .values_list("departement", flat=True)
+    # FIX PERF : via le cache, au lieu d'une requête complète ici.
+    tous_ru_it = get_managers_its()
+
+    managers_ids = tous_les_it & tous_ru_it
+    operateurs_ids = tous_les_it - tous_ru_it
+
+    cache_niveau = {}
+    niveau_par_it = {m: _niveau_manager(m, tous_ru_it, cache_niveau) for m in managers_ids}
+    vrais_n1_ids = {m for m, n in niveau_par_it.items() if n == 1}
+
+    directs_n4 = list(
+        Collaborateur.objects.filter(ru_it_id=it_session_original)
+        .exclude(it=it_session_original)
+        .select_related('unite', 'departement')
     )
-    today = timezone.now().date()
-    dates = [today - timedelta(days=i) for i in range(6, -1, -1)]
-    labels_list = [d.strftime('%d %b') for d in dates]
-    liste = []
-    reel = 0
-    systeme = 0
-    liste_ru_stats = []
-    maquette = 0
+    operateurs_directs_n4 = [c for c in directs_n4 if c.it not in tous_ru_it]
+    n1_directs_n4_collabs = [c for c in directs_n4 if niveau_par_it.get(c.it) == 1]
+    n2_directs_n4 = [c for c in directs_n4 if niveau_par_it.get(c.it) == 2]
+    n3_directs_n4 = [c for c in directs_n4 if niveau_par_it.get(c.it, 0) >= 3]
 
-    liste_N3 = liste_N3_N4(it)
-    for n in liste_N3:
-        liste.extend(liste_N1_pr_N3(n))
-
-    liste_n1 = Collaborateur.objects.filter(it__in=liste)
-    data_totale_par_jour = [0] * len(dates)
-
-    for n1 in liste_n1:
-        systeme1 =SystEff(n1.it).count()
-        reel1=reelEff(n1.it).count()
-
-        maquette1 = 0
-        if n1.unite_id:
-            u = Unite.objects.filter(abreviation=n1.unite_id).first()
-            if u and u.maquette:
-                maquette1 = u.maquette
-
-        for i, d in enumerate(dates):
-            derniere = declaration_effectif.objects.filter(
-                Ru_id=n1.it, date__lte=d
-            ).order_by("-date").first()
-
-            if derniere:
-                count = declaration_effectif.objects.filter(
-                    Ru_id=n1.it,
-                    date=derniere.date,
-                    nature__in=["A", "V"]
-                ).count()
-            else:
-                count = systeme1   # <-- fixé (était "systeme")
-
-            data_totale_par_jour[i] += count
-
-        reel += reel1
-        systeme += systeme1
-        maquette += maquette1
-
-        liste_ru_stats.append({
-            "n1": n1,
-            "reel1": reel1,
-            "systeme1": systeme1,
-            "maquette1": maquette1,
-            "mr": reel1 - maquette1,
-            "ms": systeme1 - maquette1,
+    if not vrais_n1_ids and not operateurs_ids:
+        return render(request, "declaration_effectif/N4/dashboard.html", {
+            "liste_ru_stats": [], "reel": 0, "systeme": 0, "maquette": 0,
+            "MR": 0, "MS": 0, "maint": timezone.localdate(), "non_valides": 0,
+            "chart_labels_json": json.dumps([]), "chart_data_json": json.dumps([]),
+            "operateurs_directs_n4": {"liste": [], "reel": 0},
+            "n1_directs_n4": [], "n2_groups": [], "n3_groups": [],
+            "nbr_n1_total": 0, "nbr_n2_total": 0, "nbr_n3_total": 0,
+            "lot_labels": [], "lot_reel": [], "lot_systeme": [], "lot_maquette": [],
+            "lot_details": {},
         })
 
-    # ---- Sorti de la boucle : calculé une seule fois ----
-    declaration = declaration_effectif.objects.filter(
-        date=maint, Ru_id__in=liste_n1.values_list("it", flat=True)
-    )
-    liste_declares = set(declaration.values_list("Ru_id", flat=True))
+    today = timezone.now().date()
+    start = today - timedelta(days=6)
+    dates = [start + timedelta(days=i) for i in range(7)]
+    labels_list = [d.strftime('%d %b') for d in dates]
 
-    liste_ru_avec_operateurs = set(
-        Collaborateur.objects.filter(
-            ru_it_id__in=liste_n1.values_list("it", flat=True)
+    liste_n1 = Collaborateur.objects.filter(it__in=vrais_n1_ids).select_related('unite', 'departement')
+    stats_by_it = {}
+    maquette_dedup_par_n1 = {}
+    maquette_totale = 0
+    seen_unite_ids = set()
+    maint_global = None
+
+    # FIX PERF : plus de manipulation request.session["it"] dans la
+    # boucle (inutile — voir dashboard_N3), et tous_ru_it/managers_its
+    # transmis directement plutôt que recalculés à chaque itération.
+    for collab in liste_n1:
+        systeme = SystEff(collab.it, managers_its=tous_ru_it).values('it').distinct().count()
+        reel = reelEff(collab.it, managers_its=tous_ru_it).values('it').distinct().count()
+
+        last_decl = (
+            declaration_effectif.objects
+            .filter(Ru_id=collab.it, nature__in=["A", "V"])
+            .order_by("-date").first()
         )
-        .values_list("ru_it_id", flat=True)
-        .distinct()
+        date_ref = last_decl.date if last_decl else None
+
+        maquette_dedup = 0
+        unit_key = getattr(collab, "unite_id", None)
+        if unit_key and unit_key not in seen_unite_ids:
+            maquette_dedup = getattr(collab.unite, "maquette", 0) or 0
+            seen_unite_ids.add(unit_key)
+        maquette_dedup_par_n1[collab.it] = maquette_dedup
+        maquette_brute = getattr(collab.unite, "maquette", 0) or 0
+
+        stats_by_it[collab.it] = {
+            "n1": collab,
+            "matricule": getattr(collab, "matricule", None),
+            "nom_complete": getattr(collab, "nom_complete", ""),
+            "unite": getattr(collab, 'unite_id', None),
+            "reel1": reel,
+            "systeme1": systeme,
+            "maquette1": maquette_brute,
+            "mr": reel - maquette_brute,
+            "ms": systeme - maquette_brute,
+            "last_decl_date": date_ref,
+        }
+        maquette_totale += maquette_dedup
+        if date_ref and (maint_global is None or date_ref > maint_global):
+            maint_global = date_ref
+
+    if maint_global is None:
+        maint_global = timezone.localdate()
+
+    liste_ru_stats = list(stats_by_it.values())
+
+    operateurs_sous_vrais_n1 = set(
+        Collaborateur.objects.filter(ru_it_id__in=vrais_n1_ids)
+        .values_list("it", flat=True)
     )
-    non_valides = (
-        Collaborateur.objects.filter(it__in=liste_ru_avec_operateurs)
-        .exclude(it__in=liste_declares)
-        .count()
+    operateurs_intermediaires_ids = operateurs_ids - operateurs_sous_vrais_n1
+
+    reel = sum(s["reel1"] for s in liste_ru_stats) + len(operateurs_intermediaires_ids) + len(managers_ids)
+    systeme = sum(s["systeme1"] for s in liste_ru_stats) + len(operateurs_intermediaires_ids) + len(managers_ids)
+    maquette = maquette_totale
+
+    liste_declares_today = set(
+        declaration_effectif.objects.filter(date=today, Ru_id__in=vrais_n1_ids)
+        .values_list('Ru_id', flat=True)
     )
+    non_valides = sum(
+        1 for s in liste_ru_stats
+        if s["systeme1"] > 0 and s["n1"].it not in liste_declares_today
+    )
+
+    decl_window_qs = (
+        declaration_effectif.objects
+        .filter(Ru_id__in=vrais_n1_ids, nature__in=["A", "V"], date__gte=start, date__lte=today)
+        .values('Ru_id', 'date').annotate(total=Count('collaborateur_it_id', distinct=True))
+    )
+    decls_by_ru = {}
+    for r in decl_window_qs:
+        decls_by_ru.setdefault(r['Ru_id'], []).append((r['date'], r['total']))
+    for k in decls_by_ru:
+        decls_by_ru[k].sort()
+
+    part_fixe_par_jour = len(operateurs_intermediaires_ids) + len(managers_ids)
+    data_totale_par_jour = [part_fixe_par_jour] * len(dates)
+    systeme_par_n1 = {s["n1"].it: s["systeme1"] for s in liste_ru_stats}
+
+    for ru_it_key in vrais_n1_ids:
+        ru_system = systeme_par_n1.get(ru_it_key, 0)
+        ru_decls = decls_by_ru.get(ru_it_key, [])
+        ru_dates = [dt for dt, _ in ru_decls]
+        ru_totals = [t for _, t in ru_decls]
+        for idx, d in enumerate(dates):
+            if ru_dates:
+                pos = bisect.bisect_right(ru_dates, d) - 1
+                if pos >= 0:
+                    data_totale_par_jour[idx] += ru_totals[pos]
+                    continue
+            data_totale_par_jour[idx] += ru_system
+
+    def operateurs_directs_de(m_it):
+        return list(
+            Collaborateur.objects.filter(ru_it_id=m_it, it__in=operateurs_intermediaires_ids)
+        )
+
+    def sous_managers_de(m_it, niveau_cible):
+        return [
+            c for c in Collaborateur.objects.filter(ru_it_id=m_it, it__in=managers_ids)
+            if niveau_par_it.get(c.it) == niveau_cible
+        ]
+
+    def construire_n2_group(n2):
+        sous_n1 = sous_managers_de(n2.it, 1)
+        n1_stats = [stats_by_it[c.it] for c in sous_n1 if c.it in stats_by_it]
+        directs_ops = operateurs_directs_de(n2.it)
+        return {
+            "n2": n2,
+            "n1_stats": n1_stats,
+            "directs": {"liste": directs_ops, "reel": len(directs_ops)},
+            "nbr_collabs_total": sum(s["reel1"] for s in n1_stats) + len(directs_ops),
+        }
+
+    def construire_n3_group(n3):
+        sous_n2 = sous_managers_de(n3.it, 2)
+        sous_n1_directs = sous_managers_de(n3.it, 1)
+        n1_stats_directs = [stats_by_it[c.it] for c in sous_n1_directs if c.it in stats_by_it]
+        n2_groups = [construire_n2_group(n2) for n2 in sous_n2]
+        directs_ops = operateurs_directs_de(n3.it)
+        nbr_total = (
+            sum(g["nbr_collabs_total"] for g in n2_groups)
+            + sum(s["reel1"] for s in n1_stats_directs)
+            + len(directs_ops)
+        )
+        return {
+            "n3": n3,
+            "n1_stats_directs": n1_stats_directs,
+            "n2_groups": n2_groups,
+            "directs": {"liste": directs_ops, "reel": len(directs_ops)},
+            "nbr_collabs_total": nbr_total,
+        }
+
+    n3_groups = [construire_n3_group(n3) for n3 in n3_directs_n4]
+    n2_groups_directs_n4 = [construire_n2_group(n2) for n2 in n2_directs_n4]
+    n1_stats_directs_n4 = [stats_by_it[c.it] for c in n1_directs_n4_collabs if c.it in stats_by_it]
+
+    lot_stats = {}
+    lot_details = {}
+
+    def add_to_lot(lot_value, reel=0, systeme=0, maquette=0):
+        lot_key = lot_value or "Non défini"
+        if lot_key not in lot_stats:
+            lot_stats[lot_key] = {"reel": 0, "systeme": 0, "maquette": 0}
+        lot_stats[lot_key]["reel"] += reel
+        lot_stats[lot_key]["systeme"] += systeme
+        lot_stats[lot_key]["maquette"] += maquette
+
+    def add_detail(lot_value, nom, reel=0, systeme=0, maquette=0):
+        lot_key = lot_value or "Non défini"
+        lot_details.setdefault(lot_key, []).append({
+            "nom": nom, "reel": reel, "systeme": systeme, "maquette": maquette
+        })
+
+    for stat in liste_ru_stats:
+        lot_val = getattr(stat["n1"], "lot", None)
+        maq = maquette_dedup_par_n1.get(stat["n1"].it, 0)
+        add_to_lot(lot_val, reel=stat["reel1"], systeme=stat["systeme1"], maquette=maq)
+        add_detail(
+            lot_val, getattr(stat["n1"], "nom_complete", stat["n1"].it),
+            reel=stat["reel1"], systeme=stat["systeme1"], maquette=maq,
+        )
+
+    for op in operateurs_directs_n4:
+        add_to_lot(getattr(op, "lot", None), reel=1, systeme=1, maquette=0)
+        add_detail(getattr(op, "lot", None), getattr(op, "nom_complete", op.it), reel=1, systeme=1)
+
+    ids_deja_comptes = {o.it for o in operateurs_directs_n4}
+    operateurs_intermediaires_hors_n4 = Collaborateur.objects.filter(
+        it__in=operateurs_intermediaires_ids
+    ).exclude(it__in=ids_deja_comptes)
+
+    for op in operateurs_intermediaires_hors_n4:
+        add_to_lot(getattr(op, "lot", None), reel=1, systeme=1, maquette=0)
+        add_detail(getattr(op, "lot", None), getattr(op, "nom_complete", op.it), reel=1, systeme=1)
+
+    lot_labels = list(lot_stats.keys())
+    lot_reel_data = [lot_stats[l]["reel"] for l in lot_labels]
+    lot_systeme_data = [lot_stats[l]["systeme"] for l in lot_labels]
+    lot_maquette_data = [lot_stats[l]["maquette"] for l in lot_labels]
 
     return render(request, "declaration_effectif/N4/dashboard.html", {
         "liste_ru_stats": liste_ru_stats,
         "reel": reel,
         "systeme": systeme,
-        "maint": maint,
         "maquette": maquette,
-        "MS": systeme - maquette,
         "MR": reel - maquette,
+        "MS": systeme - maquette,
+        "maint": maint_global,
+        "non_valides": non_valides,
         "chart_labels_json": json.dumps(labels_list),
         "chart_data_json": json.dumps(data_totale_par_jour),
-        "non_valides": non_valides,
+        "operateurs_directs_n4": {"liste": operateurs_directs_n4, "reel": len(operateurs_directs_n4)},
+        "n1_directs_n4": n1_stats_directs_n4,
+        "n2_groups": n2_groups_directs_n4,
+        "n3_groups": n3_groups,
+        "nbr_n1_total": len(vrais_n1_ids),
+        "nbr_n2_total": sum(1 for n in niveau_par_it.values() if n == 2),
+        "nbr_n3_total": sum(1 for n in niveau_par_it.values() if n >= 3),
+        "lot_labels": lot_labels,
+        "lot_reel": lot_reel_data,
+        "lot_systeme": lot_systeme_data,
+        "lot_maquette": lot_maquette_data,
+        "lot_details": lot_details,
     })
 
 # ============================================================
@@ -761,55 +1070,49 @@ def affectation_N4(request):
         return redirect("login")
 
     status = request.GET.get("status", "all")
+    ru_init = request.GET.get("ru_init", "").strip()
+    ru_acceuil = request.GET.get("ru_acceuil", "").strip()
+    tab_actif = request.GET.get("tab", "tab-mes")
 
     liste_N3 = liste_N3_N4(util)
-    liste = []
+
+    tous_sous_n4 = list(liste_N3)
     for n3 in liste_N3:
-        liste.extend(Rg_Dur(n3))
-    liste.extend(liste_N1_pr_N3(util))
+        tous_sous_n4.extend(Rg_Dur(n3))
+    tous_sous_n4.extend(liste_N1_pr_N3(util))
 
-    # Historique propre au N4
-    changements_n4 = histo(util)
-    toutes_declarations_N4 = list(changements_n4.get("declarations", []))
+    # FIX PERF : une requête groupée par ensemble au lieu d'une par manager.
+    toutes_declarations_N4 = list(historique_pour(liste_N3))
+    toutes_declarations = list(historique_pour(tous_sous_n4))
 
-    # Historique cumulé de tous les niveaux sous ce N+4
-    toutes_declarations = []
-    for n in liste:
-        changements_n = histo(n)
-        toutes_declarations.extend(changements_n.get("declarations", []))
+    ensemble_onglet = toutes_declarations if tab_actif == "tab-toutes" else toutes_declarations_N4
+    ru_initiaux = sorted({d.initial for d in ensemble_onglet if d.initial})
+    ru_acceuils = sorted({d.acceuil for d in ensemble_onglet if d.acceuil})
+
+    def filtrer(liste, mot_cle):
+        return [d for d in liste if d.etat and mot_cle in str(d.etat).lower()]
 
     if status == "valide":
-        toutes_declarations_N4 = [
-            d for d in toutes_declarations_N4
-            if d.etat and "valid" in str(d.etat).lower()
-        ]
-        toutes_declarations = [
-            d for d in toutes_declarations
-            if d.etat and "valid" in str(d.etat).lower()
-        ]
+        toutes_declarations_N4 = filtrer(toutes_declarations_N4, "valid")
+        toutes_declarations = filtrer(toutes_declarations, "valid")
     elif status == "refuse":
-        toutes_declarations_N4 = [
-            d for d in toutes_declarations_N4
-            if d.etat and "refus" in str(d.etat).lower()
-        ]
-        toutes_declarations = [
-            d for d in toutes_declarations
-            if d.etat and "refus" in str(d.etat).lower()
-        ]
+        toutes_declarations_N4 = filtrer(toutes_declarations_N4, "refus")
+        toutes_declarations = filtrer(toutes_declarations, "refus")
     elif status == "non_demarrer":
-        toutes_declarations_N4 = [
-            d for d in toutes_declarations_N4
-            if d.etat and "non démarr" in str(d.etat).lower()
-        ]
-        toutes_declarations = [
-            d for d in toutes_declarations
-            if d.etat and "non démarr" in str(d.etat).lower()
-        ]
+        toutes_declarations_N4 = filtrer(toutes_declarations_N4, "non démarr")
+        toutes_declarations = filtrer(toutes_declarations, "non démarr")
+
+    if ru_init:
+        toutes_declarations_N4 = [d for d in toutes_declarations_N4 if d.initial == ru_init]
+        toutes_declarations = [d for d in toutes_declarations if d.initial == ru_init]
+
+    if ru_acceuil:
+        toutes_declarations_N4 = [d for d in toutes_declarations_N4 if d.acceuil == ru_acceuil]
+        toutes_declarations = [d for d in toutes_declarations if d.acceuil == ru_acceuil]
 
     total_N4 = len(toutes_declarations_N4)
     total_nbr = len(toutes_declarations)
 
-    # ---- Pagination pour les 2 listes ----
     paginator_n4 = Paginator(toutes_declarations_N4, 10)
     page_n4 = request.GET.get("page_n4", 1)
     page_obj_n4 = paginator_n4.get_page(page_n4)
@@ -821,17 +1124,20 @@ def affectation_N4(request):
     return render(
         request,
         "declaration_effectif/N2/affectation.html",
-    {
-        "n2": page_obj_n4,
-        "page_obj_n2": page_obj_n4,
-        "info": page_obj_n1,
-        "page_obj_n1": page_obj_n1,
-        "nbr2": total_N4,
-        "nbr": total_nbr,
-        "status": status,
-    }
+        {
+            "n2": page_obj_n4,
+            "page_obj_n2": page_obj_n4,
+            "info": page_obj_n1,
+            "page_obj_n1": page_obj_n1,
+            "nbr2": total_N4,
+            "nbr": total_nbr,
+            "status": status,
+            "ru_init": ru_init,
+            "ru_acceuil": ru_acceuil,
+            "ru_initiaux": ru_initiaux,
+            "ru_acceuils": ru_acceuils,
+        }
     )
-
 # ============================================================
 # # rederiger vers la page des N+1 sous N+4 non pas valider liste
 # ============================================================
@@ -843,14 +1149,9 @@ def validation_N4(request):
         return redirect("login")
 
     maint = timezone.localdate()
-    liste=[]
-    liste_N3 = liste_N3_N4(util)
-    for n in liste_N3:
-        liste.extend(liste_N1_pr_N3(n))
 
-    liste_n1 = Collaborateur.objects.filter(it__in=liste)
-    n1_its=set(liste_n1.values_list("it", flat=True))
-    # 2. Récupérer la liste des ITs des RU/N1 qui ONT DÉJÀ soumis leur déclaration aujourd'hui
+    n1_its = get_tous_les_n1(util)
+
     liste_declares = set(
         declaration_effectif.objects.filter(
             date=maint,
@@ -858,21 +1159,28 @@ def validation_N4(request):
         ).values_list("Ru_id", flat=True)
     )
 
-    # 3. Récupérer les collaborateurs N1 qui n'ont PAS ENCORE déclaré aujourd'hui
     non_valides = Collaborateur.objects.filter(
         it__in=n1_its
     ).exclude(
         it__in=liste_declares
-    ).select_related("departement", "unite")
+    ).select_related("departement", "unite").order_by("nom_complete")
+
+    total_non_valides = non_valides.count()
+
+    paginator = Paginator(non_valides, 20)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
 
     return render(
         request,
         "declaration_effectif/N4/validation.html",
         {
-            "non_valides": non_valides,
-            "total_non_valides": non_valides.count(),
+            "non_valides": page_obj,
+            "page_obj": page_obj,
+            "total_non_valides": total_non_valides,
         },
     )
+
 # ============================================================
 # liste des validation filtre par date pr N+2
 # ============================================================
@@ -880,19 +1188,13 @@ def validation_date_N2(request):
     time_str = request.GET.get("time", "")
     it = request.session.get("it")
 
-    # Conversion sécurisée de la chaîne en objet date Python
     query_date = parse_date(time_str) if time_str else None
-
-    # Verification si la date sélectionnée est aujourd'hui
-    # status = False si c'est aujourd'hui, True sinon
     is_today = (query_date == timezone.localdate()) if query_date else False
     status = not is_today
 
-    # 1. Récupération des RU gérés
     n1 = Ru_Rg(it)
     liste_n1 = set(n1.values_list("it", flat=True))
 
-    # 2. Récupération des RU ayant déjà fait leur déclaration
     declarations_faites = set()
     if query_date:
         declarations_faites = set(
@@ -902,16 +1204,13 @@ def validation_date_N2(request):
             ).values_list("Ru_id", flat=True)
         )
 
-    # 3. Soustraction entre les 2 sets Python (les IT non encore déclarés)
     liste_it_manquants = liste_n1 - declarations_faites
 
-    # 4. Filtrage des collaborateurs correspondants
     resultats = list(
         Collaborateur.objects.filter(it__in=liste_it_manquants)
         .values("matricule", "it", "nom_complete", "lot")
     )
 
-    # 5. Retour sous forme de réponse JSON propre
     return JsonResponse({
         "resultats": resultats,
         "status": status
@@ -927,10 +1226,8 @@ def validation_date_N3(request):
     is_today = (query_date == timezone.localdate()) if query_date else False
     status = not is_today
 
-    # 1. Récupération des N+1 gérés
-    liste_n1 = liste_N1_pr_N3(it)
+    liste_n1 = get_tous_les_n1(it)
 
-    # 2. Récupération des RU ayant déjà fait leur déclaration
     declarations_faites = set()
     if query_date:
         declarations_faites = set(
@@ -940,10 +1237,8 @@ def validation_date_N3(request):
             ).values_list("Ru_id", flat=True)
         )
 
-    # 3. Soustraction entre les 2 sets Python
     liste_it_manquants = liste_n1 - declarations_faites
 
-    # 4. Filtrage des collaborateurs correspondants
     resultats = list(
         Collaborateur.objects.filter(it__in=liste_it_manquants)
         .values("matricule", "it", "nom_complete", "lot")
@@ -956,7 +1251,6 @@ def validation_date_N3(request):
 
 
 def get_badge_class(etat):
-    """Retourne la classe CSS du badge selon le texte de l'état."""
     if not etat:
         return "badge-en-attente"
     etat_lower = str(etat).lower()
@@ -985,8 +1279,6 @@ def affectation_HRBP(request):
         Q(dpt_init__in=departements) | Q(dpt_acceuil__in=departements)
     ).exclude(etat="Terminé")
 
-    # Filtrage fait en base (queryset), pas en Python sur une liste déjà chargée,
-    # pour que la pagination reste efficace.
     if status == "valide":
         affectation = affectation.filter(etat__icontains="valid")
     elif status == "refuse":
@@ -994,17 +1286,14 @@ def affectation_HRBP(request):
     elif status == "non_demarrer":
         affectation = affectation.filter(etat__icontains="non démarr")
 
-    # Filtrage par département (initial ou accueil) parmi le périmètre du HRBP
     if dpt_filtre != "all" and dpt_filtre in departements:
         affectation = affectation.filter(
             Q(dpt_init__abreviation=dpt_filtre) | Q(dpt_acceuil__abreviation=dpt_filtre)
         )
-    # --- Pagination ---
     paginator = Paginator(affectation, 20)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    # --- Ajout de la classe badge calculée uniquement pour les lignes de la page affichée ---
     for a in page_obj:
         a.badge_class = get_badge_class(a.etat)
 
@@ -1032,12 +1321,11 @@ def responsables_ru_sans_declaration_du_jour(request):
         .values_list("ru_it_id", flat=True)
         .distinct()
     )
-    
 
     operateur = Collaborateur.objects.filter(
         departement_id__in=departements
     ).exclude(it__in=responsable)
-    
+
     ru_ids = list(
         operateur
         .exclude(ru_it_id__isnull=True)
@@ -1057,16 +1345,15 @@ def responsables_ru_sans_declaration_du_jour(request):
 
     ru = Collaborateur.objects.filter(it__in=ru_ids_sans_declaration)
 
-    # --- Pagination ---
-    paginator = Paginator(ru, 20)  # 20 RU par page, ajustable
+    paginator = Paginator(ru, 20)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
     return render(request, "declaration_effectif/HRBP/declaration.html", {
-        "ru": page_obj,             # objet paginé, itérable dans le template comme avant
-        "non_valides": ru,          # total réel (non paginé) pour le KPI "Non Validés"
-        "page_obj": page_obj,       # pour les contrôles de pagination dans le template
-        "departements": departements_qs,  # <-- ajouté : queryset d'objets Departement pour le <select>
+        "ru": page_obj,
+        "non_valides": ru,
+        "page_obj": page_obj,
+        "departements": departements_qs,
         "date": today,
     })
 
@@ -1083,14 +1370,13 @@ def filter_date2(request):
         date_selectionnee = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         return JsonResponse({"resultats": [], "status": False})
-    
+
     is_today = (date_selectionnee == timezone.localdate()) if date_selectionnee else False
     status = not is_today
 
     departements_qs = Departement.objects.filter(HRBP_id=it)
     departements = list(departements_qs.values_list("abreviation", flat=True))
 
-    # Si un département précis est demandé, on restreint dessus
     if dept:
         departements = [d for d in departements if d == dept]
 
@@ -1114,7 +1400,6 @@ def filter_date2(request):
         .distinct()
     )
 
-    # Déclarations faites à LA DATE SÉLECTIONNÉE (pas today)
     ru_avec_declaration = set(
         declaration_effectif.objects.filter(date=date_selectionnee)
         .values_list("Ru_id", flat=True)
@@ -1154,23 +1439,15 @@ def validation_date_N4(request):
     time_str = request.GET.get("time", "")
     it = request.session.get("it")
 
-    # Conversion sécurisée de la chaîne en objet date Python
     query_date = parse_date(time_str) if time_str else None
-
-    # Vérification si la date sélectionnée est aujourd'hui
-    # status = False si c'est aujourd'hui, True sinon
     is_today = (query_date == timezone.localdate()) if query_date else False
     status = not is_today
 
-    # 1. Récupération des N+1 gérés (via les N+3 sous ce N+4)
-    liste = []
-    liste_N3 = liste_N3_N4(it)
-    for n in liste_N3:
-        liste.extend(liste_N1_pr_N3(n))
+    # FIX : utilise get_tous_les_n1 (cohérent avec validation_N4 et
+    # validation_date_N3), plutôt que liste_N3_N4 + liste_N1_pr_N3
+    # qui ratait les N+1 imbriqués plus profondément.
+    liste_n1 = get_tous_les_n1(it)
 
-    liste_n1 = set(liste)
-
-    # 2. Récupération des RU ayant déjà fait leur déclaration
     declarations_faites = set()
     if query_date:
         declarations_faites = set(
@@ -1180,16 +1457,13 @@ def validation_date_N4(request):
             ).values_list("Ru_id", flat=True)
         )
 
-    # 3. Soustraction entre les 2 sets Python (les IT non encore déclarés)
     liste_it_manquants = liste_n1 - declarations_faites
 
-    # 4. Filtrage des collaborateurs correspondants
     resultats = list(
         Collaborateur.objects.filter(it__in=liste_it_manquants)
         .values("matricule", "it", "nom_complete", "lot")
     )
 
-    # 5. Retour sous forme de réponse JSON propre
     return JsonResponse({
         "resultats": resultats,
         "status": status
@@ -1206,7 +1480,7 @@ def changement_dpt(request):
         historique.objects
         .filter(Q(dpt_init=departement) | Q(dpt_acceuil=departement))
         .exclude(etat="Terminé")
-        .order_by("-id")  # ordre stable requis pour la pagination
+        .order_by("-id")
     )
 
     if status == "valide":
@@ -1218,7 +1492,7 @@ def changement_dpt(request):
 
     nbr = changement.count()
 
-    paginator = Paginator(changement, 20) 
+    paginator = Paginator(changement, 20)
     try:
         page_obj = paginator.page(page_number)
     except PageNotAnInteger:

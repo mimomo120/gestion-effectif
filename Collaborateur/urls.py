@@ -18,4 +18,5 @@ urlpatterns = [
             path("rechercher-N3-par-N4", views.rechercher_N3_par_N4, name="rechercher_N3_par_N4"),
             path("collaborateurs/", views.collaborateur, name="collaborateur"),
             path("collaborateurs/api/", views.collaborateur_api, name="collaborateur_api"),
+            path("collaborateurs-ru/<str:ru_it>/", views.collaborateurs_par_ru, name="collaborateurs_par_ru"),
             ]

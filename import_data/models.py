@@ -27,6 +27,7 @@ class histo_import(models.Model):
     nb_supprimes = models.PositiveIntegerField(default=0)
     nb_ignores = models.PositiveIntegerField(default=0)
     nb_erreurs = models.PositiveIntegerField(default=0)
+    duree = models.FloatField(null=True, blank=True)
 
     class Meta:
         ordering = ["-date"]

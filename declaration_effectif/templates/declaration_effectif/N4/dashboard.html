@@ -2,22 +2,39 @@
 {% load static %}
 
 {% block title %}Tableau de bord{% endblock %}
+
 {% block css %}
 <link rel="stylesheet" href="{% static 'utilisateur/css/N2/dashboard.css' %}">
+<style>
+    /* Styles correctifs spécifiques sans modifier le CSS de base */
+    .chart-container--wide {
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    .ru-card--full {
+        width: 100%;
+        margin-bottom: 2rem;
+    }
+
+    .chart-scroll-inner {
+        height: 100%;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
 <div class="page-container">
-    <header class="header">
-        <h1>Tableau de bord</h1>
+    <!-- En-tête du tableau de bord -->
+    <header class="dashboard-header">
+        <h1 class="dashboard-title">Tableau de bord</h1>
         <div class="time">
-            <h5 id="time" aria-live="polite">{{ maint }}</h5>
+            <span id="time" class="date-picker-badge" aria-live="polite">{{ maint }}</span>
         </div>
     </header>
 
     <!-- ===== STATISTIQUES GÉNÉRALES ===== -->
     <div class="statistique-cards">
-        <!-- Carte 1: Effectif Réel -->
         <div class="stat-card card-reel">
             <h3>Effectif réel</h3>
             <div class="stat-valeur-group">
@@ -30,7 +47,6 @@
                 {% endif %}
         </div>
 
-        <!-- Carte 2: Effectif Système -->
         <div class="stat-card card-systeme">
             <h3>Effectif système</h3>
             <div class="stat-valeur-group">
@@ -43,7 +59,6 @@
                 {% endif %}
         </div>
 
-        <!-- Carte 3: Effectif Maquette -->
         <div class="stat-card card-maquette">
             <h3>Effectif maquette</h3>
             <div class="stat-valeur-group">
@@ -52,7 +67,6 @@
             </div>
         </div>
 
-        <!-- Carte 4: RU non validés -->
         <div class="stat-card card-warning">
             <h3>RU non validés</h3>
             <div class="stat-valeur-group">
@@ -62,7 +76,7 @@
         </div>
     </div>
 
-    <!-- ===== GRAPHIQUES ===== -->
+    <!-- ===== GRAPHIQUES : Évolution + Réel-Système-Maquette par LOT ===== -->
     <div class="charts-grid">
         <div class="ru-card">
             <h4>Évolution Réel</h4>
@@ -70,9 +84,20 @@
                 <canvas id="chart-global"></canvas>
             </div>
         </div>
+
         <div class="ru-card">
-            <h4>Réel vs Système vs Maquette par RU</h4>
+            <h4>Réel vs Système vs Maquette par lot</h4>
             <div class="chart-container">
+                <canvas id="chart-lot"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== GRAPHIQUE PAR RU (Barres normales avec défilement horizontal) ===== -->
+    <div class="ru-card ru-card--full">
+        <h4>Réel vs Système vs Maquette par RU</h4>
+        <div class="chart-container chart-container--wide">
+            <div class="chart-scroll-inner">
                 <canvas id="chart-comparatif"></canvas>
             </div>
         </div>
@@ -118,7 +143,6 @@
                         <td>{% if ru.unite and ru.unite != "None" %}{{ ru.unite }}{% else %}-{% endif %}</td>
                         <td>{{ ru.n1.departement|default:"-" }}</td>
 
-                        <!-- Effectif Réel -->
                         <td>
                             <div class="cell-stat-container">
                                 <span class="valeur-chiffre">{{ ru.reel1|default:"0" }}</span>
@@ -129,7 +153,6 @@
                             </div>
                         </td>
 
-                        <!-- Effectif Système -->
                         <td>
                             <div class="cell-stat-container">
                                 <span class="valeur-chiffre">{{ ru.systeme1|default:"0" }}</span>
@@ -140,14 +163,12 @@
                             </div>
                         </td>
 
-                        <!-- Effectif Maquette -->
                         <td>
                             <div class="cell-stat-container">
                                 <span class="valeur-chiffre">{{ ru.maquette1|default:"0" }}</span>
                             </div>
                         </td>
 
-                        <!-- Responsable -->
                         <td>{{ ru.n1.ru_it.nom_complete|default:"-" }}</td>
                     </tr>
                     {% empty %}
@@ -159,7 +180,6 @@
             </table>
         </div>
 
-        <!-- Pagination -->
         <div class="pagination-bar" id="pagination-bar">
             <span class="pagination-info" id="pagination-info"></span>
             <div class="pagination-controls">
@@ -175,6 +195,7 @@
 {% block script %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+    /* ---- Graphique 1 : Évolution Réel sur 7 jours ---- */
     new Chart(document.getElementById("chart-global"), {
         type: "line",
         data: {
@@ -198,7 +219,52 @@
     }
     });
 
-    new Chart(document.getElementById("chart-comparatif"), {
+    /* ---- Graphique 2 : Réel vs Système vs Maquette PAR LOT (Barres normales) ---- */
+    new Chart(document.getElementById("chart-lot"), {
+        type: "bar",
+        data: {
+            labels: {{ lot_labels| safe }},
+        datasets: [
+        {
+            label: "Réel",
+            data: {{ lot_reel| safe }},
+        backgroundColor: "#dc2626",
+        barThickness: 18,
+                },
+        {
+            label: "Système",
+            data: {{ lot_systeme| safe }},
+        backgroundColor: "#16a34a",
+        barThickness: 18,
+                },
+        {
+            label: "Maquette",
+            data: {{ lot_maquette| safe }},
+        backgroundColor: "#f59e0b",
+        barThickness: 18,
+                }
+    ]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true, position: "top" } },
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: { display: true, text: "Effectifs" }
+            }
+        }
+    }
+    });
+
+    /* ---- Graphique 3 : Réel vs Système vs Maquette PAR RU (Barres normales) ---- */
+    const nbRu = {{ liste_ru_stats| length }};
+    const largeurCanvasRu = Math.max(900, nbRu * 45);
+    const canvasRu = document.getElementById("chart-comparatif");
+    canvasRu.parentElement.style.width = largeurCanvasRu + "px";
+
+    new Chart(canvasRu, {
         type: "bar",
         data: {
             labels: [
@@ -207,41 +273,43 @@
         datasets: [
         {
             label: "Réel",
-            data: [{% for stat in liste_ru_stats %}{{ stat.reel1 }}, {% endfor %}],
+            data: [{% for stat in liste_ru_stats %}{{ stat.reel1 |default:0 }}, {% endfor %}],
         backgroundColor: "#dc2626",
-        barThickness: 16
+        barThickness: 12,
                 },
         {
             label: "Système",
-            data: [{% for stat in liste_ru_stats %}{{ stat.systeme1 }}, {% endfor %}],
+            data: [{% for stat in liste_ru_stats %}{{ stat.systeme1 |default:0 }}, {% endfor %}],
         backgroundColor: "#16a34a",
-        barThickness: 16
+        barThickness: 12,
                 },
         {
             label: "Maquette",
-            data: [{% for stat in liste_ru_stats %}{{ stat.maquette1 }}, {% endfor %}],
+            data: [{% for stat in liste_ru_stats %}{{ stat.maquette1 |default:0 }}, {% endfor %}],
         backgroundColor: "#f59e0b",
-        barThickness: 16
+        barThickness: 12,
                 }
             ]
         },
         options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-            legend: { display: true, position: "top" }
-        },
+        plugins: { legend: { display: true, position: "top" } },
         scales: {
-            y: { beginAtZero: true }
+            x: {
+                ticks: { autoSkip: false, maxRotation: 60, minRotation: 60 }
+            },
+            y: {
+                beginAtZero: true,
+                title: { display: true, text: "Effectifs" }
+            }
         }
     }
     });
 </script>
 
 <script>
-    /* =========================================================
-       RECHERCHE ET PAGINATION DYNAMIQUES
-       ========================================================= */
+    /* ---- RECHERCHE ET PAGINATION DYNAMIQUES ---- */
     document.addEventListener("DOMContentLoaded", function () {
         const rechercheInput = document.getElementById("recherche-ru");
         const tbody = document.getElementById("corps-tableau-ru");
@@ -257,7 +325,6 @@
         const pagesEl = document.getElementById("pagination-pages");
         const barreEl = document.getElementById("pagination-bar");
 
-        // Si la base de données ne renvoie aucun enregistrement, on masque la barre et on stoppe le JS de filtre
         if (toutesLesLignes.length === 0) {
             if (barreEl) barreEl.style.display = "none";
             return;
@@ -281,7 +348,6 @@
         }
 
         function afficher() {
-            // Suppression de la ligne de résultat de recherche vide dynamique si elle existe
             const ligneVideExistante = tbody.querySelector(".empty-row-recherche");
             if (ligneVideExistante) ligneVideExistante.remove();
 
@@ -300,7 +366,6 @@
                 ligne.style.display = aAfficher.has(ligne) ? "" : "none";
             });
 
-            // Affiche le message de recherche vide uniquement si une recherche active ne donne rien
             if (total === 0 && rechercheInput.value.trim() !== "") {
                 const ligneVide = document.createElement("tr");
                 ligneVide.className = "empty-row-recherche";

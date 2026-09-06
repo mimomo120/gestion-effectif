@@ -9,7 +9,10 @@ from declaration_effectif.models import declaration_effectif ,Alert ,historique
 from django.http import JsonResponse
 from datetime import date
 from declaration_effectif.views import difference , histo_aff
-from Collaborateur.views import rec ,Ru_Rg,liste_N1_pr_N3,Rg_Dur ,reelEff ,SystEff , get_effectif_reel_ids
+from Collaborateur.views import (
+    rec, Ru_Rg, liste_N1_pr_N3, Rg_Dur, reelEff, SystEff,
+    get_effectif_reel_ids, get_managers_its,
+)
 from django.db.models import Sum ,F , OuterRef, Subquery
 from .decorators import role_required
 from datetime import timedelta
@@ -43,7 +46,7 @@ def login_view(request):
                 request.session["role"] = utilis.role
                 request.session["nom"] = collab.nom_complete
                 roles_disponibles = []
-    
+
                 if utilis.N1 :
                     roles_disponibles.append("N+1")
                 if utilis.N2 :
@@ -71,10 +74,10 @@ def login_view(request):
                     return redirect("dashboard_N2")
                 elif utilis.role == "N+3":
                     return redirect("Dashboard_N3")
-                    
+
                 elif utilis.role == "N+4":
                     return redirect('page_N4')
-                
+
                 elif utilis.role == "SUPER":
                     return redirect('SUPER')
                 elif utilis.role == "HRBP":
@@ -103,24 +106,16 @@ def login_view(request):
                 "utilisateur/login.html")
 
 
-# ============================================================
-# register_view : crée un compte utilisateur pour un IT donné en
-# déduisant automatiquement son rôle (N+1 à N+4) à partir de sa
-# position dans la hiérarchie des Collaborateur (ru_it).
-# ============================================================
-
 def register_view(request):
     if request.method == "POST":
         it = request.POST.get('it')
         password = request.POST.get('password')
 
-        # 1. Validation des champs obligatoires
         if not it or not password:
             return render(request, "utilisateur/register.html", {
                 'message': "Vous devez remplir tous les champs."
             })
 
-        # 2. Vérification de l'existence dans le modèle Collaborateur
         try:
             col = Collaborateur.objects.get(it=it)
         except Collaborateur.DoesNotExist:
@@ -128,19 +123,16 @@ def register_view(request):
                 'message': "Ce collaborateur n'existe pas dans la base de données."
             })
 
-        # 3. Vérification si l'utilisateur est déjà inscrit
         if utilisateur.objects.filter(it=col).exists():
             return render(request, "utilisateur/register.html", {
                 'message': "Cet utilisateur est déjà enregistré."
             })
 
-        # 4. Calcul de la hiérarchie (utilisation correcte de 'it')
         role_calcule, n1, n2, n3, n4 = determiner_hierarchie(it)
 
         if not role_calcule:
             return render(request, "utilisateur/accesInterdi.html")
 
-        # 5. Création ou mise à jour avec l'instance 'col'
         util, created = utilisateur.objects.update_or_create(
     it=col,
     defaults={
@@ -161,32 +153,27 @@ def register_view(request):
     return render(request, "utilisateur/register.html")
 
 def determiner_hierarchie(it_val):
-    """Calcule le rôle et les flags N1..N4 pour un identifiant IT."""
     managers_ids = set(
         Collaborateur.objects.exclude(ru_it_id__isnull=True)
         .exclude(ru_it_id=F('it'))
         .values_list("ru_it_id", flat=True)
     )
-    operateurs = Collaborateur.objects.exclude(it__in=managers_ids)
+    operateurs = Collaborateur.objects.exclude(it__in=managers_ids).exclude(lot__in=["C", "E"])
 
-    # Niveau N1
     liste_N1 = set(operateurs.values_list("ru_it_id", flat=True))
     liste1 = Collaborateur.objects.filter(it__in=liste_N1)
     l1 = set(liste1.values_list("it", flat=True))
 
-    # Niveau N2
     liste_N2 = set(liste1.values_list("ru_it_id", flat=True))
     liste_N2.discard(None)
     liste2 = Collaborateur.objects.filter(it__in=liste_N2)
     l2 = set(liste2.values_list("it", flat=True))
 
-    # Niveau N3
     liste_N3 = set(liste2.values_list("ru_it_id", flat=True))
     liste_N3.discard(None)
     liste3 = Collaborateur.objects.filter(it__in=liste_N3)
     l3 = set(liste3.values_list("it", flat=True))
 
-    # Niveau N4
     liste_N4 = set(liste3.values_list("ru_it_id", flat=True))
     liste_N4.discard(None)
     liste4 = Collaborateur.objects.filter(it__in=liste_N4)
@@ -209,13 +196,10 @@ def determiner_hierarchie(it_val):
     return role_calcule, n1_flag, n2_flag, n3_flag, n4_flag
 
 # ============================================================
-# tableau : construit le tableau de bord d'un N+1 (RU) — effectif
-# système vs réel vs maquette, répartition par lot, et données du
-# graphique des 7 derniers jours de déclaration.
+# tableau : dashboard N+1
 # ============================================================
 @role_required('N+1')
 def tableau(request):
-    # 1. Récupération des informations du RU
     it = request.session.get("it")
     if not it:
         return HttpResponseForbidden("Session expirée, veuillez vous reconnecter.")
@@ -225,23 +209,22 @@ def tableau(request):
     except Collaborateur.DoesNotExist:
         return HttpResponseForbidden("Collaborateur introuvable.")
 
-    # 2. Opérateurs Système & Réel
-    operateurs_systeme = SystEff(it)
+    managers_its = get_managers_its()
+
+    operateurs_systeme = SystEff(it, managers_its=managers_its)
     syste = operateurs_systeme.values('it').distinct().count()
 
-    operateurs_reel = reelEff(it)
+    operateurs_reel = reelEff(it, managers_its=managers_its)
     counts_qs = operateurs_reel.values('lot').annotate(total=Count('it', distinct=True))
     counts_par_lot = {r['lot']: r['total'] for r in counts_qs}
     counts_ls = operateurs_systeme.values('lot').annotate(total=Count('it', distinct=True))
     counts_lot_ls = {r['lot']: r['total'] for r in counts_ls}
     reel = operateurs_reel.values('it').distinct().count()
 
-    # Différences (Système vs Réel)
     diff = difference(request)
     systeme = diff["systeme1"]
     reel1 = diff["reel1"]
 
-    # 3. Récupération de la Maquette & Unité
     unite = None
     maquette = 0
     A = E = P = C = 0
@@ -264,7 +247,6 @@ def tableau(request):
                 P = unite.P or 0
                 C = unite.C or 0
 
-    # 4. Calculs par Lots
     Pr = counts_par_lot.get("P", 0)
     Ar = counts_par_lot.get("A", 0)
     OLr = counts_par_lot.get("O", 0)
@@ -277,7 +259,6 @@ def tableau(request):
     Es = counts_lot_ls.get("E", 0)
     Cs = counts_lot_ls.get("C", 0)
 
-    # Écarts vs Maquette
     diff_r_m = reel - maquette
     diff_s_m =  syste - maquette
 
@@ -287,15 +268,15 @@ def tableau(request):
     dates = [today - timedelta(days=i) for i in range(6, -1, -1)]
     labels_list = [d.strftime('%d %b') for d in dates]
 
+    # FIX PERF : managers_its transmis à chaque appel plutôt que
+    # recalculé en interne par reelEff() pour chacun des 7 jours.
     data_list = [
-        reelEff(it, date_reference=d).values('it').distinct().count()
+        reelEff(it, date_reference=d, managers_its=managers_its).values('it').distinct().count()
         for d in dates
     ]
 
-    # 5. Derniers mouvements effectués par le RU
     derniers_mouvements = derniers_mouvements_respo(it, limite=10)
 
-    # 7. Rendu Final
     context = {
         'chart_labels': json.dumps(labels_list),
         'chart_data': json.dumps(data_list),
@@ -323,54 +304,62 @@ def tableau(request):
     return render(request, "declaration_effectif/N1/dashboard_N1.html", context)
 
 
-# ============================================================
-# verifier : endpoint AJAX qui vérifie si un IT donné correspond
-# bien à un utilisateur ayant le rôle N+1 (utilisé typiquement pour
-# valider un champ de formulaire de saisie de RU).
-# ============================================================
 def verifier(request):
     it=request.GET.get("q","")
     if it:
         nbr=utilisateur.objects.filter(it_id=it,role="N+1").exists()
         return JsonResponse({"valide": nbr})
-    
-# ============================================================
-# deconnecter : vide la session et renvoie vers la page de login.
-# ============================================================
+
 def deconnecter(request):
     request.session.flush()
     return redirect("login")
 
 # ============================================================
-# dashboard_rg : tableau de bord consolidé d'un N+2 (RG) — agrège
-# les effectifs système/réel/maquette de tous les RU (N+1) sous sa
-# responsabilité, et compte les RU n'ayant pas encore déclaré.
+# dashboard_N2
 # ============================================================
 @role_required("N+2")
 def dashboard_N2(request):
     it = request.session.get("it")
     liste_ru = Ru_Rg(it)
     ru_its = set(liste_ru.values_list("it", flat=True))
-    operateur=Collaborateur.objects.filter(ru_it=it,lot__in=["A","O","P"]).exclude(it__in=ru_its)
-    nbr_RU=liste_ru.count()
-    nbr_op=operateur.count()
+
+    # FIX PERF : calculé une seule fois et transmis à toutes les
+    # SystEff/reelEff de la boucle plus bas, au lieu d'être recalculé
+    # à chaque itération (chaque RU du périmètre).
+    managers_its = get_managers_its()
+
+    operateur = Collaborateur.objects.filter(ru_it=it).exclude(it__in=ru_its)
+    nbr_RU = liste_ru.count()
+    nbr_op = operateur.count()
+    nbr_cadre = (
+        Collaborateur.objects.filter(ru_it=it, lot__in=["C", "E"])
+        .exclude(it__in=ru_its)
+        .count()
+    )
 
     unite_abrs = set(liste_ru.values_list("unite_id", flat=True))
     maint = timezone.localdate()
     today = timezone.now().date()
     dates = [today - timedelta(days=i) for i in range(6, -1, -1)]
-    labels_list = [d.strftime('%d %b') for d in dates]
+    labels_list = [d.strftime("%d %b") for d in dates]
 
     data_list = []
     for d in dates:
         total_jour = 0
         for ru in ru_its:
-            total_jour += reelEff(ru, date_reference=d).values('it').distinct().count()
+            total_jour += (
+                reelEff(ru, date_reference=d, managers_its=managers_its).values("it").distinct().count()
+            )
+        total_jour += (
+            reelEff(it, date_reference=d, managers_its=managers_its).values("it").distinct().count()
+            + nbr_RU
+        )
         data_list.append(total_jour)
 
     liste_declares = set(
-        declaration_effectif.objects.filter(date=maint, Ru_id__in=ru_its)
-        .values_list("Ru_id", flat=True)
+        declaration_effectif.objects.filter(
+            date=maint, Ru_id__in=ru_its
+        ).values_list("Ru_id", flat=True)
     )
 
     liste_ru_avec_operateurs = set(
@@ -378,51 +367,21 @@ def dashboard_N2(request):
         .values_list("ru_it_id", flat=True)
         .distinct()
     )
-    non_valides = (
-        Collaborateur.objects.filter(it__in=liste_ru_avec_operateurs)
-        .exclude(it__in=liste_declares)
-        .count()
-    )
+    non_valides = len(liste_ru_avec_operateurs - liste_declares)
+
     unites_map = {
         u.abreviation: (u.maquette or 0)
         for u in Unite.objects.filter(abreviation__in=unite_abrs)
     }
     maquette_total = sum(unites_map.values())
 
-    systeme_counts = dict(
-        Collaborateur.objects.filter(ru_it_id__in=ru_its)
-        .values('ru_it_id')
-        .annotate(total=Count('it'))
-        .values_list('ru_it_id', 'total')
-    )
-
-    dernieres_dates = dict(
-        declaration_effectif.objects.filter(Ru_id__in=ru_its)
-        .values('Ru_id')
-        .annotate(max_date=Max('date'))
-        .values_list('Ru_id', 'max_date')
-    )
-
-    q_conditions = Q()
-    for ru_id, max_date in dernieres_dates.items():
-        if max_date:
-            q_conditions |= Q(Ru_id=ru_id, date=max_date)
-
-    reels_counts = {}
-    if q_conditions:
-        reels_counts = dict(
-            declaration_effectif.objects.filter(q_conditions, nature__in=["A", "V"])
-            .values('Ru_id')
-            .annotate(total=Count('id'))
-            .values_list('Ru_id', 'total')
-        )
     NB_MOUVEMENTS_PAR_RU = 5
-
     toutes_declarations = (
-        declaration_effectif.objects
-        .filter(Ru_id__in=ru_its, nature__in=["D", "C", "A"])
-        .select_related('collaborateur_it', 'nv_Ru')
-        .order_by('Ru_id', '-date', '-id')
+        declaration_effectif.objects.filter(
+            Ru_id__in=ru_its, nature__in=["D", "C", "A"]
+        )
+        .select_related("collaborateur_it", "nv_Ru")
+        .order_by("Ru_id", "-date", "-id")
     )
 
     mouvements_par_ru = {}
@@ -431,66 +390,140 @@ def dashboard_N2(request):
         if ru_id not in mouvements_par_ru:
             mouvements_par_ru[ru_id] = []
         if len(mouvements_par_ru[ru_id]) < NB_MOUVEMENTS_PAR_RU:
-            mouvements_par_ru[ru_id].append({
-                "collaborateur": d.collaborateur_it.nom_complete if d.collaborateur_it else None,
-                "collaborateur_it": d.collaborateur_it.it if d.collaborateur_it else None,
-                "nature": d.nature,
-                "nature_display": d.get_nature_display(),
-                "nouveau_responsable": d.nv_Ru.nom_complete if d.nv_Ru else None,
-                "date": d.date.strftime("%d/%m/%Y"),
-            })
+            mouvements_par_ru[ru_id].append(
+                {
+                    "collaborateur": (
+                        d.collaborateur_it.nom_complete
+                        if d.collaborateur_it
+                        else None
+                    ),
+                    "collaborateur_it": (
+                        d.collaborateur_it.it if d.collaborateur_it else None
+                    ),
+                    "nature": d.nature,
+                    "nature_display": d.get_nature_display(),
+                    "nouveau_responsable": (
+                        d.nv_Ru.nom_complete if d.nv_Ru else None
+                    ),
+                    "date": d.date.strftime("%d/%m/%Y"),
+                }
+            )
 
     liste_ru_stats = []
     effectif_syste = 0
     effectif_reel = 0
 
+    # FIX PERF : managers_its transmis, au lieu d'être recalculé
+    # (1 requête complète sur Collaborateur) à chaque RU de la boucle.
     for a in liste_ru:
-        systeme = SystEff(a.it).count()
+        systeme = SystEff(a.it, managers_its=managers_its).count()
         effectif_syste += systeme
-        reel = reelEff(a.it).count()
-
+        reel = reelEff(a.it, managers_its=managers_its).count()
         effectif_reel += reel
-
         maquette = unites_map.get(a.unite_id, 0)
+        mr = reel - maquette
+        ms = systeme - maquette
 
-        liste_ru_stats.append({
-            "matricule": a.matricule,
-            "it": a.it,
-            "nom_complete": a.nom_complete,
-            "lot": a.lot,
-            "unite": a.unite_id,
-            "dpt": a.departement_id,
-            "reel": reel,
-            "systeme": systeme,
-            "maquette": maquette,
-            "MS": systeme - maquette,
-            "MR": reel - maquette,
-            "derniers_mouvements": mouvements_par_ru.get(a.it, []),
-        })
+        liste_ru_stats.append(
+            {
+                "matricule": a.matricule,
+                "it": a.it,
+                "nom_complete": a.nom_complete,
+                "lot": a.lot,
+                "unite": a.unite_id,
+                "dpt": a.departement_id,
+                "reel": reel,
+                "systeme": systeme,
+                "maquette": maquette,
+                "MS": ms,
+                "MR": mr,
+                "MS_abs": abs(ms),
+                "MR_abs": abs(mr),
+                "derniers_mouvements": mouvements_par_ru.get(a.it, []),
+            }
+        )
 
-    MR = effectif_reel - maquette_total
-    MS = effectif_syste - maquette_total
+    tous_collabs_qs = Collaborateur.objects.filter(
+        Q(ru_it__in=ru_its) | Q(ru_it=it) | Q(it__in=ru_its)
+    ).distinct()
+
+    lots_distincts = sorted(
+        list(
+            set(
+                tous_collabs_qs.exclude(lot__isnull=True)
+                .exclude(lot="")
+                .values_list("lot", flat=True)
+            )
+        )
+    )
+
+    lot_stats = {
+        lot: {"systeme": 0, "reel": 0, "maquette": 0} for lot in lots_distincts
+    }
+
+    for c in tous_collabs_qs:
+        if c.lot in lot_stats:
+            lot_stats[c.lot]["systeme"] += 1
+
+    collabs_reels_its = set()
+    for ru in ru_its:
+        collabs_reels_its.update(
+            reelEff(ru, managers_its=managers_its).values_list("it", flat=True).distinct()
+        )
+    collabs_reels_its.update(
+        reelEff(it, managers_its=managers_its).values_list("it", flat=True).distinct()
+    )
+
+    for c in Collaborateur.objects.filter(it__in=collabs_reels_its):
+        if c.lot in lot_stats:
+            lot_stats[c.lot]["reel"] += 1
+
+    for ru in liste_ru:
+        if ru.lot in lot_stats:
+            lot_stats[ru.lot]["reel"] += 1
+
+    for u in Unite.objects.filter(abreviation__in=unite_abrs):
+        lot_unite = u.lot if hasattr(u, "lot") else None
+        if lot_unite and lot_unite in lot_stats:
+            lot_stats[lot_unite]["maquette"] += u.maquette or 0
+
+    lot_labels = list(lot_stats.keys())
+    lot_reel_data = [lot_stats[l]["reel"] for l in lot_labels]
+    lot_systeme_data = [lot_stats[l]["systeme"] for l in lot_labels]
+    lot_maquette_data = [lot_stats[l]["maquette"] for l in lot_labels]
+
+    effectif_reel_total = effectif_reel + reelEff(it, managers_its=managers_its).count() + nbr_RU
+    effectif_syste_total = effectif_syste + nbr_op + nbr_RU
+
+    MR = effectif_reel_total - maquette_total
+    MS = effectif_syste_total - maquette_total
 
     context = {
-        'chart_labels': json.dumps(labels_list),
-        'chart_data': json.dumps(data_list),
-        "effectif_reel": effectif_reel,
-        "effectif_syste": effectif_syste,
+        "chart_labels": json.dumps(labels_list),
+        "chart_data": json.dumps(data_list),
+        "lot_labels": json.dumps(lot_labels),
+        "lot_reel_data": json.dumps(lot_reel_data),
+        "lot_systeme_data": json.dumps(lot_systeme_data),
+        "lot_maquette_data": json.dumps(lot_maquette_data),
+        "effectif_reel": effectif_reel_total,
+        "effectif_syste": effectif_syste_total,
         "maquette_total": maquette_total,
         "non_valides": non_valides,
         "liste_ru_stats": liste_ru_stats,
         "MR": MR,
         "MS": MS,
+        "MR_abs": abs(MR),
+        "MS_abs": abs(MS),
         "maint": maint,
+        "nbr_RU": nbr_RU,
+        "nbr_op": nbr_op,
+        "nbr_cadre": nbr_cadre,
+        "op": nbr_op - nbr_cadre,
     }
 
-    return render(request, "declaration_effectif/N2/dashboard_N2.html", context)
-
-# ============================================================
-# alertes : endpoint AJAX appelé quand un utilisateur ouvre son
-# panneau de notifications — marque toutes ses alertes non lues
-# comme lues.
-# ============================================================
+    return render(
+        request, "declaration_effectif/N2/dashboard_N2.html", context
+    )
 
 def alerts(request):
     it = request.session.get("it")
@@ -498,12 +531,6 @@ def alerts(request):
     alertes.update(lu=True)
     return JsonResponse({"statu": "true"})
 
-# ============================================================
-# changer_role : bascule le rôle actif de l'utilisateur (parmi ceux
-# qu'il a le droit d'endosser, stockés en session) et le renvoie à
-# la page de login pour être redirigé vers son nouveau tableau de
-# bord.
-# ============================================================
 def changer_role(request, nouveau_role):
     roles_dispo = request.session.get('roles_disponibles', [])
     it=request.session.get("it")
@@ -519,12 +546,6 @@ def changer_role(request, nouveau_role):
     return redirect(request.META.get('HTTP_REFERER', 'ru'))
 
 
-# ============================================================
-# notifications : context processor global (déclaré dans
-# TEMPLATES/OPTIONS/context_processors) — injecte automatiquement
-# la liste des notifications et leur compteur non-lu dans TOUS les
-# templates rendus, sans que chaque vue ait à le faire explicitement.
-# ============================================================
 def notifications(request):
     it = request.session.get("it")
     alert = Alert.objects.filter(recepteur=it)
@@ -637,7 +658,7 @@ def modifier_user(request, id):
 
     if not role_final:
         return JsonResponse({"error": "Impossible de déterminer un rôle pour cet utilisateur."}, status=400)
-    
+
     util.role = role_final
     util.ADMIN = 1 if role_final == "ADMIN" else 0
     util.HRBP = 1 if role_final == "HRBP" else 0
@@ -813,7 +834,7 @@ def dashboard_rh(request):
     ).order_by("-date")[:10]
 
     today = timezone.now().date()
-    
+
     context = {
         "departements": departements,
         "colSyst": colSyst,
@@ -838,9 +859,6 @@ def dashboard_rh(request):
 
 
 def derniers_mouvements_respo(it_respo, limite=10):
-    """
-    Fonction utilitaire : retourne une liste de dicts (pas de JsonResponse).
-    """
     if not it_respo:
         return []
 
@@ -890,7 +908,6 @@ def changer_mot_de_passe(request):
     except utilisateur.DoesNotExist:
         return JsonResponse({"error": "Utilisateur introuvable."}, status=404)
 
-    # Vérification de l'ancien mot de passe via la méthode du modèle
     if not user.check_password(ancien_password):
         return JsonResponse({"error": "Mot de passe actuel incorrect."}, status=400)
 
@@ -925,7 +942,6 @@ def pilot_dashboard(request):
     )
     ru_non_declarer = ru_ids - ru_declarer
 
-    # --- Statistiques par RU pour le tableau + graphique comparatif ---
     responsables = Collaborateur.objects.filter(it__in=ru_ids).select_related(
         'departement', 'ru_it', 'unite'
     )
@@ -947,7 +963,6 @@ def pilot_dashboard(request):
             "maquette": maquette_ru,
         })
 
-    # --- Graphique d'évolution (7 derniers jours) ---
     jours = [today - timedelta(days=i) for i in range(6, -1, -1)]
     chart_labels = [j.strftime("%d/%m") for j in jours]
     chart_data = [len(get_effectif_reel_ids(departement_ids, j)) for j in jours]

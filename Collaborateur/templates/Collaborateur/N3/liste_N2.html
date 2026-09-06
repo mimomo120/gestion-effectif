@@ -33,6 +33,12 @@
                 <option value="C">Lot C</option>
             </select>
 
+            <select class="filter-select" id="filtre-role">
+                <option value="">Tous les rôles</option>
+                <option value="responsable">Responsables uniquement</option>
+                <option value="operateur">Opérateurs uniquement</option>
+            </select>
+
             <button class="btn btn-reset" id="resetBtn">
                 <i class="fas fa-redo me-2"></i>Réinitialiser
             </button>
@@ -48,19 +54,26 @@
                     <th>Utilisateur</th>
                     <th>Nom & Prénom</th>
                     <th>Lot</th>
+                    <th>Rôle</th>
+                    <th>RU</th>
                 </tr>
             </thead>
             <tbody id="result">
                 {% for operateur in operateurs %}
-                <tr class="table-row">
+                <tr class="table-row"
+                    data-role="{% if operateur.est_responsable %}responsable{% else %}operateur{% endif %}">
                     <td class="cell-matricule">{{ operateur.matricule|default:"-" }}</td>
                     <td class="cell-utilisateur">{{ operateur.it|default:"-" }}</td>
                     <td class="cell-nom">{{ operateur.nom_complete|default:"-" }}</td>
                     <td class="cell-lot">{{ operateur.lot|default:"-" }}</td>
+                    <td class="cell-lot">
+                        {% if operateur.est_responsable %}Responsable{% else %}Opérateur{% endif %}
+                    </td>
+                    <td class="cell-utilisateur">{{ operateur.ru_nom|default:"-" }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="empty-row">
+                    <td colspan="6" class="empty-row">
                         <i class="fas fa-inbox"></i> Aucun responsable trouvé
                     </td>
                 </tr>

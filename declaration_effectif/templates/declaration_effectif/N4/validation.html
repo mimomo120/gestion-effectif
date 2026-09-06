@@ -21,7 +21,7 @@
         <div class="summary-card">
             <div class="summary-info">
                 <span>Non Validés</span>
-                <h3 id="count-ru">{{ non_valides|length|default:"0" }}</h3>
+                <h3 id="count-ru">{{ total_non_valides|default:"0" }}</h3>
             </div>
             <div class="summary-icon warning">
                 &#9888;
@@ -85,6 +85,21 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-container">
+            {% if page_obj.has_previous %}
+            <a class="page-btn" href="?page={{ page_obj.previous_page_number }}">&laquo; Précédent</a>
+            {% endif %}
+
+            <span class="page-btn active">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+            {% if page_obj.has_next %}
+            <a class="page-btn" href="?page={{ page_obj.next_page_number }}">Suivant &raquo;</a>
+            {% endif %}
+        </div>
+        {% endif %}
 
     </div>
 </div>
