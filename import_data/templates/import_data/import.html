@@ -12,11 +12,20 @@
 {% block content %}
 <div class="import-container">
 
-    <div class="import-header">
-        <h1 class="import-title">Importation des données</h1>
-        <p class="import-subtitle">
-            Alimentez votre base de données en chargeant les fichiers (.xlsx, .xls, .csv).
-        </p>
+    <div class="import-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+            <h1 class="import-title">Importation des données</h1>
+            <p class="import-subtitle">
+                Alimentez votre base de données en chargeant les fichiers (.xlsx, .xls, .csv).
+            </p>
+        </div>
+
+        {% if synthese_declarations %}
+        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
+            data-bs-target="#modalSyntheseDeclarations">
+            <i class="fas fa-clipboard-check me-2"></i>Voir la synthèse des déclarations
+        </button>
+        {% endif %}
     </div>
 
     <!-- Guide des formats -->
@@ -173,10 +182,15 @@
 
     <!-- Table Historique -->
     <div class="history-card">
-        <div class="history-card-header">
-            <h5 class="history-card-title">
+        <div class="history-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="history-card-title mb-0">
                 <i class="fas fa-history me-2 text-primary"></i> Historique récent
             </h5>
+            <!-- NOUVEAU : ouvre le popup avec l'historique complet + filtre par date -->
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal"
+                data-bs-target="#modalHistoriqueComplet">
+                <i class="fas fa-list me-2"></i>Voir tout l'historique
+            </button>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle table-custom">
@@ -189,7 +203,7 @@
                         <th>Créés</th>
                         <th>Modifiés</th>
                         <th>Supprimés</th>
-                        <th>Erreurs</th>
+                        <th>Date</th>
                         <th>Statut</th>
                         <th class="text-center">Détails</th>
                     </tr>
@@ -208,8 +222,8 @@
                         </td>
                         <td><span class="badge bg-warning-subtle text-warning fw-bold">{{ item.modif|default:0 }}</span>
                         </td>
-                        <td><span class="badge bg-danger-subtle text-danger fw-bold">{{ item.supprime|default:0 }}</span></td>
-                        <td><span class="badge bg-secondary-subtle text-secondary fw-bold">{{ item.erreur|default:0}}</span></td>
+                        <td><span class="badge bg-danger-subtle text-danger fw-bold">{{ item.supprime|default:0}}</span></td>
+                        <td><span class="badge bg-secondary-subtle text-secondary fw-bold">{{item.date|default:0}}</span></td>
                         <td>
                             {% if item.statut == "SUCCES" %}
                             <span
@@ -220,7 +234,8 @@
                             {% elif item.statut == "ECHEC" %}
                             <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Échec</span>
                             {% else %}
-                            <span class="badge bg-info-subtle text-info border border-info-subtle">{{ item.statut}}</span>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle">{{
+                                item.statut}}</span>
                             {% endif %}
                         </td>
                         <td class="text-center">
@@ -244,7 +259,7 @@
     </div>
 </div>
 
-<!-- Modales -->
+<!-- Modales détails import -->
 {% for item in historique_imports %}
 <div class="modal fade" id="modalDetails{{ item.id }}" tabindex="-1" aria-labelledby="label{{ item.id }}"
     aria-hidden="true">
@@ -284,6 +299,242 @@
 </div>
 {% endfor %}
 
+<!-- ================================================================
+     NOUVEAU : Popup "Historique complet" avec filtre par date
+     ================================================================ -->
+<div class="modal fade" id="modalHistoriqueComplet" tabindex="-1" aria-labelledby="labelHistoriqueComplet"
+    aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="labelHistoriqueComplet">
+                    <i class="fas fa-history me-2 text-primary"></i>Historique complet des imports
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Filtre par plage de dates -->
+                <form id="formFiltreHistorique" class="row g-2 align-items-end mb-3">
+                    <div class="col-auto">
+                        <label for="filtreDateDebut" class="form-label mb-1 small">Du</label>
+                        <input type="date" id="filtreDateDebut" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-auto">
+                        <label for="filtreDateFin" class="form-label mb-1 small">Au</label>
+                        <input type="date" id="filtreDateFin" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-filter me-1"></i>Filtrer
+                        </button>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" id="btnReinitialiserFiltre" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-times me-1"></i>Réinitialiser
+                        </button>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <span class="text-muted small" id="totalHistoriqueLabel"></span>
+                    </div>
+                </form>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Fichier</th>
+                                <th>Auteur</th>
+                                <th>Durée</th>
+                                <th>Créés</th>
+                                <th>Modifiés</th>
+                                <th>Supprimés</th>
+                                <th>Date</th>
+                                <th>Statut</th>
+                                <th class="text-center">Détails</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpsHistoriqueComplet">
+                            <tr>
+                                <td colspan="10" class="text-center py-4 text-muted">Chargement...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de détails générique, utilisé par les lignes de l'historique complet
+     chargées dynamiquement (elles n'ont pas de modal dédié pré-rendu côté
+     serveur comme les 10 derniers imports). -->
+<div class="modal fade" id="modalDetailsGenerique" tabindex="-1" aria-labelledby="labelDetailsGenerique"
+    aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="labelDetailsGenerique">Détails de l'import</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                <table class="table table-striped mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Action</th>
+                            <th>IT</th>
+                            <th>Matricule</th>
+                            <th>Nom complet</th>
+                            <th>Champ</th>
+                            <th>Ancienne Val.</th>
+                            <th>Nouvelle Val.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailsBodyGenerique">
+                        <tr>
+                            <td colspan="7" class="text-center py-3 text-muted">Chargement...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================================================================
+     NOUVEAU : Popup de synthèse des déclarations vs fichier importé
+     (DRH / SUPER uniquement — la vue elle-même est protégée par
+     @role_required(['SUPER', 'DRH']), donc pas de re-vérification ici)
+     ================================================================ -->
+{% if synthese_declarations %}
+<div class="modal fade" id="modalSyntheseDeclarations" tabindex="-1" aria-labelledby="labelSyntheseDeclarations"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="labelSyntheseDeclarations">
+                    <i class="fas fa-clipboard-check me-2 text-primary"></i>Synthèse des déclarations
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="list-unstyled fs-5 mb-4">
+                    <li class="mb-1">
+                        🔴 Départs déclarés mais non effectués :
+                        <strong>{{ synthese_declarations.nb_departs }}</strong>
+                    </li>
+                    <li class="mb-1">
+                        🟠 Changements déclarés mais non effectués :
+                        <strong>{{ synthese_declarations.nb_changements }}</strong>
+                    </li>
+                    <li class="mb-1">
+                        🟢 Déclarations correctement effectuées :
+                        <strong>{{ synthese_declarations.nb_effectuees }}</strong>
+                    </li>
+                </ul>
+
+                <ul class="nav nav-tabs" id="syntheseTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="tab-departs-btn" data-bs-toggle="tab"
+                            data-bs-target="#tab-departs" type="button" role="tab">
+                            🔴 Départs ({{ synthese_declarations.nb_departs }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-changements-btn" data-bs-toggle="tab"
+                            data-bs-target="#tab-changements" type="button" role="tab">
+                            🟠 Changements ({{ synthese_declarations.nb_changements }})
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content pt-3">
+                    <div class="tab-pane fade show active" id="tab-departs" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Matricule</th>
+                                        <th>Nom complet</th>
+                                        <th>RU</th>
+                                        <th>Date déclaration</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for d in synthese_declarations.departs_non_effectues %}
+                                    <tr>
+                                        <td>{{ d.matricule|default:"-" }}</td>
+                                        <td>{{ d.nom_complete|default:"-" }}</td>
+                                        <td>{{ d.ru|default:"-" }}</td>
+                                        <td>{{ d.date_declaration }}</td>
+                                        <td><span class="badge bg-danger-subtle text-danger">{{ d.statut }}</span></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-muted text-center py-3">
+                                            Aucun départ en attente.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-changements" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Matricule</th>
+                                        <th>Nom complet</th>
+                                        <th>Ancienne affectation</th>
+                                        <th>Nouvelle affectation déclarée</th>
+                                        <th>Affectation actuelle (fichier)</th>
+                                        <th>Date déclaration</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for c in synthese_declarations.changements_non_effectues %}
+                                    <tr>
+                                        <td>{{ c.matricule|default:"-" }}</td>
+                                        <td>{{ c.nom_complete|default:"-" }}</td>
+                                        <td>{{ c.ancienne_affectation|default:"-" }}</td>
+                                        <td>{{ c.nouvelle_affectation_declaree|default:"-" }}</td>
+                                        <td>{{ c.affectation_actuelle_fichier|default:"-" }}</td>
+                                        <td>{{ c.date_declaration }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-muted text-center py-3">
+                                            Aucun changement en attente.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="{% url 'export_synthese_declarations' %}" class="btn btn-success">
+                    <i class="fas fa-file-excel me-2"></i>Exporter le rapport
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const URL = "{% url 'import_details_json' 0 %}";
@@ -315,6 +566,144 @@
                     `).join('');
                 });
         });
+    });
+
+    // Ouvre automatiquement la popup de synthèse des déclarations UNIQUEMENT
+    // juste après un import réussi (just_imported=True). Sur un simple
+    // rechargement de page, elle reste accessible via le bouton "Voir la
+    // synthèse des déclarations" mais ne s'ouvre plus toute seule.
+    {% if just_imported %}
+    document.addEventListener("DOMContentLoaded", () => {
+        const modalSyntheseEl = document.getElementById("modalSyntheseDeclarations");
+        if (modalSyntheseEl && typeof bootstrap !== "undefined") {
+            new bootstrap.Modal(modalSyntheseEl).show();
+        }
+    });
+    {% endif %}
+
+    /* =========================================================
+       HISTORIQUE COMPLET DES IMPORTS + FILTRE PAR DATE
+       ========================================================= */
+    const URL_HISTORIQUE = "{% url 'historique_imports_json' %}";
+    const URL_DETAILS_BASE = "{% url 'import_details_json' 0 %}"; // remplacer le 0 par l'id réel
+
+    const STATUT_BADGE_HTML = (statut, label) => {
+        const classes = {
+            "SUCCES": "bg-success-subtle text-success border border-success-subtle",
+            "PARTIEL": "bg-warning-subtle text-warning border border-warning-subtle",
+            "ECHEC": "bg-danger-subtle text-danger border border-danger-subtle",
+            "EN_COURS": "bg-info-subtle text-info border border-info-subtle",
+        };
+        const cls = classes[statut] || "bg-secondary-subtle text-secondary";
+        return `<span class="badge ${cls}">${label}</span>`;
+    };
+
+    function chargerHistoriqueComplet(dateDebut = "", dateFin = "") {
+        const corps = document.getElementById("corpsHistoriqueComplet");
+        const totalLabel = document.getElementById("totalHistoriqueLabel");
+        corps.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">Chargement...</td></tr>';
+
+        const params = new URLSearchParams();
+        if (dateDebut) params.set("date_debut", dateDebut);
+        if (dateFin) params.set("date_fin", dateFin);
+
+        fetch(`${URL_HISTORIQUE}?${params.toString()}`)
+            .then(r => r.json())
+            .then(data => {
+                if (totalLabel) {
+                    totalLabel.textContent = `${data.total} import(s) trouvé(s)`;
+                }
+
+                if (!data.resultats.length) {
+                    corps.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted"><i class="fas fa-inbox mb-2 d-block fa-2x"></i>Aucun import trouvé pour cette période.</td></tr>';
+                    return;
+                }
+
+                corps.innerHTML = data.resultats.map(item => `
+                    <tr>
+                        <td class="fw-bold">#${item.id}</td>
+                        <td class="text-nowrap"><i class="fas fa-file-excel me-1 text-success"></i>${item.nom_fichier}</td>
+                        <td>${item.utilisateur}</td>
+                        <td>${item.duree}</td>
+                        <td><span class="badge bg-success-subtle text-success fw-bold">${item.depar}</span></td>
+                        <td><span class="badge bg-warning-subtle text-warning fw-bold">${item.modif}</span></td>
+                        <td><span class="badge bg-danger-subtle text-danger fw-bold">${item.supprime}</span></td>
+                        <td><span class="badge bg-secondary-subtle text-secondary fw-bold">${item.date}</span></td>
+                        <td>${STATUT_BADGE_HTML(item.statut, item.statut_label)}</td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-light text-primary rounded-circle"
+                                onclick="voirDetailsImportGenerique(${item.id}, '${item.nom_fichier.replace(/'/g, "\\'")}')"
+                                aria-label="Voir les détails">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            })
+            .catch(() => {
+                corps.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-danger">Erreur lors du chargement de l\'historique.</td></tr>';
+            });
+    }
+
+    function voirDetailsImportGenerique(importId, nomFichier) {
+        const titre = document.getElementById("labelDetailsGenerique");
+        const corps = document.getElementById("detailsBodyGenerique");
+        titre.textContent = `Détails de l'import #${importId} - ${nomFichier}`;
+        corps.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">Chargement...</td></tr>';
+
+        const url = URL_DETAILS_BASE.replace('/0/', `/${importId}/`);
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.details.length) {
+                    corps.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">Aucun détail enregistré pour cet import.</td></tr>';
+                } else {
+                    corps.innerHTML = data.details.map(d => `
+                        <tr>
+                            <td><span class="badge bg-secondary-subtle text-secondary">${d.action}</span></td>
+                            <td>${d.it || '-'}</td>
+                            <td>${d.matricule || '-'}</td>
+                            <td>${d.nom_complete || '-'}</td>
+                            <td>${d.champ_modifie || '-'}</td>
+                            <td class="text-muted"><small>${d.ancienne_valeur || '-'}</small></td>
+                            <td class="fw-bold"><small>${d.nouvelle_valeur || '-'}</small></td>
+                        </tr>
+                    `).join('');
+                }
+                const modalGenerique = bootstrap.Modal.getOrCreateInstance(document.getElementById("modalDetailsGenerique"));
+                modalGenerique.show();
+            });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const modalHistoriqueEl = document.getElementById("modalHistoriqueComplet");
+        if (modalHistoriqueEl) {
+            // Chargement initial (sans filtre) à chaque ouverture du popup
+            modalHistoriqueEl.addEventListener("show.bs.modal", () => {
+                const dateDebut = document.getElementById("filtreDateDebut").value;
+                const dateFin = document.getElementById("filtreDateFin").value;
+                chargerHistoriqueComplet(dateDebut, dateFin);
+            });
+        }
+
+        const formFiltre = document.getElementById("formFiltreHistorique");
+        if (formFiltre) {
+            formFiltre.addEventListener("submit", (e) => {
+                e.preventDefault();
+                const dateDebut = document.getElementById("filtreDateDebut").value;
+                const dateFin = document.getElementById("filtreDateFin").value;
+                chargerHistoriqueComplet(dateDebut, dateFin);
+            });
+        }
+
+        const btnReset = document.getElementById("btnReinitialiserFiltre");
+        if (btnReset) {
+            btnReset.addEventListener("click", () => {
+                document.getElementById("filtreDateDebut").value = "";
+                document.getElementById("filtreDateFin").value = "";
+                chargerHistoriqueComplet();
+            });
+        }
     });
 </script>
 {% endblock %}

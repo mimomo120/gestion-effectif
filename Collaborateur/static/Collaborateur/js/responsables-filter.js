@@ -101,7 +101,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         <td class="cell-utilisateur">${escapeHtml(op.it || '')}</td>
                         <td class="cell-nom">${escapeHtml(op.nom_complete || '')}</td>
                         <td class="cell-lot">${escapeHtml(op.lot || '')}</td>
-                        <td class="cell-lot">${op.est_responsable ? 'Responsable' : 'Opérateur'}</td>
                         <td class="cell-utilisateur">${escapeHtml(op.ru_nom || '-')}</td>
                     </tr>
                 `).join("");

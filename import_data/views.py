@@ -1,5 +1,6 @@
 import pandas as pd
-from django.shortcuts import render
+from datetime import datetime, time
+from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.db import transaction
 from .forms import MultipleImportForm
@@ -7,7 +8,7 @@ from Collaborateur.models import Collaborateur, Departement, Unite
 from declaration_effectif.models import historique
 from .models import histo_import, histo_import_detail
 from utilisateur.decorators import role_required
-from declaration_effectif.models import declaration_effectif
+from declaration_effectif.models import declaration_effectif as DeclarationEffectif
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from django.utils import timezone
@@ -192,6 +193,13 @@ def _val_affichable(v):
     return str(v)
 
 def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_map=None):
+    """
+    Retourne un tuple :
+        (nb_lignes_traitees, collaborateurs_dans_fichier)
+    où collaborateurs_dans_fichier est le set des "it" présents dans le
+    fichier importé. Ce set est réutilisé ensuite pour comparer l'état du
+    fichier aux dernières déclarations enregistrées dans declaration_effectif.
+    """
     departements_map = {d.abreviation: d for d in Departement.objects.all()}
     unites_map = {u.abreviation: u for u in Unite.objects.all()}
 
@@ -302,9 +310,7 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
                 ))
 
     # Collaborateurs présents en base mais absents du nouveau fichier
-    collaborateurs_a_supprimer = set(collaborateurs_map.keys()) - collaborateurs_dans_fichier - {
-        it for it, _ in ru_a_resoudre
-    } if False else set(collaborateurs_map.keys()) - collaborateurs_dans_fichier
+    collaborateurs_a_supprimer = set(collaborateurs_map.keys()) - collaborateurs_dans_fichier
 
     if import_log is not None:
         for it_supp in collaborateurs_a_supprimer:
@@ -371,7 +377,7 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
         import_log.erreur = len(erreurs)
         import_log.save(update_fields=["depar", "modif", "supprime", "erreur"])
 
-    return len(a_creer) + len(a_maj) + len(collaborateurs_a_supprimer)
+    return len(a_creer) + len(a_maj) + len(collaborateurs_a_supprimer), collaborateurs_dans_fichier
 
 # ------------------------------------------------------------------
 # IMPORT CHANGEMENTS D'AFFECTATION
@@ -422,6 +428,163 @@ def importer_changements(df_chg, erreurs):
     return len(a_creer)
 
 # ------------------------------------------------------------------
+# SUIVI DES DÉCLARATIONS (declaration_effectif) VS FICHIER IMPORTÉ
+# ------------------------------------------------------------------
+
+def _snapshot_ru(collaborateurs_map):
+    """
+    Capture l'affectation (ru_it_id) de chaque collaborateur AVANT le
+    traitement du nouveau fichier. Sert de référence pour "l'ancienne
+    affectation" lors de la comparaison avec les déclarations de changement.
+    """
+    return {it: getattr(c, "ru_it_id", None) for it, c in collaborateurs_map.items()}
+
+
+def analyser_declarations_vs_import(ancien_ru_map, collaborateurs_dans_fichier):
+    """
+    Compare les DERNIÈRES déclarations de départ ('D') et de changement
+    d'affectation ('C') de declaration_effectif à l'état du fichier
+    collaborateurs qui vient d'être importé.
+
+    - Un départ est considéré "effectué" si le collaborateur n'est plus
+      présent dans le nouveau fichier (collaborateurs_dans_fichier).
+    - Un changement est considéré "effectué" si l'affectation actuelle du
+      collaborateur (après import) correspond à la nouvelle RU déclarée
+      (nv_Ru) dans declaration_effectif.
+
+    Seule la dernière déclaration ('D' ou 'C') de chaque collaborateur est
+    prise en compte, afin d'éviter les doublons et les déclarations déjà
+    obsolètes/remplacées.
+    """
+    declarations = (
+        DeclarationEffectif.objects
+        .filter(nature__in=["D", "C"])
+        .select_related("collaborateur_it", "nv_Ru")
+        .order_by("collaborateur_it_id", "-date", "-id")
+    )
+
+    # On ne garde que la dernière déclaration par collaborateur.
+    dernieres = {}
+    for d in declarations:
+        cid = d.collaborateur_it_id
+        if cid and cid not in dernieres:
+            dernieres[cid] = d
+
+    its_concernes = list(dernieres.keys())
+    collaborateurs_apres = {
+        c.it: c for c in Collaborateur.objects.filter(it__in=its_concernes)
+    }
+
+    departs_non_effectues = []
+    changements_non_effectues = []
+    effectuees = []
+
+    for cid, decl in dernieres.items():
+        collab_actuel = collaborateurs_apres.get(cid)
+        collab_declare = decl.collaborateur_it  # peut être None si SET_NULL
+
+        matricule = (collab_actuel.matricule if collab_actuel
+                     else getattr(collab_declare, "matricule", None))
+        nom_complet = (collab_actuel.nom_complete if collab_actuel
+                       else getattr(collab_declare, "nom_complete", cid))
+
+        if decl.nature == "D":
+            if cid in collaborateurs_dans_fichier:
+                departs_non_effectues.append({
+                    "matricule": matricule,
+                    "nom_complete": nom_complet,
+                    "date_declaration": decl.date,
+                    "ru": ancien_ru_map.get(cid),
+                    "statut": "Départ déclaré, non effectué",
+                })
+            else:
+                effectuees.append({
+                    "matricule": matricule,
+                    "nom_complete": nom_complet,
+                    "type": "Départ",
+                    "date_declaration": decl.date,
+                })
+
+        elif decl.nature == "C":
+            ancienne_affectation = ancien_ru_map.get(cid)
+            nouvelle_declaree = decl.nv_Ru_id
+            actuelle_dans_fichier = collab_actuel.ru_it_id if collab_actuel else None
+
+            if actuelle_dans_fichier == nouvelle_declaree:
+                effectuees.append({
+                    "matricule": matricule,
+                    "nom_complete": nom_complet,
+                    "type": "Changement d'affectation",
+                    "date_declaration": decl.date,
+                })
+            else:
+                changements_non_effectues.append({
+                    "matricule": matricule,
+                    "nom_complete": nom_complet,
+                    "ancienne_affectation": ancienne_affectation,
+                    "nouvelle_affectation_declaree": nouvelle_declaree,
+                    "affectation_actuelle_fichier": actuelle_dans_fichier,
+                    "date_declaration": decl.date,
+                    "statut": "Changement déclaré, non effectué",
+                })
+
+    return {
+        "departs_non_effectues": departs_non_effectues,
+        "changements_non_effectues": changements_non_effectues,
+        "effectuees": effectuees,
+        "nb_departs": len(departs_non_effectues),
+        "nb_changements": len(changements_non_effectues),
+        "nb_effectuees": len(effectuees),
+    }
+
+
+def _serialiser_synthese(synthese):
+    """
+    Convertit la synthèse en une structure 100% JSON-sérialisable (les objets
+    date ne le sont pas nativement) afin de pouvoir la stocker en base
+    (histo_import.synthese_json).
+    Elle est ensuite réutilisée pour : (1) réafficher le bouton "Voir la
+    synthèse" après un rechargement de page OU une reconnexion, (2) générer
+    l'export Excel.
+    """
+    def _conv_liste(liste):
+        out = []
+        for item in liste:
+            item2 = dict(item)
+            if item2.get("date_declaration") is not None:
+                item2["date_declaration"] = str(item2["date_declaration"])
+            out.append(item2)
+        return out
+
+    return {
+        "departs_non_effectues": _conv_liste(synthese["departs_non_effectues"]),
+        "changements_non_effectues": _conv_liste(synthese["changements_non_effectues"]),
+        "effectuees": _conv_liste(synthese["effectuees"]),
+        "nb_departs": synthese["nb_departs"],
+        "nb_changements": synthese["nb_changements"],
+        "nb_effectuees": synthese["nb_effectuees"],
+    }
+
+
+def _derniere_synthese():
+    """
+    NOUVEAU : récupère la synthèse du DERNIER import collaborateurs qui en
+    possède une, directement depuis la base de données (histo_import.synthese_json).
+
+    Contrairement à request.session (qui est propre à un utilisateur/navigateur
+    et disparaît au logout ou à l'expiration de la session), cette fonction
+    renvoie toujours la même synthèse à tout utilisateur autorisé, qu'il vienne
+    de se reconnecter, de changer de navigateur, ou de recharger la page.
+    """
+    dernier = (
+        histo_import.objects
+        .exclude(synthese_json__isnull=True)
+        .order_by("-date")
+        .first()
+    )
+    return dernier.synthese_json if dernier else None
+
+# ------------------------------------------------------------------
 # VUE PRINCIPALE
 # ------------------------------------------------------------------
 @role_required(['SUPER', "DRH"])
@@ -443,10 +606,16 @@ def importer_fichiers_combines(request):
         for _ in storage:
             pass
 
+        # NOUVEAU : la synthèse est lue en base (dernier import avec
+        # synthese_json renseigné), donc elle reste disponible même après un
+        # logout/reconnexion, un changement de navigateur, etc. Elle ne
+        # s'ouvre pas automatiquement dans ce cas (just_imported=False).
         return render(request, "import_data/import.html", {
             "form": MultipleImportForm(),
             "template_de_base": template_de_base,
             "historique_imports": historique_imports,
+            "synthese_declarations": _derniere_synthese(),
+            "just_imported": False,
         })
 
     form = MultipleImportForm(request.POST, request.FILES)
@@ -455,6 +624,8 @@ def importer_fichiers_combines(request):
             "form": form,
             "template_de_base": template_de_base,
             "historique_imports": historique_imports,
+            "synthese_declarations": _derniere_synthese(),
+            "just_imported": False,
         })
 
     f_collab = request.FILES.get("fichier_collaborateur")
@@ -468,12 +639,16 @@ def importer_fichiers_combines(request):
             "form": form,
             "template_de_base": template_de_base,
             "historique_imports": historique_imports,
+            "synthese_declarations": _derniere_synthese(),
+            "just_imported": False,
         })
 
     erreurs = []
     crees_dpts = crees_unites = crees_collabs = crees_chgs = 0
     import_log = None
     debut = timezone.now()
+    synthese_declarations = None
+    collaborateurs_dans_fichier = set()
 
     # OPTIM : une seule lecture de la table Collaborateur, partagée entre
     # importer_departements (résolution HRBP/ADMIN/DRH) et importer_collaborateurs.
@@ -485,6 +660,11 @@ def importer_fichiers_combines(request):
                 "departement_id", "unite_id", "eq", "shift", "sexe", "ru_it_id",
             )
         }
+
+    # Snapshot de l'affectation AVANT le traitement du nouveau fichier
+    # collaborateurs. Sert de point de référence ("ancienne affectation")
+    # pour la comparaison avec les déclarations de changement.
+    ancien_ru_map = _snapshot_ru(collaborateurs_map) if collaborateurs_map else {}
 
     if f_dpt:
         try:
@@ -508,11 +688,26 @@ def importer_fichiers_combines(request):
                 nom_fichier=f_collab.name,
                 statut="EN_COURS",
             )
-            crees_collabs = importer_collaborateurs(
+            crees_collabs, collaborateurs_dans_fichier = importer_collaborateurs(
                 df_collab, erreurs, import_log=import_log, collaborateurs_map=collaborateurs_map
             )
             import_log.statut = "SUCCES" if not erreurs else "PARTIEL"
             import_log.save(update_fields=["statut"])
+
+            # Comparaison des dernières déclarations (declaration_effectif)
+            # avec l'état réel du fichier qui vient d'être importé.
+            synthese_declarations = analyser_declarations_vs_import(
+                ancien_ru_map, collaborateurs_dans_fichier
+            )
+
+            # NOUVEAU : la synthèse est persistée EN BASE, rattachée à cet
+            # import précis (import_log.synthese_json), et non plus dans
+            # request.session. Elle reste donc accessible après un logout,
+            # une reconnexion, ou depuis un autre poste, pour tout
+            # utilisateur SUPER/DRH.
+            synthese_serialisee = _serialiser_synthese(synthese_declarations)
+            import_log.synthese_json = synthese_serialisee
+            import_log.save(update_fields=["synthese_json"])
         except Exception as e:
             if import_log is not None:
                 import_log.statut = "ECHEC"
@@ -561,6 +756,8 @@ def importer_fichiers_combines(request):
         "form": MultipleImportForm(),
         "template_de_base": template_de_base,
         "historique_imports": historique_imports,
+        "synthese_declarations": synthese_declarations,
+        "just_imported": synthese_declarations is not None,
     })
 
 # ============================================================
@@ -577,7 +774,7 @@ def get_collaborateurs_reels(departements):
     ids = list(collaborateurs.values_list("it", flat=True))
 
     declarations = (
-        declaration_effectif.objects
+        DeclarationEffectif.objects
         .filter(collaborateur_it_id__in=ids, nature__in=["C", "D", "A", "V"])
         .select_related("nv_Ru")
         .order_by("collaborateur_it_id", "-date", "-id")
@@ -628,10 +825,21 @@ def export_effectif_reel(request):
 
     resultats = get_collaborateurs_reels(departements)
 
+    # Build an it -> (matricule, nom_complete) lookup for all RU codes present
+    # in the results, so we can display the RU's matricule and full name
+    # instead of just their "it" code.
+    ru_its = {r["ru"] for r in resultats if r.get("ru")}
+    ru_info_map = {
+        it_val: (matricule, nom_complete)
+        for it_val, matricule, nom_complete in Collaborateur.objects.filter(
+            it__in=ru_its
+        ).values_list("it", "matricule", "nom_complete")
+    }
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Effectif Réel"
-    headers = ["Matricule", "IT", "Nom & Prénom", "Département", "Unité", "Lot", "RU(utilisateur)"]
+    headers = ["Matricule", "IT", "Nom", "Prénom", "Département", "Unité", "Lot", "EP", "RU(utilisateur)","Nom Prénom"]
     ws.append(headers)
 
     header_fill = PatternFill(start_color="1e293b", end_color="1e293b", fill_type="solid")
@@ -643,14 +851,24 @@ def export_effectif_reel(request):
 
     for r in sorted(resultats, key=lambda x: (x["collaborateur"].departement_id or "", x["collaborateur"].nom_complete)):
         c = r["collaborateur"]
+        ru_matricule, ru_nom_prenom = ru_info_map.get(r["ru"], ("-", "-")) if r.get("ru") else ("-", "-")
+
+        # 1er mot = Nom, le reste = Prénom
+        parts = (c.nom_complete or "").split(None, 1)
+        nom = parts[0] if parts else "-"
+        prenom = parts[1] if len(parts) > 1 else "-"
+
         ws.append([
             c.matricule,
             c.it,
-            c.nom_complete,
+            nom,
+            prenom,
             c.departement.abreviation if c.departement else "-",
             c.unite_id if c.unite_id else "-",
             c.lot,
-            r["ru"] or "-",
+            c.eq,
+            ru_matricule,
+            ru_nom_prenom,
         ])
 
     for col_cells in ws.columns:
@@ -675,3 +893,162 @@ def import_details_json(request, import_id):
         "champ_modifie", "ancienne_valeur", "nouvelle_valeur",
     )
     return JsonResponse({"details": list(details)})
+
+
+# ------------------------------------------------------------------
+# HISTORIQUE COMPLET DES IMPORTS (popup + filtre par date)
+# ------------------------------------------------------------------
+
+STATUT_BADGES = {
+    "SUCCES": ("Succès", "bg-success-subtle text-success border border-success-subtle"),
+    "PARTIEL": ("Partiel", "bg-warning-subtle text-warning border border-warning-subtle"),
+    "ECHEC": ("Échec", "bg-danger-subtle text-danger border border-danger-subtle"),
+    "EN_COURS": ("En cours", "bg-info-subtle text-info border border-info-subtle"),
+}
+
+
+def _parse_date(val):
+    """Parse une date au format YYYY-MM-DD envoyée par un <input type="date">.
+    Retourne None si absente ou invalide (le filtre correspondant est alors
+    simplement ignoré plutôt que de lever une erreur)."""
+    if not val:
+        return None
+    try:
+        return datetime.strptime(val, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+@role_required(['SUPER', "DRH"])
+def historique_imports_json(request):
+    """
+    Retourne l'historique COMPLET des imports (pas seulement les 10 derniers),
+    avec un filtrage optionnel par plage de dates via les paramètres GET
+    `date_debut` et `date_fin` (format YYYY-MM-DD, bornes incluses).
+    """
+    qs = histo_import.objects.order_by('-date')
+
+    date_debut = _parse_date(request.GET.get("date_debut"))
+    date_fin = _parse_date(request.GET.get("date_fin"))
+
+    if date_debut:
+        qs = qs.filter(date__gte=datetime.combine(date_debut, time.min))
+    if date_fin:
+        qs = qs.filter(date__lte=datetime.combine(date_fin, time.max))
+
+    resultats = []
+    for item in qs:
+        label, css_class = STATUT_BADGES.get(item.statut, (item.statut, "bg-secondary-subtle text-secondary"))
+        resultats.append({
+            "id": item.id,
+            "nom_fichier": item.nom_fichier or "-",
+            "utilisateur": item.utilisateur or "Inconnu",
+            "duree": item.duree if item.duree is not None else "-",
+            "depar": item.depar,
+            "modif": item.modif,
+            "supprime": item.supprime,
+            "date": timezone.localtime(item.date).strftime("%d/%m/%Y %H:%M") if item.date else "-",
+            "statut": item.statut,
+            "statut_label": label,
+            "statut_css": css_class,
+        })
+
+    return JsonResponse({"resultats": resultats, "total": len(resultats)})
+
+
+# ------------------------------------------------------------------
+# EXPORT EXCEL DE LA SYNTHÈSE DES DÉCLARATIONS
+# ------------------------------------------------------------------
+
+def _style_header_row(ws):
+    header_fill = PatternFill(start_color="1e293b", end_color="1e293b", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+
+def _autosize(ws):
+    for col_cells in ws.columns:
+        length = max((len(str(cell.value)) for cell in col_cells if cell.value is not None), default=0)
+        ws.column_dimensions[col_cells[0].column_letter].width = max(length + 2, 12)
+
+
+@role_required(['SUPER', "DRH"])
+def export_synthese_declarations(request):
+    """
+    Exporte en Excel la dernière synthèse des déclarations (générée lors du
+    dernier import du fichier collaborateurs), avec 3 feuilles :
+    Départs non effectués / Changements non effectués / Déclarations effectuées.
+
+    NOUVEAU : la synthèse est lue depuis la base (histo_import.synthese_json
+    du dernier import qui en possède une) au lieu de request.session, afin
+    que l'export reste possible même après un logout/reconnexion.
+    """
+    synthese = _derniere_synthese()
+
+    if not synthese:
+        messages.error(
+            request,
+            "Aucune synthèse disponible à exporter. Veuillez relancer un import de collaborateurs.",
+            extra_tags="import",
+        )
+        return redirect("importer_fichier")
+
+    wb = openpyxl.Workbook()
+
+    # --- Feuille 1 : Départs non effectués ---
+    ws1 = wb.active
+    ws1.title = "Departs non effectues"
+    ws1.append(["Matricule", "Nom complet", "RU", "Date déclaration", "Statut"])
+    _style_header_row(ws1)
+    for d in synthese.get("departs_non_effectues", []):
+        ws1.append([
+            d.get("matricule") or "-",
+            d.get("nom_complete") or "-",
+            d.get("ru") or "-",
+            d.get("date_declaration") or "-",
+            d.get("statut") or "-",
+        ])
+    _autosize(ws1)
+
+    # --- Feuille 2 : Changements non effectués ---
+    ws2 = wb.create_sheet("Changements non effectues")
+    ws2.append([
+        "Matricule", "Nom complet", "Ancienne affectation",
+        "Nouvelle affectation déclarée", "Affectation actuelle (fichier)", "Date déclaration",
+    ])
+    _style_header_row(ws2)
+    for c in synthese.get("changements_non_effectues", []):
+        ws2.append([
+            c.get("matricule") or "-",
+            c.get("nom_complete") or "-",
+            c.get("ancienne_affectation") or "-",
+            c.get("nouvelle_affectation_declaree") or "-",
+            c.get("affectation_actuelle_fichier") or "-",
+            c.get("date_declaration") or "-",
+        ])
+    _autosize(ws2)
+
+    # --- Feuille 3 : Déclarations effectuées ---
+    ws3 = wb.create_sheet("Declarations effectuees")
+    ws3.append(["Matricule", "Nom complet", "Type", "Date déclaration"])
+    _style_header_row(ws3)
+    for e in synthese.get("effectuees", []):
+        ws3.append([
+            e.get("matricule") or "-",
+            e.get("nom_complete") or "-",
+            e.get("type") or "-",
+            e.get("date_declaration") or "-",
+        ])
+    _autosize(ws3)
+
+    today_str = timezone.localdate().strftime("%Y-%m-%d")
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="synthese_declarations_{today_str}.xlsx"'
+    wb.save(response)
+
+    return response

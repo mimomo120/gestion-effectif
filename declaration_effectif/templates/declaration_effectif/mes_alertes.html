@@ -1,0 +1,35 @@
+{% extends "utilisateur/navbar_N1.html" %}
+{% block content %}
+<div class="p-4">
+    <h2 class="text-xl font-bold mb-4">Mes alertes ({{ non_lues }} non lue(s))</h2>
+
+    <table class="w-full border-collapse">
+        <thead>
+            <tr class="bg-slate-800 text-white">
+                <th class="p-2">Date</th>
+                <th class="p-2">Contenu</th>
+                <th class="p-2">Statut</th>
+                <th class="p-2">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in alertes %}
+            <tr class="{% if not a.lu %}bg-yellow-50 font-semibold{% endif %}">
+                <td class="p-2">{{ a.date }}</td>
+                <td class="p-2">{{ a.contenu }}</td>
+                <td class="p-2">{% if a.lu %}Lue{% else %}Non lue{% endif %}</td>
+                <td class="p-2">
+                    {% if not a.lu %}
+                    <a href="{% url 'marquer_alerte_lue' a.id %}">Marquer comme lue</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" class="p-2 text-center">Aucune alerte.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

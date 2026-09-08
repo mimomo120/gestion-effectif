@@ -55,7 +55,6 @@
                     <th>Utilisateur</th>
                     <th>Nom & Prénom</th>
                     <th>Lot</th>
-                    <th>Statut</th>
                     <th>Responsable</th>
                 </tr>
             </thead>
@@ -66,7 +65,6 @@
                     <td class="cell-utilisateur">{{ operateur.it|default:"-" }}</td>
                     <td class="cell-nom">{{ operateur.nom_complete|default:"-" }}</td>
                     <td class="cell-lot">{{ operateur.lot|default:"-" }}</td>
-                    <td class="cell-lot">{{ operateur.est_responsable|yesno:"Responsable,Opérateur" }}</td>
                     <td class="cell-utilisateur">{{ operateur.ru_nom|default:"-" }}</td>
                 </tr>
                 {% empty %}

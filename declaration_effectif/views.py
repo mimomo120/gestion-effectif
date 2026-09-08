@@ -24,6 +24,7 @@ from django.utils.dateparse import parse_date
 from django.core.paginator import PageNotAnInteger, Paginator, EmptyPage
 import bisect
 from django.views.decorators.cache import never_cache
+from django.contrib.auth.decorators import login_required
 
 @ensure_csrf_cookie
 
@@ -399,13 +400,13 @@ def affectation_N3(request):
     status = request.GET.get("status", "all")
     ru_init = request.GET.get("ru_init", "").strip()
     ru_acceuil = request.GET.get("ru_acceuil", "").strip()
-
     n1_ids, n2_ids = get_n1_et_n2_sous(util)
-
-    # FIX PERF : historique_pour() fait maintenant UNE requête par
-    # ensemble (n2_ids, n1_ids) au lieu d'une par manager.
-    toutes_declarations_N2 = list(historique_pour(n2_ids))
-    toutes_declarations = list(historique_pour(n1_ids))
+    user=Collaborateur.objects.get(it=util)
+    toutes_declarations_N2 =historique.objects.filter( Q(initial=user.nom_complete) | Q(acceuil = user.nom_complete ))
+    toutes_declarations = (
+    list(historique_pour(n2_ids))
+    + list(historique_pour(n1_ids))
+)
 
     tab_actif = request.GET.get("tab", "tab-mes")
     ensemble_onglet = toutes_declarations if tab_actif == "tab-toutes" else toutes_declarations_N2
@@ -822,6 +823,12 @@ def page_N4(request):
     niveau_par_it = {m: _niveau_manager(m, tous_ru_it, cache_niveau) for m in managers_ids}
     vrais_n1_ids = {m for m, n in niveau_par_it.items() if n == 1}
 
+    # >>> NEW : comptages globaux calculés une fois, réutilisés dans le total
+    # et dans le contexte final (au lieu d'être recalculés à la fin).
+    nbr_n1_total = len(vrais_n1_ids)                                   # direct + indirect
+    nbr_n2_total = sum(1 for n in niveau_par_it.values() if n == 2)    # direct + indirect
+    nbr_n3_total = sum(1 for n in niveau_par_it.values() if n >= 3)    # direct + indirect (tous niveaux >=3)
+
     directs_n4 = list(
         Collaborateur.objects.filter(ru_it_id=it_session_original)
         .exclude(it=it_session_original)
@@ -856,9 +863,6 @@ def page_N4(request):
     seen_unite_ids = set()
     maint_global = None
 
-    # FIX PERF : plus de manipulation request.session["it"] dans la
-    # boucle (inutile — voir dashboard_N3), et tous_ru_it/managers_its
-    # transmis directement plutôt que recalculés à chaque itération.
     for collab in liste_n1:
         systeme = SystEff(collab.it, managers_its=tous_ru_it).values('it').distinct().count()
         reel = reelEff(collab.it, managers_its=tous_ru_it).values('it').distinct().count()
@@ -905,8 +909,26 @@ def page_N4(request):
     )
     operateurs_intermediaires_ids = operateurs_ids - operateurs_sous_vrais_n1
 
-    reel = sum(s["reel1"] for s in liste_ru_stats) + len(operateurs_intermediaires_ids) + len(managers_ids)
-    systeme = sum(s["systeme1"] for s in liste_ru_stats) + len(operateurs_intermediaires_ids) + len(managers_ids)
+    # >>> FIX : total_r / total_s = 
+    #   effectif des opérateurs sous chaque N1 (reel1/systeme1, direct+indirect via reelEff/SystEff)
+    # + opérateurs directs sous N2/N3/N4 (hors branche N1)                         [collab direct+indirect]
+    # + nbr N+1 (direct + indirect)
+    # + nbr N+2 (direct + indirect)
+    # + nbr N+3 (DIRECT uniquement, tel que demandé)
+    reel = (
+        sum(s["reel1"] for s in liste_ru_stats)
+        + len(operateurs_intermediaires_ids)
+        + nbr_n1_total
+        + nbr_n2_total
+        + len(n3_directs_n4)
+    )
+    systeme = (
+        sum(s["systeme1"] for s in liste_ru_stats)
+        + len(operateurs_intermediaires_ids)
+        + nbr_n1_total
+        + nbr_n2_total
+        + len(n3_directs_n4)
+    )
     maquette = maquette_totale
 
     liste_declares_today = set(
@@ -929,6 +951,9 @@ def page_N4(request):
     for k in decls_by_ru:
         decls_by_ru[k].sort()
 
+    # NB : ce total quotidien (courbe) garde volontairement len(managers_ids)
+    # (tous niveaux) car il sert de "socle fixe" avant d'ajouter les
+    # déclarations réelles par N1 jour par jour — logique différente de total_r.
     part_fixe_par_jour = len(operateurs_intermediaires_ids) + len(managers_ids)
     data_totale_par_jour = [part_fixe_par_jour] * len(dates)
     systeme_par_n1 = {s["n1"].it: s["systeme1"] for s in liste_ru_stats}
@@ -957,32 +982,45 @@ def page_N4(request):
             if niveau_par_it.get(c.it) == niveau_cible
         ]
 
+    def sous_managers_niveau_min(m_it, niveau_min):
+        return [
+            c for c in Collaborateur.objects.filter(ru_it_id=m_it, it__in=managers_ids)
+            if niveau_par_it.get(c.it, 0) >= niveau_min
+        ]
+
     def construire_n2_group(n2):
         sous_n1 = sous_managers_de(n2.it, 1)
         n1_stats = [stats_by_it[c.it] for c in sous_n1 if c.it in stats_by_it]
         directs_ops = operateurs_directs_de(n2.it)
+        nbr_total = sum(s["reel1"] for s in n1_stats) + len(n1_stats) + len(directs_ops)
         return {
             "n2": n2,
             "n1_stats": n1_stats,
             "directs": {"liste": directs_ops, "reel": len(directs_ops)},
-            "nbr_collabs_total": sum(s["reel1"] for s in n1_stats) + len(directs_ops),
+            "nbr_collabs_total": nbr_total,
         }
 
     def construire_n3_group(n3):
+        sous_n3_imbriques = sous_managers_niveau_min(n3.it, 3)
         sous_n2 = sous_managers_de(n3.it, 2)
         sous_n1_directs = sous_managers_de(n3.it, 1)
+
         n1_stats_directs = [stats_by_it[c.it] for c in sous_n1_directs if c.it in stats_by_it]
         n2_groups = [construire_n2_group(n2) for n2 in sous_n2]
+        n3_groups_imbriques = [construire_n3_group(n3b) for n3b in sous_n3_imbriques]
         directs_ops = operateurs_directs_de(n3.it)
+
         nbr_total = (
-            sum(g["nbr_collabs_total"] for g in n2_groups)
-            + sum(s["reel1"] for s in n1_stats_directs)
+            sum(g["nbr_collabs_total"] for g in n2_groups) + len(n2_groups)
+            + sum(g["nbr_collabs_total"] for g in n3_groups_imbriques) + len(n3_groups_imbriques)
+            + sum(s["reel1"] for s in n1_stats_directs) + len(n1_stats_directs)
             + len(directs_ops)
         )
         return {
             "n3": n3,
             "n1_stats_directs": n1_stats_directs,
             "n2_groups": n2_groups,
+            "n3_groups_imbriques": n3_groups_imbriques,
             "directs": {"liste": directs_ops, "reel": len(directs_ops)},
             "nbr_collabs_total": nbr_total,
         }
@@ -1050,16 +1088,15 @@ def page_N4(request):
         "n1_directs_n4": n1_stats_directs_n4,
         "n2_groups": n2_groups_directs_n4,
         "n3_groups": n3_groups,
-        "nbr_n1_total": len(vrais_n1_ids),
-        "nbr_n2_total": sum(1 for n in niveau_par_it.values() if n == 2),
-        "nbr_n3_total": sum(1 for n in niveau_par_it.values() if n >= 3),
+        "nbr_n1_total": nbr_n1_total,
+        "nbr_n2_total": nbr_n2_total,
+        "nbr_n3_total": nbr_n3_total,
         "lot_labels": lot_labels,
         "lot_reel": lot_reel_data,
         "lot_systeme": lot_systeme_data,
         "lot_maquette": lot_maquette_data,
         "lot_details": lot_details,
     })
-
 # ============================================================
 # # rederiger LISTE DES AFFECTATION DE N+4
 # ============================================================
@@ -1074,6 +1111,11 @@ def affectation_N4(request):
     ru_acceuil = request.GET.get("ru_acceuil", "").strip()
     tab_actif = request.GET.get("tab", "tab-mes")
 
+    try:
+        user = Collaborateur.objects.get(it=util)
+    except Collaborateur.DoesNotExist:
+        return redirect("login")
+
     liste_N3 = liste_N3_N4(util)
 
     tous_sous_n4 = list(liste_N3)
@@ -1082,7 +1124,9 @@ def affectation_N4(request):
     tous_sous_n4.extend(liste_N1_pr_N3(util))
 
     # FIX PERF : une requête groupée par ensemble au lieu d'une par manager.
-    toutes_declarations_N4 = list(historique_pour(liste_N3))
+    toutes_declarations_N4 = historique.objects.filter(
+        Q(initial=user.nom_complete) | Q(acceuil=user.nom_complete)
+    )
     toutes_declarations = list(historique_pour(tous_sous_n4))
 
     ensemble_onglet = toutes_declarations if tab_actif == "tab-toutes" else toutes_declarations_N4

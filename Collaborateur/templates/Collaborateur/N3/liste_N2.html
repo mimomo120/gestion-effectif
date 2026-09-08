@@ -39,6 +39,13 @@
                 <option value="operateur">Opérateurs uniquement</option>
             </select>
 
+            <select class="filter-select" id="ru_it_filter" data-filter-param="ru_it">
+                <option value="">Tous les RU</option>
+                {% for ru_id, ru_nom in ru_options %}
+                <option value="{{ ru_id }}">{{ ru_nom }}</option>
+                {% endfor %}
+            </select>
+
             <button class="btn btn-reset" id="resetBtn">
                 <i class="fas fa-redo me-2"></i>Réinitialiser
             </button>
@@ -54,7 +61,6 @@
                     <th>Utilisateur</th>
                     <th>Nom & Prénom</th>
                     <th>Lot</th>
-                    <th>Rôle</th>
                     <th>RU</th>
                 </tr>
             </thead>
@@ -66,9 +72,6 @@
                     <td class="cell-utilisateur">{{ operateur.it|default:"-" }}</td>
                     <td class="cell-nom">{{ operateur.nom_complete|default:"-" }}</td>
                     <td class="cell-lot">{{ operateur.lot|default:"-" }}</td>
-                    <td class="cell-lot">
-                        {% if operateur.est_responsable %}Responsable{% else %}Opérateur{% endif %}
-                    </td>
                     <td class="cell-utilisateur">{{ operateur.ru_nom|default:"-" }}</td>
                 </tr>
                 {% empty %}

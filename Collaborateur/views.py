@@ -569,9 +569,17 @@ def liste_N2_par_N3(request):
         for c in tous
     ]
 
+    # RU distincts présents dans la liste, pour peupler le filtre "RU"
+    ru_vus = {}
+    for c in tous:
+        if c.ru_it_id and c.ru_it_id not in ru_vus:
+            ru_vus[c.ru_it_id] = c.ru_it.nom_complete if c.ru_it else c.ru_it_id
+    ru_options = sorted(ru_vus.items(), key=lambda item: item[1] or "")
+
     return render(request, "Collaborateur/N3/liste_N2.html", {
         "operateurs": liste_finale,
         "count": len(liste_finale),
+        "ru_options": ru_options,
     })
 
 
@@ -584,6 +592,7 @@ def rechercher_N2_par_N3(request):
     q = request.GET.get("q", "").strip()
     lot = request.GET.get("choix", "").strip()
     role = request.GET.get("role", "").strip()
+    ru_it = request.GET.get("ru_it", "").strip()
     page_number = request.GET.get("page", 1)
 
     tous_les_it = get_tous_les_it_sous(it)
@@ -597,6 +606,8 @@ def rechercher_N2_par_N3(request):
         )
     if lot:
         resultat = resultat.filter(lot=lot)
+    if ru_it:
+        resultat = resultat.filter(ru_it_id=ru_it)
 
     if role == "responsable":
         resultat = resultat.filter(it__in=tous_ru_it)
@@ -979,7 +990,6 @@ def get_departement_ids_for_role(role, it):
         return []
     return list(Departement.objects.filter(**{field: it}).values_list("id", flat=True))
 
-
 def collaborateur(request):
     it = request.session.get("it")
     role = request.session.get("role")
@@ -991,6 +1001,14 @@ def collaborateur(request):
 
     collaborateurs_qs = Collaborateur.objects.filter(it__in=ids_total_r).order_by("matricule")
 
+    # RU = FK vers Collaborateur -> on filtre/affiche par son champ "it"
+    ru_choices = (
+        Collaborateur.objects.filter(it__in=ids_total_r, ru_it__isnull=False)
+        .values_list("ru_it__it", "ru_it__nom_complete")
+        .distinct()
+        .order_by("ru_it__nom_complete")
+    )
+
     paginator = Paginator(collaborateurs_qs, PER_PAGE)
     collaborateur_page = paginator.page(1)
 
@@ -1001,6 +1019,7 @@ def collaborateur(request):
             "collaborateur": collaborateur_page,
             "total_r": total_r,
             "today": today.isoformat(),
+            "ru_choices": ru_choices,
         },
     )
 
@@ -1015,6 +1034,7 @@ def collaborateur_api(request):
 
     search = request.GET.get("q", "").strip()
     lot = request.GET.get("lot", "").strip()
+    ru = request.GET.get("ru", "").strip()
     selected_date = _parse_date(request.GET.get("date"))
     page_number = request.GET.get("page", 1)
 
@@ -1027,8 +1047,10 @@ def collaborateur_api(request):
         )
     if lot:
         qs = qs.filter(lot=lot)
+    if ru:
+        qs = qs.filter(ru_it__it=ru)
 
-    qs = qs.select_related("departement").order_by("matricule")
+    qs = qs.select_related("departement", "ru_it").order_by("matricule")
 
     paginator = Paginator(qs, PER_PAGE)
     try:
@@ -1044,6 +1066,8 @@ def collaborateur_api(request):
             "it": c.it,
             "nom_complete": c.nom_complete,
             "lot": c.lot,
+            "ru_it": c.ru_it.it if c.ru_it else "",
+            "ru_nom": c.ru_it.nom_complete if c.ru_it else "",
             "departement": c.departement.abreviation if c.departement else "",
         }
         for c in page_obj

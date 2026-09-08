@@ -41,10 +41,9 @@
                 <span class="kpi-title">Effectif Réel</span>
                 <div class="kpi-val-group">
                     <span class="kpi-value">{{ colReel|default:0 }}</span>
-                    {% if MR < 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MR
-                        }}</span>
+                    {% if MR > 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MR}}</span>
                         {% else %}
-                        <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i>{{ MR }}</span>
+                        <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i> {{ MR }}</span>
                         {% endif %}
                 </div>
             </div>
@@ -58,8 +57,7 @@
                 <span class="kpi-title">Effectif Système</span>
                 <div class="kpi-val-group">
                     <span class="kpi-value">{{ colSyst|default:"3496" }}</span>
-                    {% if MS < 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i>+{{ MS
-                        }}</span>
+                    {% if MS > 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MS}}</span>
                         {% else %}
                         <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i>{{ MS }}</span>
                         {% endif %}

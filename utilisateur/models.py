@@ -31,5 +31,33 @@ class utilisateur(models.Model):
     def check_password(self, raw_password):
         return check_password(raw_password, self.password)
     def __str__(self):
-        return self.role
-    
+        return  str(self.it)
+
+
+class LoginLog(models.Model):
+    utilisateur = models.ForeignKey(
+        "utilisateur",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="login_logs"
+    )
+
+    action = models.CharField(
+        max_length=20,
+        choices=[
+            ("LOGIN", "Connexion"),
+            ("LOGOUT", "Déconnexion"),
+            ("FAILED", "Connexion échouée"),
+        ]
+    )
+
+    date_heure = models.DateTimeField(auto_now_add=True)
+
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True
+    )
+
+    def __str__(self):
+        return f"{self.utilisateur} - {self.action} - {self.date_heure}"

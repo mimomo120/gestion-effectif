@@ -27,5 +27,4 @@ urlpatterns=[
     path("filter_date2/",views.filter_date2,name="validation_filtre"),
     path('filter_date_N4', views.validation_date_N4, name='filter_date_N4'),
     path("PILOT/affectation",views.changement_dpt,name="affectation_PILOT"),
-    
 ]

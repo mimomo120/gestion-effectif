@@ -32,6 +32,13 @@
                 <option value="C">Lot C</option>
             </select>
 
+            <select class="filter-select" id="ru">
+                <option value="">Tous les RU</option>
+                {% for ru_it_val, ru_nom in ru_choices %}
+                <option value="{{ ru_it_val }}">{{ ru_nom }}</option>
+                {% endfor %}
+            </select>
+
             <input type="date" class="filter-input date-input" id="date">
 
             <button class="btn btn-reset" id="resetBtn">
@@ -49,6 +56,7 @@
                     <th>Utilisateur</th>
                     <th>Nom & Prénom</th>
                     <th>Lot</th>
+                    <th>RU</th>
                     <th>DPT</th>
                 </tr>
             </thead>
@@ -59,11 +67,12 @@
                     <td class="cell-utilisateur">{{ operateur.it }}</td>
                     <td class="cell-nom">{{ operateur.nom_complete }}</td>
                     <td class="cell-lot">{{ operateur.lot }}</td>
+                    <td class="cell-lot">{{ operateur.ru_it.nom_complete }}</td>
                     <td class="cell-lot">{{ operateur.departement.abreviation }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="empty-row">
+                    <td colspan="6" class="empty-row">
                         <i class="fas fa-inbox"></i> Aucun opérateur trouvé
                     </td>
                 </tr>
@@ -84,6 +93,7 @@
         const counter = document.getElementById("counter");
         const searchInput = document.getElementById("search");
         const lotSelect = document.getElementById("choix");
+        const ruSelect = document.getElementById("ru");
         const dateInput = document.getElementById("date");
         const resetBtn = document.getElementById("resetBtn");
         const pagination = document.getElementById("pagination");
@@ -117,7 +127,7 @@
             if (!results.length) {
                 resultat.innerHTML = `
                     <tr>
-                        <td colspan="5" class="empty-row">
+                        <td colspan="6" class="empty-row">
                             <i class="fas fa-inbox"></i> Aucun opérateur trouvé
                         </td>
                     </tr>`;
@@ -129,6 +139,7 @@
                     <td class="cell-utilisateur">${escapeHtml(c.it)}</td>
                     <td class="cell-nom">${escapeHtml(c.nom_complete)}</td>
                     <td class="cell-lot">${escapeHtml(c.lot)}</td>
+                    <td class="cell-lot">${escapeHtml(c.ru_nom)}</td>
                     <td class="cell-lot">${escapeHtml(c.departement)}</td>
                 </tr>
             `).join("");
@@ -176,6 +187,7 @@
             const params = new URLSearchParams({
                 q: searchInput.value.trim(),
                 lot: lotSelect.value,
+                ru: ruSelect.value,
                 date: dateInput.value || defaultDate,
                 page: currentPage,
             });
@@ -196,7 +208,7 @@
                     console.error(err);
                     resultat.innerHTML = `
                         <tr>
-                            <td colspan="5" class="empty-row">
+                            <td colspan="6" class="empty-row">
                                 <i class="fas fa-exclamation-triangle"></i> Erreur de chargement
                             </td>
                         </tr>`;
@@ -213,11 +225,13 @@
 
         searchInput.addEventListener("input", debouncedApplyFilters);
         lotSelect.addEventListener("change", () => { currentPage = 1; applyFilters(); });
+        ruSelect.addEventListener("change", () => { currentPage = 1; applyFilters(); });
         dateInput.addEventListener("change", () => { currentPage = 1; applyFilters(); });
 
         resetBtn.addEventListener("click", () => {
             searchInput.value = "";
             lotSelect.value = "";
+            ruSelect.value = "";
             dateInput.value = defaultDate;
             currentPage = 1;
             applyFilters();

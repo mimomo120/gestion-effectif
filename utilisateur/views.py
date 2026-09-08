@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect , get_object_or_404
-from utilisateur.models import utilisateur
+from utilisateur.models import utilisateur , LoginLog
 from Collaborateur.models import  Departement , Collaborateur ,Unite
 from django.contrib.auth.hashers import make_password , check_password
 from django.db.models import Q ,Count ,Max ,F
@@ -65,8 +65,13 @@ def login_view(request):
                     roles_disponibles.append("DRH")
                 if utilis.PILOT :
                     roles_disponibles.append("PILOT")
-
+                
                 request.session['roles_disponibles'] = roles_disponibles
+                LoginLog.objects.create(
+    utilisateur=utilis,
+    action="LOGIN",
+    ip_address=request.META.get("REMOTE_ADDR")
+)
                 if utilis.role == "N+1":
                     return redirect('dashboard_N1')
 
@@ -89,6 +94,11 @@ def login_view(request):
                 elif utilis.role == "PILOT":
                     return redirect('pilot')
             else:
+                LoginLog.objects.create(
+        utilisateur=utilis,
+        action="FAILED",
+        ip_address=request.META.get("REMOTE_ADDR")
+    )
                 return render(
                     request,
                     "utilisateur/login.html",
@@ -178,20 +188,23 @@ def determiner_hierarchie(it_val):
     liste_N4.discard(None)
     liste4 = Collaborateur.objects.filter(it__in=liste_N4)
     l4 = set(liste4.values_list("it", flat=True))
-    n1_flag = 1 if it_val in l1 else 0
-    n2_flag = 1 if it_val in l2 else 0
-    n3_flag = 1 if it_val in l3 else 0
-    n4_flag = 1 if it_val in l4 else 0
 
-    role_calcule = None
+    # On ne retient que le niveau le plus élevé auquel it_val appartient.
     if it_val in l4:
         role_calcule = "N+4"
+        n1_flag, n2_flag, n3_flag, n4_flag = 0, 0, 0, 1
     elif it_val in l3:
         role_calcule = "N+3"
+        n1_flag, n2_flag, n3_flag, n4_flag = 0, 0, 1, 0
     elif it_val in l2:
         role_calcule = "N+2"
+        n1_flag, n2_flag, n3_flag, n4_flag = 0, 1, 0, 0
     elif it_val in l1:
         role_calcule = "N+1"
+        n1_flag, n2_flag, n3_flag, n4_flag = 1, 0, 0, 0
+    else:
+        role_calcule = None
+        n1_flag, n2_flag, n3_flag, n4_flag = 0, 0, 0, 0
 
     return role_calcule, n1_flag, n2_flag, n3_flag, n4_flag
 
@@ -311,7 +324,13 @@ def verifier(request):
         return JsonResponse({"valide": nbr})
 
 def deconnecter(request):
+    it = request.session.get("it")
     request.session.flush()
+    LoginLog.objects.create(
+    utilisateur=it,
+    action="LOGOUT",
+    ip_address=request.META.get("REMOTE_ADDR")
+)
     return redirect("login")
 
 # ============================================================
@@ -841,8 +860,8 @@ def dashboard_rh(request):
         "colReel": colReel,
         "today": today,
         "maquette": maquette,
-        "MS": maquette - colSyst,
-        "MR": maquette - colReel,
+        "MS": colSyst - maquette ,
+        "MR": colReel - maquette,
         "labels": graphe["labels"],
         "valeurs": graphe["valeurs"],
         "detail_par_dept": detail_par_dept,
