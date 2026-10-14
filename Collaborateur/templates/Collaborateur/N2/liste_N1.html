@@ -12,19 +12,7 @@
 {% block content %}
 <div class="operateurs-container">
 
-    <h1 class="page-title">Responsables</h1>
-
-    <!-- Onglets -->
-    <div class="affectation-tabs">
-        <button type="button" class="affectation-tab active" data-tab="collab-directs">
-            Collaborateurs directs
-            <span class="tab-count">{{ col|length }}</span>
-        </button>
-        <button type="button" class="affectation-tab" data-tab="ru">
-            Responsables d'unités
-            <span class="tab-count">{{ operateurs|length }}</span>
-        </button>
-    </div>
+    <h1 class="page-title"> <i class="fas fa-users"></i> Collaborateurs :</h1>
 
     <!-- Filtres & Recherche -->
     <div class="search-filter-bar">
@@ -50,8 +38,8 @@
         </button>
     </div>
 
-    <!-- Panneau 1 : Collaborateurs Directs -->
-    <div class="section-card resp-panel" id="panel-collab-directs">
+    <!-- Panneau : Liste des Responsables (N+1) -->
+    <div class="section-card resp-panel" id="panel-ru">
         <div class="table-container">
             <table class="table-operateurs">
                 <thead>
@@ -62,8 +50,8 @@
                         <th>Lot</th>
                     </tr>
                 </thead>
-                <tbody id="result-collab">
-                    {% for c in col %}
+                <tbody id="result">
+                    {% for c in operateurs %}
                     <tr data-search="{{ c.matricule|lower }} {{ c.it|lower }} {{ c.nom_complete|lower }}"
                         data-lot="{{ c.lot }}">
                         <td class="fw-semibold text-secondary">{{ c.matricule|default:"-" }}</td>
@@ -78,51 +66,6 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center py-4 text-muted">
-                            <i class="fas fa-inbox me-2"></i> Aucun collaborateur direct
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Panneau 2 : Responsables d'Unité -->
-    <div class="section-card resp-panel d-none" id="panel-ru">
-        <div class="table-container">
-            <table class="table-operateurs">
-                <thead>
-                    <tr>
-                        <th>Matricule</th>
-                        <th>Utilisateur</th>
-                        <th>Nom & Prénom</th>
-                        <th>Lot</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="result">
-                    {% for operateur in operateurs %}
-                    <tr data-search="{{ operateur.matricule|lower }} {{ operateur.it|lower }} {{ operateur.nom_complete|lower }}"
-                        data-lot="{{ operateur.lot }}">
-                        <td class="fw-semibold text-secondary">{{ operateur.matricule|default:"-" }}</td>
-                        <td>{{ operateur.it|default:"-" }}</td>
-                        <td>
-                            <div class="user-cell">
-                                <div class="user-avatar">{{ operateur.nom_complete|slice:":1" }}</div>
-                                <span class="fw-medium">{{ operateur.nom_complete|default:"-" }}</span>
-                            </div>
-                        </td>
-                        <td><span class="badge-lot" data-lot="{{ operateur.lot }}">{{ operateur.lot|default:"-"}}</span></td>
-                        <td class="text-end">
-                            <button type="button" class="btn-voir-collab" data-it="{{ operateur.it }}"
-                                data-nom="{{ operateur.nom_complete }}">
-                                <i class="fas fa-users"></i> Voir l'équipe
-                            </button>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
                         <td colspan="5" class="text-center py-4 text-muted">
                             <i class="fas fa-inbox me-2"></i> Aucun responsable trouvé
                         </td>
@@ -131,6 +74,34 @@
                 </tbody>
             </table>
         </div>
+
+        {% if operateurs.has_other_pages %}
+        <div class="table-footer">
+            <ul class="pagination">
+                {% if operateurs.has_previous %}
+                <li><a class="page-link" href="?page_ru={{ operateurs.previous_page_number }}"><i
+                            class="fas fa-chevron-left"></i></a></li>
+                {% else %}
+                <li><span class="page-link disabled"><i class="fas fa-chevron-left"></i></span></li>
+                {% endif %}
+
+                {% for num in operateurs.paginator.page_range %}
+                {% if num == operateurs.number %}
+                <li><span class="page-link active">{{ num }}</span></li>
+                {% else %}
+                <li><a class="page-link" href="?page_ru={{ num }}">{{ num }}</a></li>
+                {% endif %}
+                {% endfor %}
+
+                {% if operateurs.has_next %}
+                <li><a class="page-link" href="?page_ru={{ operateurs.next_page_number }}"><i
+                            class="fas fa-chevron-right"></i></a></li>
+                {% else %}
+                <li><span class="page-link disabled"><i class="fas fa-chevron-right"></i></span></li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
     </div>
 
 </div>
@@ -156,32 +127,12 @@
 {{ block.super }}
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        const tabs = document.querySelectorAll(".affectation-tab");
-        const panels = {
-            "collab-directs": document.getElementById("panel-collab-directs"),
-            "ru": document.getElementById("panel-ru"),
-        };
         const search = document.getElementById("search");
         const lotFilter = document.getElementById("choix");
         const resetBtn = document.getElementById("resetBtn");
-
-        function activeTabKey() {
-            return document.querySelector(".affectation-tab.active").dataset.tab;
-        }
-
-        tabs.forEach(function (tab) {
-            tab.addEventListener("click", function () {
-                tabs.forEach(function (t) { t.classList.remove("active"); });
-                tab.classList.add("active");
-                Object.keys(panels).forEach(function (key) {
-                    panels[key].classList.toggle("d-none", key !== tab.dataset.tab);
-                });
-                appliquerFiltres();
-            });
-        });
+        const panel = document.getElementById("panel-ru");
 
         function appliquerFiltres() {
-            const panel = panels[activeTabKey()];
             if (!panel) return;
             const rows = panel.querySelectorAll("tbody tr[data-search]");
             const q = (search.value || "").toLowerCase().trim();
@@ -194,13 +145,15 @@
             });
         }
 
-        search.addEventListener("input", appliquerFiltres);
-        lotFilter.addEventListener("change", appliquerFiltres);
-        resetBtn.addEventListener("click", function () {
-            search.value = "";
-            lotFilter.value = "";
-            appliquerFiltres();
-        });
+        if (search) search.addEventListener("input", appliquerFiltres);
+        if (lotFilter) lotFilter.addEventListener("change", appliquerFiltres);
+        if (resetBtn) {
+            resetBtn.addEventListener("click", function () {
+                search.value = "";
+                lotFilter.value = "";
+                appliquerFiltres();
+            });
+        }
 
         // Gestion Modal
         const popup = document.getElementById("popup-collab");
@@ -215,20 +168,20 @@
         if (overlay) document.body.appendChild(overlay);
 
         function fermerPopup() {
-            popup.classList.remove("active");
-            overlay.classList.remove("active");
+            if (popup) popup.classList.remove("active");
+            if (overlay) overlay.classList.remove("active");
         }
 
         function ouvrirPopup(btn) {
             const it = btn.dataset.it;
             const nom = btn.dataset.nom || "-";
 
-            popupNom.textContent = nom;
-            popupCount.textContent = "";
-            popupBody.innerHTML = '<div class="popup-collab-loading"><i class="fas fa-spinner fa-spin me-2"></i>Chargement...</div>';
+            if (popupNom) popupNom.textContent = nom;
+            if (popupCount) popupCount.textContent = "";
+            if (popupBody) popupBody.innerHTML = '<div class="popup-collab-loading"><i class="fas fa-spinner fa-spin me-2"></i>Chargement...</div>';
 
-            popup.classList.add("active");
-            overlay.classList.add("active");
+            if (popup) popup.classList.add("active");
+            if (overlay) overlay.classList.add("active");
 
             fetch(`/collaborateurs-ru/${encodeURIComponent(it)}/`)
                 .then(res => {
@@ -237,10 +190,10 @@
                 })
                 .then(data => {
                     const liste = data.collaborateurs || [];
-                    popupCount.textContent = liste.length ? `(${liste.length})` : "";
+                    if (popupCount) popupCount.textContent = liste.length ? `(${liste.length})` : "";
 
                     if (liste.length === 0) {
-                        popupBody.innerHTML = '<div class="popup-collab-empty">Aucun collaborateur trouvé.</div>';
+                        if (popupBody) popupBody.innerHTML = '<div class="popup-collab-empty">Aucun collaborateur trouvé.</div>';
                         return;
                     }
 
@@ -264,10 +217,10 @@
                         </div>`;
                     });
 
-                    popupBody.innerHTML = html;
+                    if (popupBody) popupBody.innerHTML = html;
                 })
                 .catch(() => {
-                    popupBody.innerHTML = '<div class="popup-collab-empty">Erreur lors du chargement des données.</div>';
+                    if (popupBody) popupBody.innerHTML = '<div class="popup-collab-empty">Erreur lors du chargement des données.</div>';
                 });
         }
 
@@ -280,8 +233,8 @@
             });
         }
 
-        popupClose.addEventListener("click", fermerPopup);
-        overlay.addEventListener("click", fermerPopup);
+        if (popupClose) popupClose.addEventListener("click", fermerPopup);
+        if (overlay) overlay.addEventListener("click", fermerPopup);
         document.addEventListener("keydown", e => { if (e.key === "Escape") fermerPopup(); });
     });
 </script>

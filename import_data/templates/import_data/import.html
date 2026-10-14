@@ -53,28 +53,6 @@
                     </div>
                 </div>
             </div>
-
-            <div class="col-12 col-md-6 col-xl-3">
-                <div class="guide-card h-100">
-                    <div class="guide-card-header text-primary">
-                        <i class="fas fa-sitemap"></i>
-                        <strong>Unités</strong>
-                    </div>
-                    <p class="guide-text">Colonne requise (*)</p>
-                    <div class="column-tags">
-                        <span class="tag tag-required">Abréviation *</span>
-                        <span class="tag">Nom</span>
-                        <span class="tag">Maquette</span>
-                        <span class="tag">T</span>
-                        <span class="tag">A</span>
-                        <span class="tag">P</span>
-                        <span class="tag">C</span>
-                    </div>
-                    <small class="text-muted mt-2 d-block" style="font-size: 0.725rem;">* P, T, A, C doivent être des
-                        entiers.</small>
-                </div>
-            </div>
-
             <div class="col-12 col-md-6 col-xl-3">
                 <div class="guide-card h-100">
                     <div class="guide-card-header text-primary">
@@ -107,7 +85,6 @@
                         <span class="tag tag-required">Lot *</span>
                         <span class="tag tag-required">Matricule*</span>
                         <span class="tag">DPT</span>
-                        <span class="tag">Unité</span>
                         <span class="tag">Équipe</span>
                         <span class="tag">Shift</span>
                         <span class="tag">Sexe</span>
@@ -117,7 +94,45 @@
             </div>
         </div>
     </div>
+{% if messages %}
+<div class="container mt-3">
 
+    {% for message in messages %}
+
+    {% if 'error' in message.tags %}
+    {% with alert_class='danger' %}
+    <div class="alert alert-{{ alert_class }} alert-dismissible fade show" role="alert">
+        <i class="fas fa-circle-exclamation me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endwith %}
+
+    {% elif 'warning' in message.tags %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="fas fa-triangle-exclamation me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    {% elif 'success' in message.tags %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-circle-check me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    {% else %}
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    {% endfor %}
+
+</div>
+{% endif %}
     <!-- Zone de téléchargement -->
     <div class="import-card-form mb-4">
         <form method="post" enctype="multipart/form-data">
@@ -134,19 +149,6 @@
                     <small class="import-error">{{ error }}</small>
                     {% endfor %}
                 </div>
-
-                <div>
-                    <label for="{{ form.fichier_unite.id_for_label }}" class="import-field-label">
-                        <i class="fas fa-sitemap me-1 text-secondary"></i> Unités
-                    </label>
-                    <div class="file-input-wrapper">
-                        {{ form.fichier_unite }}
-                    </div>
-                    {% for error in form.fichier_unite.errors %}
-                    <small class="import-error">{{ error }}</small>
-                    {% endfor %}
-                </div>
-
                 <div>
                     <label for="{{ form.fichier_changement.id_for_label }}" class="import-field-label">
                         <i class="fas fa-exchange-alt me-1 text-secondary"></i> Changements d'affectation
@@ -186,7 +188,6 @@
             <h5 class="history-card-title mb-0">
                 <i class="fas fa-history me-2 text-primary"></i> Historique récent
             </h5>
-            <!-- NOUVEAU : ouvre le popup avec l'historique complet + filtre par date -->
             <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal"
                 data-bs-target="#modalHistoriqueComplet">
                 <i class="fas fa-list me-2"></i>Voir tout l'historique
@@ -222,8 +223,11 @@
                         </td>
                         <td><span class="badge bg-warning-subtle text-warning fw-bold">{{ item.modif|default:0 }}</span>
                         </td>
-                        <td><span class="badge bg-danger-subtle text-danger fw-bold">{{ item.supprime|default:0}}</span></td>
-                        <td><span class="badge bg-secondary-subtle text-secondary fw-bold">{{item.date|default:0}}</span></td>
+                        <td><span class="badge bg-danger-subtle text-danger fw-bold">{{ item.supprime|default:0}}</span>
+                        </td>
+                        <td><span
+                                class="badge bg-secondary-subtle text-secondary fw-bold">{{item.date|default:0}}</span>
+                        </td>
                         <td>
                             {% if item.statut == "SUCCES" %}
                             <span
@@ -259,11 +263,11 @@
     </div>
 </div>
 
-<!-- Modales détails import -->
+<!-- Modales détails import (10 derniers) -->
 {% for item in historique_imports %}
 <div class="modal fade" id="modalDetails{{ item.id }}" tabindex="-1" aria-labelledby="label{{ item.id }}"
     aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="label{{ item.id }}">
@@ -271,6 +275,20 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
+
+            <!-- Barre de filtre par action -->
+            <div class="details-filtre-bar">
+                <label for="filtreAction{{ item.id }}" class="details-filtre-label">Filtrer par action :</label>
+                <select class="form-select form-select-sm details-filtre-select" id="filtreAction{{ item.id }}"
+                    onchange="filtrerActions('{{ item.id }}')">
+                    <option value="">Toutes les actions</option>
+                    <option value="CREATION">Créations</option>
+                    <option value="MODIFICATION">Modifications</option>
+                    <option value="SUPPRESSION">Suppressions</option>
+                    <option value="ERREUR">Erreurs</option>
+                </select>
+            </div>
+
             <div class="modal-body p-0">
                 <table class="table table-striped mb-0">
                     <thead class="table-light">
@@ -299,12 +317,10 @@
 </div>
 {% endfor %}
 
-<!-- ================================================================
-     NOUVEAU : Popup "Historique complet" avec filtre par date
-     ================================================================ -->
+<!-- Popup "Historique complet" avec filtre par date -->
 <div class="modal fade" id="modalHistoriqueComplet" tabindex="-1" aria-labelledby="labelHistoriqueComplet"
     aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="labelHistoriqueComplet">
@@ -313,7 +329,6 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
             <div class="modal-body">
-                <!-- Filtre par plage de dates -->
                 <form id="formFiltreHistorique" class="row g-2 align-items-end mb-3">
                     <div class="col-auto">
                         <label for="filtreDateDebut" class="form-label mb-1 small">Du</label>
@@ -369,17 +384,29 @@
     </div>
 </div>
 
-<!-- Modal de détails générique, utilisé par les lignes de l'historique complet
-     chargées dynamiquement (elles n'ont pas de modal dédié pré-rendu côté
-     serveur comme les 10 derniers imports). -->
+<!-- Modal de détails générique (lignes chargées dynamiquement) -->
 <div class="modal fade" id="modalDetailsGenerique" tabindex="-1" aria-labelledby="labelDetailsGenerique"
     aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="labelDetailsGenerique">Détails de l'import</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
+
+            <!-- Barre de filtre par action -->
+            <div class="details-filtre-bar">
+                <label for="filtreActionGenerique" class="details-filtre-label">Filtrer par action :</label>
+                <select class="form-select form-select-sm details-filtre-select" id="filtreActionGenerique"
+                    onchange="filtrerActions('Generique')">
+                    <option value="">Toutes les actions</option>
+                    <option value="CREATION">Créations</option>
+                    <option value="MODIFICATION">Modifications</option>
+                    <option value="SUPPRESSION">Suppressions</option>
+                    <option value="ERREUR">Erreurs</option>
+                </select>
+            </div>
+
             <div class="modal-body p-0">
                 <table class="table table-striped mb-0">
                     <thead class="table-light">
@@ -407,15 +434,11 @@
     </div>
 </div>
 
-<!-- ================================================================
-     NOUVEAU : Popup de synthèse des déclarations vs fichier importé
-     (DRH / SUPER uniquement — la vue elle-même est protégée par
-     @role_required(['SUPER', 'DRH']), donc pas de re-vérification ici)
-     ================================================================ -->
+<!-- Popup de synthèse des déclarations vs fichier importé -->
 {% if synthese_declarations %}
 <div class="modal fade" id="modalSyntheseDeclarations" tabindex="-1" aria-labelledby="labelSyntheseDeclarations"
     aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="labelSyntheseDeclarations">
@@ -539,10 +562,74 @@
 <script>
     const URL = "{% url 'import_details_json' 0 %}";
 
-    document.querySelectorAll('[id^="modalDetails"]').forEach(modal => {
+    // Correspondance action -> classe CSS du badge
+    const ACTION_BADGE_CLASS = {
+        "CREATION": "badge-action-creation",
+        "MODIFICATION": "badge-action-modification",
+        "SUPPRESSION": "badge-action-suppression",
+        "ERREUR": "badge-action-erreur",
+    };
+
+    const ACTION_LABEL = {
+        "CREATION": "Création",
+        "MODIFICATION": "Modification",
+        "SUPPRESSION": "Suppression",
+        "ERREUR": "Erreur",
+    };
+
+    // Construit une ligne <tr> pour une entrée de détail d'import
+    function ligneDetail(d) {
+        const cls = ACTION_BADGE_CLASS[d.action] || "badge-action-defaut";
+        const label = ACTION_LABEL[d.action] || d.action;
+        return `
+            <tr>
+                <td><span class="badge-action ${cls}" data-action="${d.action}">${label}</span></td>
+                <td>${d.it || '-'}</td>
+                <td>${d.matricule || '-'}</td>
+                <td>${d.nom_complete || '-'}</td>
+                <td>${d.champ_modifie || '-'}</td>
+                <td class="text-muted"><small>${d.ancienne_valeur || '-'}</small></td>
+                <td class="fw-bold"><small>${d.nouvelle_valeur || '-'}</small></td>
+            </tr>`;
+    }
+
+    // Filtre les lignes déjà rendues dans une modale de détails selon l'action choisie
+    function filtrerActions(id) {
+        const select = document.getElementById('filtreAction' + id);
+        if (!select) return;
+        const valeur = select.value;
+        const tbody = document.getElementById('detailsBody' + id);
+        if (!tbody) return;
+
+        let visibles = 0;
+        tbody.querySelectorAll('tr').forEach(row => {
+            const badge = row.querySelector('.badge-action');
+            if (!badge) return; // ligne "Aucun détail" / "Chargement..."
+            const match = !valeur || badge.dataset.action === valeur;
+            row.style.display = match ? '' : 'none';
+            if (match) visibles++;
+        });
+
+        // Message si le filtre ne retourne rien
+        let ligneVide = tbody.querySelector('.ligne-filtre-vide');
+        if (visibles === 0 && tbody.querySelector('.badge-action')) {
+            if (!ligneVide) {
+                ligneVide = document.createElement('tr');
+                ligneVide.className = 'ligne-filtre-vide';
+                ligneVide.innerHTML = '<td colspan="7" class="text-center py-3 text-muted">Aucun résultat pour ce filtre.</td>';
+                tbody.appendChild(ligneVide);
+            }
+        } else if (ligneVide) {
+            ligneVide.remove();
+        }
+    }
+
+    document.querySelectorAll('[id^="modalDetails"]:not(#modalDetailsGenerique)').forEach(modal => {
         modal.addEventListener('show.bs.modal', function () {
             const importId = this.id.replace('modalDetails', '');
             const tbody = document.getElementById('detailsBody' + importId);
+            const filtreSelect = document.getElementById('filtreAction' + importId);
+            if (filtreSelect) filtreSelect.value = '';
             const url = URL.replace('/0/', '/' + importId + '/');
 
             fetch(url)
@@ -552,26 +639,11 @@
                         tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">Aucun détail enregistré pour cet import.</td></tr>';
                         return;
                     }
-
-                    tbody.innerHTML = data.details.map(d => `
-                        <tr>
-                            <td><span class="badge bg-secondary-subtle text-secondary">${d.action}</span></td>
-                            <td>${d.it || '-'}</td>
-                            <td>${d.matricule || '-'}</td>
-                            <td>${d.nom_complete || '-'}</td>
-                            <td>${d.champ_modifie || '-'}</td>
-                            <td class="text-muted"><small>${d.ancienne_valeur || '-'}</small></td>
-                            <td class="fw-bold"><small>${d.nouvelle_valeur || '-'}</small></td>
-                        </tr>
-                    `).join('');
+                    tbody.innerHTML = data.details.map(ligneDetail).join('');
                 });
         });
     });
 
-    // Ouvre automatiquement la popup de synthèse des déclarations UNIQUEMENT
-    // juste après un import réussi (just_imported=True). Sur un simple
-    // rechargement de page, elle reste accessible via le bouton "Voir la
-    // synthèse des déclarations" mais ne s'ouvre plus toute seule.
     {% if just_imported %}
     document.addEventListener("DOMContentLoaded", () => {
         const modalSyntheseEl = document.getElementById("modalSyntheseDeclarations");
@@ -585,7 +657,7 @@
        HISTORIQUE COMPLET DES IMPORTS + FILTRE PAR DATE
        ========================================================= */
     const URL_HISTORIQUE = "{% url 'historique_imports_json' %}";
-    const URL_DETAILS_BASE = "{% url 'import_details_json' 0 %}"; // remplacer le 0 par l'id réel
+    const URL_DETAILS_BASE = "{% url 'import_details_json' 0 %}";
 
     const STATUT_BADGE_HTML = (statut, label) => {
         const classes = {
@@ -648,6 +720,9 @@
     function voirDetailsImportGenerique(importId, nomFichier) {
         const titre = document.getElementById("labelDetailsGenerique");
         const corps = document.getElementById("detailsBodyGenerique");
+        const filtreSelect = document.getElementById("filtreActionGenerique");
+        if (filtreSelect) filtreSelect.value = '';
+
         titre.textContent = `Détails de l'import #${importId} - ${nomFichier}`;
         corps.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">Chargement...</td></tr>';
 
@@ -658,17 +733,7 @@
                 if (!data.details.length) {
                     corps.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">Aucun détail enregistré pour cet import.</td></tr>';
                 } else {
-                    corps.innerHTML = data.details.map(d => `
-                        <tr>
-                            <td><span class="badge bg-secondary-subtle text-secondary">${d.action}</span></td>
-                            <td>${d.it || '-'}</td>
-                            <td>${d.matricule || '-'}</td>
-                            <td>${d.nom_complete || '-'}</td>
-                            <td>${d.champ_modifie || '-'}</td>
-                            <td class="text-muted"><small>${d.ancienne_valeur || '-'}</small></td>
-                            <td class="fw-bold"><small>${d.nouvelle_valeur || '-'}</small></td>
-                        </tr>
-                    `).join('');
+                    corps.innerHTML = data.details.map(ligneDetail).join('');
                 }
                 const modalGenerique = bootstrap.Modal.getOrCreateInstance(document.getElementById("modalDetailsGenerique"));
                 modalGenerique.show();
@@ -678,7 +743,6 @@
     document.addEventListener("DOMContentLoaded", () => {
         const modalHistoriqueEl = document.getElementById("modalHistoriqueComplet");
         if (modalHistoriqueEl) {
-            // Chargement initial (sans filtre) à chaque ouverture du popup
             modalHistoriqueEl.addEventListener("show.bs.modal", () => {
                 const dateDebut = document.getElementById("filtreDateDebut").value;
                 const dateFin = document.getElementById("filtreDateFin").value;

@@ -33,12 +33,12 @@
                 <span class="kpi-label">Effectif Réel</span>
             </div>
             <div class="kpi-value">{{ reel|default:"0" }}</div>
-            {% if diff_r_m > 0 %} <div class="badge-vs positive">
+            {% if diff_r_m > 0 %}
+            <div class="badge-vs positive">
                 <i class="fas fa-arrow-up me-1"></i> +{{ diff_r_m|default:"0" }} vs Maquette
-        </div>
-        {% elif diff_r_m < 0 %}
-        <div class="badge-vs negative">
-            <i class="fas fa-arrow-down me-1"></i>{{ diff_r_m|default:"0" }} vs Maquette
+            </div>
+            {% elif diff_r_m < 0 %} <div class="badge-vs negative">
+                <i class="fas fa-arrow-down me-1"></i>{{ diff_r_m|default:"0" }} vs Maquette
         </div>
         {% endif %}
     </div>
@@ -50,12 +50,12 @@
             <span class="kpi-label">Effectif Système</span>
         </div>
         <div class="kpi-value">{{ syste|default:"0" }}</div>
-        {% if diff_s_m > 0 %} <div class="badge-vs positive">
+        {% if diff_s_m > 0 %}
+        <div class="badge-vs positive">
             <i class="fas fa-arrow-up me-1"></i>+{{ diff_s_m|default:"0" }} vs Maquette
-    </div>
-    {% elif diff_s_m < 0 %}
-    <div class="badge-vs negative">
-        <i class="fas fa-arrow-down me-1"></i>{{ diff_s_m|default:"0" }} vs Maquette
+        </div>
+        {% elif diff_s_m < 0 %} <div class="badge-vs negative">
+            <i class="fas fa-arrow-down me-1"></i>{{ diff_s_m|default:"0" }} vs Maquette
     </div>
     {% endif %}
 </div>
@@ -73,9 +73,6 @@
 </div>
 </div>
 
-
-
-
 <!-- Graphiques -->
 <div class="charts-grid mb-4">
     <div class="chart-card">
@@ -92,11 +89,16 @@
         </div>
     </div>
 </div>
+
 <!-- Section Derniers Mouvements du RU -->
 <div class="table-card mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="table-title mb-0">Derniers mouvements effectués</h2>
-        <span class="badge bg-light text-dark fw-normal border">Historique récent</span>
+        <!-- Bouton modale cliquable -->
+        <button type="button" class="btn btn-sm btn-outline-secondary fw-normal border" data-bs-toggle="modal"
+            data-bs-target="#historiqueModal">
+            <i class="fas fa-history me-1"></i> Historique récent
+        </button>
     </div>
     <div class="table-responsive">
         <table class="custom-table">
@@ -153,6 +155,7 @@
         </table>
     </div>
 </div>
+
 <!-- Section Écarts (Tableaux) -->
 <div class="tables-section">
     <!-- Écart Système / Réel -->
@@ -231,22 +234,82 @@
 </div>
 
 </div>
+
+<!-- Modal Historique des Mouvements -->
+<!-- Modal Historique des Mouvements -->
+<div class="modal fade" id="historiqueModal" tabindex="-1" aria-labelledby="historiqueModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="historiqueModalLabel">
+                    <i class="fas fa-history text-primary me-2"></i>Historique complet des mouvements
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Formulaire de filtrage par date avec bouton Effacer -->
+                <form id="filterHistoriqueForm" class="row g-3 align-items-end mb-4">
+                    <div class="col-md-4">
+                        <label for="date_debut" class="form-label small text-muted">Date début</label>
+                        <input type="date" class="form-control form-control-sm" id="date_debut" name="date_debut">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="date_fin" class="form-label small text-muted">Date fin</label>
+                        <input type="date" class="form-control form-control-sm" id="date_fin" name="date_fin">
+                    </div>
+                    <div class="col-md-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                            <i class="fas fa-filter me-1"></i> Filtrer
+                        </button>
+                        <button type="button" id="resetFilterBtn" class="btn btn-outline-secondary btn-sm"
+                            title="Effacer les filtres">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Tableau dynamique de la modale -->
+                <div class="table-responsive">
+                    <table class="custom-table table-sm enterprise-table">
+                        <thead>
+                            <tr>
+                                <th>DATE</th>
+                                <th>COLLABORATEUR</th>
+                                <th>IT</th>
+                                <th>NATURE</th>
+                                <th>STATUT / DÉTAIL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historiqueModalBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-3">Chargement en cours...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block script %}
 {{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        // --- 1. GRAPHIQUE D'ÉVOLUTION DE L'EFFECTIF RÉEL ---
         const dynamicLabels = JSON.parse('{{ chart_labels|safe }}');
         const dynamicData = JSON.parse('{{ chart_data|safe }}');
 
-        // Calcul dynamique de l'axe Y pour éviter les distorsions
         const minVal = Math.min(...dynamicData);
         const maxVal = Math.max(...dynamicData);
         const padding = Math.ceil((maxVal - minVal) * 0.2) || 5;
 
-        // Chart Évolution Réel
         const ctx = document.getElementById('evolutionRUChart').getContext('2d');
         const gradient = ctx.createLinearGradient(0, 0, 0, 240);
         gradient.addColorStop(0, 'rgba(37, 99, 235, 0.2)');
@@ -285,7 +348,7 @@
             }
         });
 
-        // Chart Réel vs Maquette vs Système par Lot
+        // --- 2. GRAPHIQUE COMPARATIF PAR LOT ---
         const reelParLot = JSON.parse('{{ reel_par_lot_json|safe }}');
         const maquetteParLot = JSON.parse('{{ maquette_par_lot_json|safe }}');
         const systemeParLot = JSON.parse('{{ systeme_par_lot_json|safe }}');
@@ -328,6 +391,55 @@
                 }
             }
         });
+
+        // --- 3. GESTION DE LA MODALE ET DU FILTRE AJAX ---
+        const historiqueModal = document.getElementById('historiqueModal');
+        const historiqueBody = document.getElementById('historiqueModalBody');
+        const filterForm = document.getElementById('filterHistoriqueForm');
+        const resetFilterBtn = document.getElementById('resetFilterBtn');
+
+        function fetchHistorique(urlParams = '') {
+            fetch(`?load_modal=1&${urlParams}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    historiqueBody.innerHTML = data.html;
+                })
+                .catch(error => {
+                    historiqueBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3">Erreur lors du chargement.</td></tr>`;
+                });
+        }
+
+        // Chargement automatique à l'ouverture de la modale
+        if (historiqueModal) {
+            historiqueModal.addEventListener('show.bs.modal', function () {
+                if (filterForm) filterForm.reset();
+                fetchHistorique();
+            });
+        }
+
+        // Soumission du formulaire de filtre par date
+        if (filterForm) {
+            filterForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const formData = new FormData(filterForm);
+                const params = new URLSearchParams(formData).toString();
+                historiqueBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Filtrage en cours...</td></tr>`;
+                fetchHistorique(params);
+            });
+        }
+
+        // Réinitialisation / Effacer les filtres
+        if (resetFilterBtn) {
+            resetFilterBtn.addEventListener('click', function () {
+                if (filterForm) filterForm.reset();
+                historiqueBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Chargement en cours...</td></tr>`;
+                fetchHistorique();
+            });
+        }
     });
 </script>
 {% endblock %}

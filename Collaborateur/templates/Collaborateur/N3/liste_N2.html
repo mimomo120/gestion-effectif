@@ -10,83 +10,103 @@
 {% endblock %}
 
 {% block content %}
-<div class="operateurs-container">
-    <header class="header">
+<div class="page-container">
+    <!-- En-tête de la page -->
+    <header class="header-section">
         <h1>Responsables</h1>
-        <div class="time">
-            <span id="counter" aria-live="polite">Total : {{ count }}</span>
-        </div>
+        <p>Gestion et suivi de l'ensemble des responsables d'unité</p>
     </header>
 
-    <!-- Filters Section -->
-    <div class="filters-section">
-        <div class="filter-group">
-            <input type="text" placeholder="Rechercher par matricule ou nom" class="filter-input search-input"
-                id="search">
+    <!-- Carte Principale -->
+    <div class="content-card">
+        <!-- Barre d'outils et filtres -->
+        <div class="toolbar">
+            <div class="filters-left">
+                <!-- Recherche -->
+                <div class="filter-item">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" placeholder="Rechercher par matricule ou nom" class="input-control"
+                            id="search">
+                    </div>
+                </div>
 
-            <select class="filter-select" id="choix">
-                <option value="">Tous les lots</option>
-                <option value="A">Lot A</option>
-                <option value="O">Lot O</option>
-                <option value="P">Lot P</option>
-                <option value="E">Lot E</option>
-                <option value="C">Lot C</option>
-            </select>
+                <!-- Filtre Lot -->
+                <div class="filter-item">
+                    <select class="input-control select-control" id="choix">
+                        <option value="">Tous les lots</option>
+                        <option value="A">Lot A</option>
+                        <option value="O">Lot O</option>
+                        <option value="P">Lot P</option>
+                        <option value="E">Lot E</option>
+                        <option value="C">Lot C</option>
+                    </select>
+                </div>
 
-            <select class="filter-select" id="filtre-role">
-                <option value="">Tous les rôles</option>
-                <option value="responsable">Responsables uniquement</option>
-                <option value="operateur">Opérateurs uniquement</option>
-            </select>
+                <!-- Filtre RU -->
+                <div class="filter-item">
+                    <select class="input-control select-control" id="ru_it_filter" data-filter-param="ru_it">
+                        <option value="">Tous les RU</option>
+                        {% for ru_id, ru_nom in ru_options %}
+                        <option value="{{ ru_id }}">{{ ru_nom }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-            <select class="filter-select" id="ru_it_filter" data-filter-param="ru_it">
-                <option value="">Tous les RU</option>
-                {% for ru_id, ru_nom in ru_options %}
-                <option value="{{ ru_id }}">{{ ru_nom }}</option>
-                {% endfor %}
-            </select>
+                <!-- Bouton Réinitialiser -->
+                <button type="button" class="btn-secondary" id="resetBtn">
+                    <i class="fas fa-redo"></i>Réinitialiser
+                </button>
+            </div>
 
-            <button class="btn btn-reset" id="resetBtn">
-                <i class="fas fa-redo me-2"></i>Réinitialiser
-            </button>
+            <!-- Badge KPI Total -->
+            <div class="badge-status-info">
+                <i class="fas fa-users"></i>
+                <span>Total : <strong id="counter" aria-live="polite">{{ count }}</strong></span>
+            </div>
         </div>
-    </div>
 
-    <!-- Table Section -->
-    <div class="table-container">
-        <table class="table-operateurs">
-            <thead>
-                <tr>
-                    <th>Matricule</th>
-                    <th>Utilisateur</th>
-                    <th>Nom & Prénom</th>
-                    <th>Lot</th>
-                    <th>RU</th>
-                </tr>
-            </thead>
-            <tbody id="result">
-                {% for operateur in operateurs %}
-                <tr class="table-row"
-                    data-role="{% if operateur.est_responsable %}responsable{% else %}operateur{% endif %}">
-                    <td class="cell-matricule">{{ operateur.matricule|default:"-" }}</td>
-                    <td class="cell-utilisateur">{{ operateur.it|default:"-" }}</td>
-                    <td class="cell-nom">{{ operateur.nom_complete|default:"-" }}</td>
-                    <td class="cell-lot">{{ operateur.lot|default:"-" }}</td>
-                    <td class="cell-utilisateur">{{ operateur.ru_nom|default:"-" }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="empty-row">
-                        <i class="fas fa-inbox"></i> Aucun responsable trouvé
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        <!-- Tableau des données -->
+        <div class="table-responsive">
+            <table class="enterprise-table">
+                <thead>
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Utilisateur</th>
+                        <th>Nom & Prénom</th>
+                        <th>ÉQUIPE</th>
+                        <th class="text-center">Lot</th>
+                        <th>RU</th>
+                    </tr>
+                </thead>
+                <tbody id="result">
+                    {% for operateur in operateurs %}
+                    <tr class="table-row"
+                        data-role="{% if operateur.est_responsable %}responsable{% else %}operateur{% endif %}">
+                        <td class="font-mono">{{ operateur.matricule|default:"-" }}</td>
+                        <td class="font-mono">{{ operateur.it|default:"-" }}</td>
+                        <td class="font-medium">{{ operateur.nom_complete|default:"-" }}</td>
+                        <td>{{ operateur.eq|default:"-" }}</td>
+                        <td class="text-center">
+                            <span class="lot-badge">{{ operateur.lot|default:"-" }}</span>
+                        </td>
+                        <td class="text-muted">{{ operateur.ru_nom|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>Aucun responsable trouvé</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-    <!-- Pagination -->
-    <div class="pagination-container" id="pagination"></div>
+        <!-- Pagination -->
+        <div id="pagination"></div>
+    </div>
 </div>
 {% endblock %}
 

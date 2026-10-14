@@ -10,107 +10,126 @@
 {% endblock %}
 
 {% block content %}
-<div class="affectations-container">
+<div class="page-container">
 
-    <!-- En-tête de page -->
-    <header class="header">
-        <h1>Liste des affectations</h1>
-    </header>
-    <div class="filter-bar">
-        <div class="filter-group">
-            <input type="text" id="searchInput" class="filter-input" placeholder="Rechercher par nom, RU ou état..." />
-        </div>
-        <div class="filter-box">
-            <select id="statusFilter" class="filter-select" onchange="location.href='?status=' + this.value">
-                <option value="all" {% if status == "all" or not status %}selected{% endif %}>Tous les états</option>
-                <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
-                <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
-                <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés</option>
-            </select>
-        </div>
+    <div class="header-section">
+        <h1><i class="fa-solid fa-user-pen me-2" style="color: black;"></i>Liste des affectations</h1>
+        <p>Suivi des changements d'affectation des collaborateurs</p>
     </div>
 
-    <div class="sections-wrapper">
-        <div class="section-card">
-            <div class="table-scroll">
-                <table class="table-affectations" id="affectationsTable">
-                    <thead>
-                        <tr>
-                            <th>Nom complet Collaborateur</th>
-                            <th>Nom complet RU initial</th>
-                            <th>Nom complet RU cible</th>
-                            <th class="text-center">État</th>
-                        </tr>
-                    </thead>
-                    <tbody id="result">
-                        {% for affectation in info %}
-                        <tr class="table-row">
-                            <td class="cell-primary">
-                                {{ affectation.collaborateur|default:"—" }}
-                            </td>
+    <div class="content-card">
+        <!-- Barre de filtres / Toolbar -->
+        <div class="toolbar">
+            <div class="filters-left">
+                <div class="filter-item search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" class="input-control"
+                        placeholder="Rechercher par nom, RU ou état...">
+                </div>
 
-                            <td>
-                                {{ affectation.initial|default:"—" }}
-                            </td>
-
-                            <td>
-                                {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
-                                {{ affectation.acceuil }}
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-
-                            <td class="text-center">
-                                {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                                <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat|slugify }}">
-                                    {{ affectation.etat }}
-                                </span>
-                                {% else %}
-                                <span class="badge badge-en-attente">En attente</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr id="noDataRow">
-                            <td colspan="4" class="empty-row">Aucune affectation trouvée.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div class="filter-item">
+                    <select id="statusFilter" class="input-control select-control"
+                        onchange="location.href='?status=' + this.value">
+                        <option value="all" {% if status == "all" or not status %}selected{% endif %}>Tous les états
+                        </option>
+                        <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
+                        <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
+                        <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés
+                        </option>
+                    </select>
+                </div>
             </div>
+        </div>
 
-            <!-- Pagination -->
-            {% if page_obj.paginator.num_pages > 1 %}
-            <div class="pagination-container">
+        <!-- Tableau -->
+        <div class="table-responsive">
+            <table class="enterprise-table" id="affectationsTable">
+                <thead>
+                    <tr>
+                        <th>Nom complet Collaborateur</th>
+                        <th>Nom complet RU initial</th>
+                        <th>Nom complet RU cible</th>
+                        <th class="text-center">État</th>
+                    </tr>
+                </thead>
+                <tbody id="result">
+                    {% for affectation in info %}
+                    <tr class="table-row">
+                        <td class="font-medium">
+                            {{ affectation.collaborateur|default:"—" }}
+                        </td>
+
+                        <td>
+                            {{ affectation.initial|default:"—" }}
+                        </td>
+
+                        <td>
+                            {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
+                            {{ affectation.acceuil }}
+                            {% else %}
+                            <span class="text-subtle">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-center">
+                            {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
+                            {% if "valid" in affectation.etat|lower %}
+                            <span class="badge badge-valide">{{ affectation.etat }}</span>
+                            {% elif "refus" in affectation.etat|lower %}
+                            <span class="badge badge-refuse">{{ affectation.etat }}</span>
+                            {% elif "non" in affectation.etat|lower %}
+                            <span class="badge badge-non_demarrer">{{ affectation.etat }}</span>
+                            {% else %}
+                            <span class="badge badge-en-attente">{{ affectation.etat }}</span>
+                            {% endif %}
+                            {% else %}
+                            <span class="badge badge-en-attente">En attente</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr id="noDataRow">
+                        <td colspan="4" class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <div>Aucune affectation trouvée</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="table-footer">
+            <div class="pagination">
                 {% if page_obj.has_previous %}
-                <a class="page-btn"
+                <a class="page-link"
                     href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}">&laquo;
                     Précédent</a>
                 {% else %}
-                <span class="page-btn" aria-disabled="true">&laquo; Précédent</span>
+                <span class="page-link disabled">&laquo; Précédent</span>
                 {% endif %}
 
                 {% for num in page_obj.paginator.page_range %}
                 {% if num == page_obj.number %}
-                <span class="page-btn active">{{ num }}</span>
-                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <a class="page-btn"
+                <span class="page-link active">{{ num }}</span>
+                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <a class="page-link"
                     href="?page={{ num }}{% if status %}&status={{ status }}{% endif %}">{{ num }}</a>
                     {% endif %}
                     {% endfor %}
 
                     {% if page_obj.has_next %}
-                    <a class="page-btn"
+                    <a class="page-link"
                         href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}">Suivant
                         &raquo;</a>
                     {% else %}
-                    <span class="page-btn" aria-disabled="true">Suivant &raquo;</span>
+                    <span class="page-link disabled">Suivant &raquo;</span>
                     {% endif %}
             </div>
-            {% endif %}
         </div>
+        {% endif %}
     </div>
-
 </div>
 {% endblock %}
 

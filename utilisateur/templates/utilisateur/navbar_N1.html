@@ -26,39 +26,47 @@
                 <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none"
                     href="{% url 'dashboard_N1' %}">
                     {% elif request.session.role == "N+2" %}
-                    <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'dashboard_N2' %}">
-                    {% elif request.session.role == "N+3" %}
-                    <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'Dashboard_N3' %}">
-                    {% elif request.session.role == "N+4" %}
-                        <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'page_N4' %}">
-                    {% elif request.session.role == "HRBP" %}
-                    <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'dashboard' %}">
-                    {% elif request.session.role == "ADMIN" %}
-                        <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'dashboard' %}">
-                    {% elif request.session.role == "DRH" %}
-                        <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="{% url 'dashboard' %}">
-                    {% endif %}
-                    <!-- Icone Logo SVG -->
-                    <svg width="32" height="32" viewBox="0 0 70 55" fill="none" class="flex-shrink-0">
-                        <rect x="0" y="40" width="8" height="8" fill="#0d233a" rx="1" />
-                        <rect x="0" y="28" width="8" height="8" fill="#0d233a" rx="1" />
-                        <rect x="0" y="16" width="8" height="8" fill="#0056b3" rx="1" />
-                        <rect x="0" y="4" width="8" height="8" fill="#0056b3" rx="1" />
-                        <rect x="11" y="13" width="7" height="7" fill="#0056b3" opacity="0.85" rx="1" />
-                        <rect x="21" y="22" width="6" height="6" fill="#0056b3" opacity="0.7" rx="1" />
-                        <rect x="30" y="30" width="7" height="7" fill="#0d233a" rx="1" />
-                        <rect x="39" y="22" width="6" height="6" fill="#0056b3" opacity="0.7" rx="1" />
-                        <rect x="48" y="13" width="7" height="7" fill="#0056b3" opacity="0.85" rx="1" />
-                        <rect x="58" y="4" width="8" height="8" fill="#0056b3" rx="1" />
-                        <rect x="58" y="16" width="8" height="8" fill="#0056b3" rx="1" />
-                        <rect x="58" y="28" width="8" height="8" fill="#0d233a" rx="1" />
-                        <rect x="58" y="40" width="8" height="8" fill="#0d233a" rx="1" />
-                    </svg>
-                    <div class="d-flex flex-column lh-1">
-                        <span class="brand-title fw-bold fs-4">MODULA</span>
-                        <span class="brand-subtitle fw-semibold">EFFECTIF MANAGEMENT</span>
-                    </div>
-                </a>
+                    <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none"
+                        href="{% url 'dashboard_N2' %}">
+                        {% elif request.session.role == "N+3" %}
+                        <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none"
+                            href="{% url 'Dashboard_N3' %}">
+                            {% elif request.session.role == "N+4" %}
+                            <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none"
+                                href="{% url 'page_N4' %}">
+                                {% elif request.session.role == "HRBP" or request.session.role == "ADMIN" or request.session.role == "DRH" %}
+                                <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none"
+                                    href="{% url 'dashboard' %}">
+                                    {% else %}
+                                    <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none"
+                                        href="#">
+                                        {% endif %}
+                                        <!-- Icone Logo SVG -->
+                                        <svg width="32" height="32" viewBox="0 0 70 55" fill="none"
+                                            class="flex-shrink-0">
+                                            <rect x="0" y="40" width="8" height="8" fill="#0d233a" rx="1" />
+                                            <rect x="0" y="28" width="8" height="8" fill="#0d233a" rx="1" />
+                                            <rect x="0" y="16" width="8" height="8" fill="#0056b3" rx="1" />
+                                            <rect x="0" y="4" width="8" height="8" fill="#0056b3" rx="1" />
+                                            <rect x="11" y="13" width="7" height="7" fill="#0056b3" opacity="0.85"
+                                                rx="1" />
+                                            <rect x="21" y="22" width="6" height="6" fill="#0056b3" opacity="0.7"
+                                                rx="1" />
+                                            <rect x="30" y="30" width="7" height="7" fill="#0d233a" rx="1" />
+                                            <rect x="39" y="22" width="6" height="6" fill="#0056b3" opacity="0.7"
+                                                rx="1" />
+                                            <rect x="48" y="13" width="7" height="7" fill="#0056b3" opacity="0.85"
+                                                rx="1" />
+                                            <rect x="58" y="4" width="8" height="8" fill="#0056b3" rx="1" />
+                                            <rect x="58" y="16" width="8" height="8" fill="#0056b3" rx="1" />
+                                            <rect x="58" y="28" width="8" height="8" fill="#0d233a" rx="1" />
+                                            <rect x="58" y="40" width="8" height="8" fill="#0d233a" rx="1" />
+                                        </svg>
+                                        <div class="d-flex flex-column lh-1">
+                                            <span class="brand-title fw-bold fs-4">MODULA</span>
+                                            <span class="brand-subtitle fw-semibold">EFFECTIF MANAGEMENT</span>
+                                        </div>
+                                    </a>
             </div>
 
             <!-- Section Droite: Alertes + Profil Utilisateur -->
@@ -80,7 +88,6 @@
 
                 <!-- Profil Utilisateur -->
                 <div class="user-card d-flex align-items-center gap-3 bg-white px-3 py-2 rounded-3 shadow-sm">
-                    
                     <div class="avatar-circle">
                         NY
                     </div>
@@ -133,32 +140,33 @@
             </div>
         </div>
 
+        <!-- Sous-Barres de Navigation dynamiques -->
         {% if request.session.role == "N+1" %}
         <nav class="sub-navbar border-top">
             <div class="container-fluid px-4">
                 <ul class="nav nav-tabs border-0">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_N1' %}active{% endif %}"
+                        <a class="nav-link {% if 'dashboard' in request.path|lower %}active{% endif %}"
                             href="{% url 'dashboard_N1' %}">
-                            <i class="fas fa-home me-2"></i>Dashboard
+                            <i class="fas fa-gauge-high"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'Liste_des_operateurs' %}active{% endif %}"
+                        <a class="nav-link {% if 'operateur' in request.path|lower or 'collaborateur' in request.path|lower %}active{% endif %}"
                             href="{% url 'Liste_des_operateurs' %}">
-                            <i class="fas fa-users me-2"></i>Collaborateurs
+                            <i class="fas fa-users"></i> Collaborateurs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'validation' %}active{% endif %}"
+                        <a class="nav-link {% if 'validation' in request.path|lower %}active{% endif %}"
                             href="{% url 'validation' %}">
-                            <i class="fas fa-calendar-check me-2"></i>Validation du jour
+                            <i class="fas fa-calendar-check"></i> Validation du jour
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'historique' %}active{% endif %}"
+                        <a class="nav-link {% if 'historique' in request.path|lower or 'affectation' in request.path|lower %}active{% endif %}"
                             href="{% url 'historique' %}">
-                            <i class="fas fa-link me-2"></i>Affectation
+                            <i class="fas fa-link"></i> Affectation
                         </a>
                     </li>
                 </ul>
@@ -171,27 +179,27 @@
             <div class="container-fluid px-4">
                 <ul class="nav nav-tabs border-0">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_N2' %}active{% endif %}"
+                        <a class="nav-link {% if 'dashboard' in request.path|lower %}active{% endif %}"
                             href="{% url 'dashboard_N2' %}">
-                            <i class="fas fa-home me-2"></i>Dashboard
+                            <i class="fas fa-gauge-high"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N1_par_N2' %}active{% endif %}"
+                        <a class="nav-link {% if 'liste_n1' in request.path|lower or 'collaborateur' in request.path|lower %}active{% endif %}"
                             href="{% url 'liste_N1_par_N2' %}">
-                            <i class="fas fa-users me-2"></i>Collaborateurs
+                            <i class="fas fa-users"></i> Collaborateurs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N1_non_valides_N2' %}active{% endif %}"
+                        <a class="nav-link {% if 'declaration' in request.path|lower or 'non_valides' in request.path|lower %}active{% endif %}"
                             href="{% url 'liste_N1_non_valides_N2' %}">
-                            <i class="fas fa-calendar-check me-2"></i>Validation du jour
+                            <i class="fas fa-calendar-check"></i> Declaration d'effectifs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N2' %}active{% endif %}"
+                        <a class="nav-link {% if 'affectation' in request.path|lower %}active{% endif %}"
                             href="{% url 'affectation_N2' %}">
-                            <i class="fas fa-link me-2"></i>Affectation
+                            <i class="fas fa-link"></i> Affectation
                         </a>
                     </li>
                 </ul>
@@ -204,27 +212,27 @@
             <div class="container-fluid px-4">
                 <ul class="nav nav-tabs border-0">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'Dashboard_N3' %}active{% endif %}"
+                        <a class="nav-link {% if 'dashboard' in request.path|lower %}active{% endif %}"
                             href="{% url 'Dashboard_N3' %}">
-                            <i class="fas fa-home me-2"></i>Dashboard
+                            <i class="fas fa-gauge-high"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N2_par_N3' %}active{% endif %}"
+                        <a class="nav-link {% if 'collaborateur' in request.path|lower or 'liste_n2' in request.path|lower %}active{% endif %}"
                             href="{% url 'liste_N2_par_N3' %}">
-                            <i class="fas fa-users me-2"></i>Collaborateurs
+                            <i class="fas fa-users"></i> Collaborateurs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N1_non_valides_N3' %}active{% endif %}"
+                        <a class="nav-link {% if 'declaration' in request.path|lower or 'non_valides' in request.path|lower %}active{% endif %}"
                             href="{% url 'liste_N1_non_valides_N3' %}">
-                            <i class="fas fa-calendar-check me-2"></i>Validation du jour
+                            <i class="fas fa-calendar-check"></i> Declaration d'effectifs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N3' %}active{% endif %}"
+                        <a class="nav-link {% if 'affectation' in request.path|lower %}active{% endif %}"
                             href="{% url 'affectation_N3' %}">
-                            <i class="fas fa-link me-2"></i>Affectation
+                            <i class="fas fa-link"></i> Affectation
                         </a>
                     </li>
                 </ul>
@@ -237,27 +245,27 @@
             <div class="container-fluid px-4">
                 <ul class="nav nav-tabs border-0">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'page_N4' %}active fw-bold{% endif %}"
+                        <a class="nav-link {% if 'dashboard' in request.path|lower or 'page_n4' in request.path|lower %}active{% endif %}"
                             href="{% url 'page_N4' %}">
-                            <i class="fas fa-home me-2"></i>Dashboard
+                            <i class="fas fa-gauge-high"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_N3' %}active fw-bold{% endif %}"
+                        <a class="nav-link {% if 'collaborateur' in request.path|lower or 'liste_n3' in request.path|lower %}active{% endif %}"
                             href="{% url 'liste_N3' %}">
-                            <i class="fas fa-users me-2"></i>Collaborateurs
+                            <i class="fas fa-users"></i> Collaborateurs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'validation_N4' %}active fw-bold{% endif %}"
+                        <a class="nav-link {% if 'validation' in request.path|lower or 'declaration' in request.path|lower %}active{% endif %}"
                             href="{% url 'validation_N4' %}">
-                            <i class="fas fa-check-circle me-2"></i>Validation du jour
+                            <i class="fas fa-check-circle"></i> Declaration d'effectifs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'affectation_N4' %}active fw-bold{% endif %}"
+                        <a class="nav-link {% if 'affectation' in request.path|lower %}active{% endif %}"
                             href="{% url 'affectation_N4' %}">
-                            <i class="fas fa-history me-2"></i>Affectations
+                            <i class="fas fa-history"></i> Affectations
                         </a>
                     </li>
                 </ul>
@@ -266,139 +274,148 @@
         {% endif %}
 
         {% if request.session.role == "HRBP" %}
-        <!-- Navigation Bar (Deuxième niveau avec Onglets) -->
         <nav class="sub-navbar border-top">
             <div class="container-fluid px-4">
                 <ul class="nav nav-tabs border-0">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+                        <a class="nav-link {% if 'dashboard' in request.path|lower %}active{% endif %}"
                             href="{% url 'dashboard' %}">
-                            <i class="fas fa-users me-2"></i>Dasboard
+                            <i class="fas fa-gauge-high"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link  {% if request.resolver_match.url_name == 'collaborateur' %}active{% endif %}"
+                        <a class="nav-link {% if 'collaborateur' in request.path|lower %}active{% endif %}"
                             href="{% url 'collaborateur' %}">
-                            <i class="fas fa-users me-2"></i>Collaborateurs
+                            <i class="fas fa-users"></i> Collaborateurs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link  {% if request.resolver_match.url_name == 'affectation_HRBP' %}active{% endif %}"
+                        <a class="nav-link {% if 'affectation' in request.path|lower %}active{% endif %}"
                             href="{% url 'affectation_HRBP' %}">
-                            <i class="fas fa-exchange-alt me-2"></i>Changement d'affectation
+                            <i class="fas fa-exchange-alt"></i> Changement d'affectation
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'declaration_HRBP' %}active{% endif %}"
+                        <a class="nav-link {% if 'declaration' in request.path|lower %}active{% endif %}"
                             href="{% url 'declaration_HRBP' %}">
-                            <i class="fas fa-users me-2"></i>Declaration d'effectifs
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </nav>
-        {% endif%}
-        {% if request.session.role == "SUPER" %}
-        <nav class="sub-navbar border-top">
-            <div class="container-fluid px-4">
-                <ul class="nav nav-tabs border-0">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'SUPER' %}active{% endif %}"
-                            href="{% url 'SUPER' %}">
-                            <i class="fas fa-users me-2"></i>Liste Utilisateurs
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'importer_fichier' %}active{% endif %}"
-                            href="{% url 'importer_fichier' %}">
-                            <i class="fas fa-file-import me-2"></i></i>Importer Fichiers
+                            <i class="fas fa-users"></i> Declaration d'effectifs
                         </a>
                     </li>
                 </ul>
             </div>
         </nav>
         {% endif %}
-            {% if request.session.role == "ADMIN" %}
-            <nav class="sub-navbar border-top">
-                <div class="container-fluid px-4">
-                    <ul class="nav nav-tabs border-0">
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
-                                href="{% url 'dashboard' %}">
-                                <i class="fas fa-users me-2"></i>Dasboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link  {% if request.resolver_match.url_name == 'collaborateur' %}active{% endif %}"
-                                href="{% url 'collaborateur' %}">
-                                <i class="fas fa-users me-2"></i>Collaborateurs
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link  {% if request.resolver_match.url_name == 'affectation_HRBP' %}active{% endif %}"
-                                href="{% url 'affectation_HRBP' %}">
-                                <i class="fas fa-exchange-alt me-2"></i>Changement d'affectation
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-            {% endif %}
-            {% if request.session.role == "PILOT" %}
-            <nav class="sub-navbar border-top">
-                <div class="container-fluid px-4">
-                    <ul class="nav nav-tabs border-0">
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'pilot' %}active{% endif %}"
-                                href="{% url 'pilot' %}">
-                                <i class="fas fa-users me-2"></i>Dasboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link  {% if request.resolver_match.url_name == 'affectation_PILOT' %}active{% endif %}"
-                                href="{% url 'affectation_PILOT' %}">
-                                <i class="fas fa-exchange-alt me-2"></i>Changement d'affectation
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link  {% if request.resolver_match.url_name == 'declaration' %}active{% endif %}"
-                                href="{% url 'declaration' %}">
-                                <i class="fas fa-users me-2"></i>Declaration d'effectifs
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link  {% if request.resolver_match.url_name == 'collaborateur' %}active{% endif %}"
-                                href="{% url 'collaborateur' %}">
-                                <i class="fas fa-users me-2"></i>Collaborateurs
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-            {% endif %}
-            {% if request.session.role == "DRH" %}
-            <nav class="sub-navbar border-top">
-                <div class="container-fluid px-4">
-                    <ul class="nav nav-tabs border-0">
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
-                                href="{% url 'dashboard' %}">
-                                <i class="fas fa-users me-2"></i>Dasboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'importer_fichier' %}active{% endif %}"
-                                href="{% url 'importer_fichier' %}">
-                                <i class="fas fa-file-import me-2"></i></i>Importer Fichiers
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-            {% endif %}
+
+        {% if request.session.role == "SUPER" %}
+        <nav class="sub-navbar border-top">
+            <div class="container-fluid px-4">
+                <ul class="nav nav-tabs border-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'super' in request.path|lower or 'utilisateur' in request.path|lower %}active{% endif %}"
+                            href="{% url 'SUPER' %}">
+                            <i class="fas fa-users"></i> Liste Utilisateurs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'importer' in request.path|lower %}active{% endif %}"
+                            href="{% url 'importer_fichier' %}">
+                            <i class="fas fa-file-import"></i> Importer Fichiers
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        {% endif %}
+
+        {% if request.session.role == "ADMIN" %}
+        <nav class="sub-navbar border-top">
+            <div class="container-fluid px-4">
+                <ul class="nav nav-tabs border-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'dashboard' in request.path|lower %}active{% endif %}"
+                            href="{% url 'dashboard' %}">
+                            <i class="fas fa-gauge-high"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'collaborateur' in request.path|lower %}active{% endif %}"
+                            href="{% url 'collaborateur' %}">
+                            <i class="fas fa-users"></i> Collaborateurs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'affectation' in request.path|lower %}active{% endif %}"
+                            href="{% url 'affectation_HRBP' %}">
+                            <i class="fas fa-exchange-alt"></i> Changement d'affectation
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        {% endif %}
+
+        {% if request.session.role == "PILOT" %}
+        <nav class="sub-navbar border-top">
+            <div class="container-fluid px-4">
+                <ul class="nav nav-tabs border-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'pilot' in request.path|lower or 'dashboard' in request.path|lower %}active{% endif %}"
+                            href="{% url 'pilot' %}">
+                            <i class="fas fa-gauge-high"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'collaborateur' in request.path|lower %}active{% endif %}"
+                            href="{% url 'collaborateur' %}">
+                            <i class="fas fa-users"></i> Collaborateurs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'declaration' in request.path|lower %}active{% endif %}"
+                            href="{% url 'declaration' %}">
+                            <i class="fa-solid fa-file-signature"></i> Declaration d'effectifs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'affectation' in request.path|lower %}active{% endif %}"
+                            href="{% url 'affectation_PILOT' %}">
+                            <i class="fas fa-exchange-alt"></i> Changement d'affectation
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'maquette' in request.path|lower %}active{% endif %}"
+                            href="{% url 'maquette' %}">
+                            <i class="fa-solid fa-table-cells"></i> Maquette
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        {% endif %}
+
+        {% if request.session.role == "DRH" %}
+        <nav class="sub-navbar border-top">
+            <div class="container-fluid px-4">
+                <ul class="nav nav-tabs border-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'dashboard' in request.path|lower %}active{% endif %}"
+                            href="{% url 'dashboard' %}">
+                            <i class="fas fa-table-columns"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'importer' in request.path|lower %}active{% endif %}"
+                            href="{% url 'importer_fichier' %}">
+                            <i class="fas fa-file-import"></i> Importer Fichiers
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        {% endif %}
     </header>
 
-    <!-- Modal Alertes (uniquement pertinent pour N+1) -->
+    <!-- Modal Alertes (uniquement pour N+1) -->
     {% if request.session.role == "N+1" %}
     <div class="modal fade" id="alertsModal" tabindex="-1" aria-labelledby="alertsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable">
@@ -437,7 +454,7 @@
     </div>
     {% endif %}
 
-    <!-- Modal Changer Mot de Passe (disponible pour tous les rôles connectés) -->
+    <!-- Modal Changer Mot de Passe -->
     <div class="modal fade" id="modal-changer-password" tabindex="-1" aria-labelledby="modalChangerPasswordLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -502,9 +519,6 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            /* =========================================================
-            CHANGER MOT DE PASSE
-            ============================================================ */
             const btnConfirmerPassword = document.getElementById("btn-confirmer-password");
             const alertPassword = document.querySelector(".alert-password");
             const spinnerPassword = document.getElementById("btn-spinner-password");
@@ -601,7 +615,6 @@
         }
     </script>
     {% endif %}
-
 
     {% block script %}{% endblock %}
 </body>

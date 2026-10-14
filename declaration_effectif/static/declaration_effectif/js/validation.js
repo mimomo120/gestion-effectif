@@ -40,14 +40,22 @@ function slugifyIt(it) {
 function showAlert(message, type = 'error') {
     const alertEl = document.querySelector(".alert");
     if (alertEl) {
-        alertEl.innerHTML = `<p style="color: ${type === 'error' ? '#DC2626' : '#16A34A'}; font-weight: 600; margin-top: 10px;">${escapeHtml(message)}</p>`;
+        const isError = type === 'error';
+        alertEl.innerHTML = `<div class="feedback-pill ${isError ? 'feedback-error' : 'feedback-success'}">
+            <i class="fas ${isError ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i>
+            <span>${escapeHtml(message)}</span>
+        </div>`;
     }
 }
 
 function showAlert2(message, type = 'error') {
     const alertEl = document.querySelector(".alert2");
     if (alertEl) {
-        alertEl.innerHTML = `<p style="color: ${type === 'error' ? '#DC2626' : '#16A34A'}; font-weight: 600; margin-top: 10px;">${escapeHtml(message)}</p>`;
+        const isError = type === 'error';
+        alertEl.innerHTML = `<div class="feedback-pill ${isError ? 'feedback-error' : 'feedback-success'}">
+            <i class="fas ${isError ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i>
+            <span>${escapeHtml(message)}</span>
+        </div>`;
     }
 }
 
@@ -58,6 +66,28 @@ function clearAlert2() {
     }
 }
 
+// =====================================================================
+// BADGES D'ÉTAT (Validé / Départ / Changement)
+// =====================================================================
+
+function setValideBadge(btn) {
+    if (!btn) return;
+    btn.innerHTML = '<i class="fas fa-check"></i> Validé';
+    btn.classList.add("is-done");
+    btn.classList.remove("state-depart", "state-changement");
+    btn.style.display = "inline-flex";
+}
+
+function setRefuseBadge(btn, type) {
+    if (!btn) return;
+    const isChangement = type === "changement";
+    const icon = isChangement ? "fa-right-left" : "fa-user-slash";
+    const label = isChangement ? "Changement" : "Départ";
+    btn.innerHTML = `<i class="fas ${icon}"></i> ${label}`;
+    btn.classList.add("is-done", isChangement ? "state-changement" : "state-depart");
+    btn.classList.remove(isChangement ? "state-depart" : "state-changement");
+    btn.style.display = "inline-flex";
+}
 
 // =====================================================================
 // STATE MANAGEMENT
@@ -85,11 +115,13 @@ function resetLigneStyle(ligne) {
 
     if (btn_v) {
         btn_v.innerHTML = '<i class="fas fa-check"></i>';
+        btn_v.classList.remove("is-done");
         btn_v.style.display = "inline-flex";
     }
 
     if (btn_inv) {
         btn_inv.innerHTML = '<i class="fas fa-times"></i>';
+        btn_inv.classList.remove("is-done", "state-depart", "state-changement");
         btn_inv.style.display = "inline-flex";
     }
 
@@ -107,24 +139,15 @@ function appliquerEtatExistant(ligne, it) {
     const checkbox = ligne.querySelector(".op-checkbox");
 
     if (liste_valider.includes(it)) {
-        if (btn_v) {
-            btn_v.innerHTML = "✓ Validé";
-            btn_v.style.display = "inline-flex";
-        }
+        setValideBadge(btn_v);
         if (btn_inv) btn_inv.style.display = "none";
         if (checkbox) checkbox.checked = true;
     } else if (liste_D.includes(it)) {
-        if (btn_inv) {
-            btn_inv.innerHTML = "⊘ Départ";
-            btn_inv.style.display = "inline-flex";
-        }
+        setRefuseBadge(btn_inv, "depart");
         if (btn_v) btn_v.style.display = "none";
         if (checkbox) checkbox.checked = true;
     } else if (liste_C.some(o => o.it === it)) {
-        if (btn_inv) {
-            btn_inv.innerHTML = "↻ Changement";
-            btn_inv.style.display = "inline-flex";
-        }
+        setRefuseBadge(btn_inv, "changement");
         if (btn_v) btn_v.style.display = "none";
         if (checkbox) checkbox.checked = true;
     }
@@ -168,6 +191,8 @@ function findRowByIT(it) {
 function construireLigneOperateur(op) {
     const idSafe = slugifyIt(op.it);
     const it = op.it || "";
+    const initiale = (op.nom_complete || "?").trim().charAt(0).toUpperCase() || "?";
+    const lotLower = (op.lot || "").toLowerCase();
 
     const row = document.createElement("tr");
     row.id = `row-${idSafe}`;
@@ -177,8 +202,13 @@ function construireLigneOperateur(op) {
         </td>
         <td class="matricule cell-mono">${escapeHtml(op.matricule)}</td>
         <td class="utilisateur cell-mono">${escapeHtml(op.it)}</td>
-        <td class="nom">${escapeHtml(op.nom_complete)}</td>
-        <td class="lot"><span class="chip chip-lot">${escapeHtml(op.lot)}</span></td>
+        <td class="nom">
+            <div class="nom-cell">
+                <span class="avatar">${escapeHtml(initiale)}</span>
+                <span>${escapeHtml(op.nom_complete)}</span>
+            </div>
+        </td>
+        <td class="lot"><span class="chip chip-lot chip-lot-${escapeHtml(lotLower)}">${escapeHtml(op.lot)}</span></td>
         <td class="actions">
             <div class="action-buttons">
                 <button type="button" class="btn-valider" data-matricule="${escapeHtml(it)}" title="Valider">
@@ -195,7 +225,10 @@ function construireLigneOperateur(op) {
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">Refuser ${escapeHtml(op.nom_complete)}</h5>
+                            <div class="modal-header-info">
+                                <span class="modal-icon modal-icon-red"><i class="fas fa-user-slash"></i></span>
+                                <h5 class="modal-title">Refuser ${escapeHtml(op.nom_complete)}</h5>
+                            </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
                         </div>
                         <div class="modal-body">
@@ -250,8 +283,7 @@ document.addEventListener("click", async function (e) {
         retirerDesListes(it);
         liste_valider.push(it);
 
-        btnValider.innerHTML = "✓ Validé";
-        btnValider.style.display = "inline-flex";
+        setValideBadge(btnValider);
         if (btn_inv) btn_inv.style.display = "none";
         return;
     }
@@ -279,10 +311,7 @@ document.addEventListener("click", async function (e) {
                 retirerDesListes(it);
                 liste_D.push(it);
 
-                if (btn_inv) {
-                    btn_inv.innerHTML = "⊘ Départ";
-                    btn_inv.style.display = "inline-flex";
-                }
+                setRefuseBadge(btn_inv, "depart");
                 if (btn_v) btn_v.style.display = "none";
             } catch (error) {
                 console.error("Erreur Départ:", error);
@@ -312,10 +341,7 @@ document.addEventListener("click", async function (e) {
                 retirerDesListes(it);
                 liste_C.push({ it: it, nvRu: nvRu });
 
-                if (btn_inv) {
-                    btn_inv.innerHTML = "↻ Changement";
-                    btn_inv.style.display = "inline-flex";
-                }
+                setRefuseBadge(btn_inv, "changement");
                 if (btn_v) btn_v.style.display = "none";
 
                 nvRuInput.value = "";
@@ -453,7 +479,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         result.appendChild(row);
                     });
                 } else {
-                    result.innerHTML = '<tr><td colspan="6" class="empty-row">Aucun opérateur trouvé.</td></tr>';
+                    result.innerHTML = '<tr><td colspan="6" class="empty-row"><i class="fas fa-inbox"></i><div>Aucun opérateur trouvé.</div></td></tr>';
                 }
             } catch (error) {
                 console.error("Erreur lors de la recherche:", error);
@@ -501,10 +527,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     retirerDesListes(it);
                     liste_valider.push(it);
 
-                    if (btnValider) {
-                        btnValider.innerHTML = "✓ Validé";
-                        btnValider.style.display = "inline-flex";
-                    }
+                    setValideBadge(btnValider);
                     if (btnRefuser) {
                         btnRefuser.style.display = "none";
                     }
@@ -529,10 +552,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const btnValider = row ? row.querySelector('.btn-valider') : null;
                 const btnRefuser = row ? row.querySelector('.btn-refuser') : null;
 
-                if (btnValider) {
-                    btnValider.innerHTML = "✓ Validé";
-                    btnValider.style.display = "inline-flex";
-                }
+                setValideBadge(btnValider);
                 if (btnRefuser) {
                     btnRefuser.style.display = "none";
                 }

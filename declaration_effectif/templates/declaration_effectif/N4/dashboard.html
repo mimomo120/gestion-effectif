@@ -6,19 +6,31 @@
 {% block css %}
 <link rel="stylesheet" href="{% static 'utilisateur/css/N2/dashboard.css' %}">
 <style>
-    /* Styles correctifs spécifiques sans modifier le CSS de base */
-    .chart-container--wide {
-        overflow-x: auto;
-        overflow-y: hidden;
+    /* Style personnalisé pour les boutons de bascule d'onglets */
+    .tab-toggle-btn {
+        border-radius: 20px;
+        padding: 6px 16px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border: 1px solid transparent;
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
     }
 
-    .ru-card--full {
-        width: 100%;
-        margin-bottom: 2rem;
+    .tab-toggle-btn.active {
+        background-color: #2C5F8A;
+        color: #ffffff;
+        border-color: #2C5F8A;
     }
 
-    .chart-scroll-inner {
-        height: 100%;
+    .tab-toggle-btn:not(.active) {
+        background-color: #ffffff;
+        color: #4b5563;
+        border-color: #e5e7eb;
+    }
+
+    .tab-toggle-btn:not(.active):hover {
+        background-color: #f3f4f6;
     }
 </style>
 {% endblock %}
@@ -27,16 +39,30 @@
 <div class="page-container">
     <!-- En-tête du tableau de bord -->
     <header class="dashboard-header">
-        <h1 class="dashboard-title">Tableau de bord</h1>
-        <div class="time">
-            <span id="time" class="date-picker-badge" aria-live="polite">{{ maint }}</span>
+        <div>
+            <h1 class="dashboard-title">Tableau de bord</h1>
+            <p class="dashboard-subtitle">Aperçu des effectifs et des mouvements</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div class="date-picker-badge">
+                <span>{{ maint|date:"d M Y" }}</span>
+                <i class="far fa-calendar ms-2"></i>
+            </div>
         </div>
     </header>
 
-    <!-- ===== STATISTIQUES GÉNÉRALES ===== -->
-    <div class="statistique-cards">
-        <div class="stat-card card-reel">
-            <h3>Effectif réel</h3>
+    <!-- ===== STATISTIQUES GÉNÉRALES (Ligne 1) ===== -->
+    <div class="kpi-primary-row">
+        <div class="stat-card">
+            <div class="stat-card-top">
+                <h3>Effectif réel</h3>
+                <div class="stat-icon icon-brand">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+            </div>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ reel|default:"0" }}</span>
                 <span class="unite">collaborateurs</span>
@@ -47,8 +73,17 @@
                 {% endif %}
         </div>
 
-        <div class="stat-card card-systeme">
-            <h3>Effectif système</h3>
+        <div class="stat-card">
+            <div class="stat-card-top">
+                <h3>Effectif système</h3>
+                <div class="stat-icon icon-teal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+            </div>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ systeme|default:"0" }}</span>
                 <span class="unite">collaborateurs</span>
@@ -59,46 +94,147 @@
                 {% endif %}
         </div>
 
-        <div class="stat-card card-maquette">
-            <h3>Effectif maquette</h3>
-            <div class="stat-valeur-group">
-                <span class="valeur">{{ maquette|default:"0" }}</span>
-                <span class="unite">collaborateurs</span>
+        <div class="stat-card">
+            <div class="stat-card-top">
+                <h3>Effectif maquette</h3>
+                <div class="stat-icon icon-amber">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                </div>
+            </div>
+        <div class="stat-valeur-group">
+            <span class="valeur">{{ maquette|default:"0" }}</span>
+            <span class="unite">collaborateurs</span>
+            <div class="collars-badges">
+                <span class="collar-badge blue-collar">
+                    <span class="collar-dot"></span> Blue collars : <strong>{{ somme_ap|default:"0" }}</strong>
+                </span>
+                <span class="collar-badge white-collar">
+                    <span class="collar-dot"></span> White collars : <strong>{{ somme_ce|default:"0" }}</strong>
+                </span>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- ===== STATISTIQUES SECONDAIRES (Ligne 2) ===== -->
+    <div class="alert-strip">
+        <div class="alert-pill">
+            <span class="stat-icon icon-red" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                    </path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ non_valides|default:"0" }} / {{ nbr_n1_total|default:"0" }}</span>
+                <span class="alert-pill-label">RU non validés</span>
             </div>
         </div>
 
-        <div class="stat-card card-warning">
-            <h3>RU non validés</h3>
-            <div class="stat-valeur-group">
-                <span class="valeur">{{ non_valides|default:"0" }}</span>
-                <span class="unite">responsables</span>
+        <div class="alert-pill" data-bs-toggle="modal" data-bs-target="#modalListeN2" style="cursor: pointer;">
+            <span class="stat-icon icon-violet" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_n2_total|default:"0" }}</span>
+                <span class="alert-pill-label">Responsables N+2</span>
+            </div>
+        </div>
+
+        <div class="alert-pill" data-bs-toggle="modal" data-bs-target="#modalListeN3" style="cursor: pointer;">
+            <span class="stat-icon icon-violet" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_n3_total|default:"0" }}</span>
+                <span class="alert-pill-label">Responsables N+3</span>
+            </div>
+        </div>
+        <div class="alert-pill" data-bs-toggle="modal" data-bs-target="#modalDepart" style="cursor: pointer;">
+            <span class="stat-icon icon-red" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M1 21v-2a4 4 0 0 1 4-4h4"></path>
+                    <line x1="17" y1="8" x2="22" y2="13"></line>
+                    <line x1="22" y1="8" x2="17" y2="13"></line>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_departs|default:"0" }}</span>
+                <span class="alert-pill-label">Départs déclarés</span>
+            </div>
+        </div>
+        
+        <div class="alert-pill" data-bs-toggle="modal" data-bs-target="#modalChangement" style="cursor: pointer;">
+            <span class="stat-icon icon-amber" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="17 1 21 5 17 9"></polyline>
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                    <polyline points="7 23 3 19 7 15"></polyline>
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_changements_non_faits|default:"0" }}</span>
+                <span class="alert-pill-label">Changements en attente</span>
             </div>
         </div>
     </div>
 
-    <!-- ===== GRAPHIQUES : Évolution + Réel-Système-Maquette par LOT ===== -->
+    <!-- ===== GRAPHIQUES ===== -->
     <div class="charts-grid">
+        <!-- Carte regroupant Évolution Réel -->
         <div class="ru-card">
-            <h4>Évolution Réel</h4>
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h4 class="mb-0 fw-bold">Évolution Réel</h4>
+
+                {% if annees_disponibles %}
+                <select id="select-annee-evolution" class="form-select form-select-sm" style="width: auto;">
+                    {% for annee in annees_disponibles %}
+                    <option value="{{ annee }}">{{ annee }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </div>
+
+            <!-- Onglets de bascule -->
+            <div class="d-flex gap-2 mb-3">
+                <button type="button" class="tab-toggle-btn active" id="btn-vue-globale">Vue globale</button>
+                <button type="button" class="tab-toggle-btn" id="btn-par-mois">Par mois</button>
+            </div>
+
+            <!-- Visualisations Graphiques -->
             <div class="chart-container">
-                <canvas id="chart-global"></canvas>
+                <!-- Vue globale (12 Mois) -->
+                <canvas id="chart-mensuel"></canvas>
+                <!-- Par mois (Jours du mois actuel) -->
+                <canvas id="chart-global" style="display: none;"></canvas>
             </div>
         </div>
 
+        <!-- Deuxième Graphique : Lot -->
         <div class="ru-card">
             <h4>Réel vs Système vs Maquette par lot</h4>
             <div class="chart-container">
                 <canvas id="chart-lot"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== GRAPHIQUE PAR RU (Barres normales avec défilement horizontal) ===== -->
-    <div class="ru-card ru-card--full">
-        <h4>Réel vs Système vs Maquette par RU</h4>
-        <div class="chart-container chart-container--wide">
-            <div class="chart-scroll-inner">
-                <canvas id="chart-comparatif"></canvas>
             </div>
         </div>
     </div>
@@ -108,8 +244,7 @@
         <div class="section-header">
             <h2>Statistiques par responsable d'unité</h2>
             <div class="recherche-ru">
-                <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
+                <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="7"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
@@ -125,7 +260,6 @@
                         <th>Utilisateur</th>
                         <th>Responsable Unité</th>
                         <th>Lot</th>
-                        <th>Unité</th>
                         <th>DPT</th>
                         <th>Effectif réel</th>
                         <th>Effectif système</th>
@@ -135,14 +269,13 @@
                 </thead>
                 <tbody id="corps-tableau-ru">
                     {% for ru in liste_ru_stats %}
-                    <tr data-matricule="{{ ru.n1.it }}" data-nom="{{ ru.n1.nom_complete }}">
-                        <td>{{ ru.n1.matricule }}</td>
+                    <tr data-matricule="{{ ru.n1.matricule|default:'' }}"
+                        data-nom="{{ ru.n1.nom_complete|default:'' }}">
+                        <td>{{ ru.n1.matricule|default:"-" }}</td>
                         <td class="matricule">{{ ru.n1.it|default:"-" }}</td>
                         <td>{{ ru.n1.nom_complete|default:"-" }}</td>
                         <td>{{ ru.n1.lot|default:"-" }}</td>
-                        <td>{% if ru.unite and ru.unite != "None" %}{{ ru.unite }}{% else %}-{% endif %}</td>
                         <td>{{ ru.n1.departement|default:"-" }}</td>
-
                         <td>
                             <div class="cell-stat-container">
                                 <span class="valeur-chiffre">{{ ru.reel1|default:"0" }}</span>
@@ -152,7 +285,6 @@
                                     {% endif %}
                             </div>
                         </td>
-
                         <td>
                             <div class="cell-stat-container">
                                 <span class="valeur-chiffre">{{ ru.systeme1|default:"0" }}</span>
@@ -162,18 +294,16 @@
                                     {% endif %}
                             </div>
                         </td>
-
                         <td>
                             <div class="cell-stat-container">
                                 <span class="valeur-chiffre">{{ ru.maquette1|default:"0" }}</span>
                             </div>
                         </td>
-
                         <td>{{ ru.n1.ru_it.nom_complete|default:"-" }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="empty-row">Aucune donnée disponible</td>
+                        <td colspan="9" class="empty-row">Aucune donnée disponible</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -190,122 +320,462 @@
         </div>
     </div>
 </div>
+
+<!-- ===== POPUP : DÉPARTS & CHANGEMENTS ===== -->
+<div class="modal fade custom-modal" id="modalDepart" tabindex="-1" aria-labelledby="modalListeN2Label"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="modal-title-icon icon-violet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h5 class="modal-title" id="modalListeN2Label">Départs non appliqués</h5>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {% if liste_departs %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom</th>
+                                <th>Lot</th>
+                                <th>Date déclaration</th>
+                                <th>Responsable</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in liste_departs %}
+                            <tr>
+                                <td>{{ d.it }}</td>
+                                <td>{{ d.nom }}</td>
+                                <td>{{ d.lot }}</td>
+                                <td>{{ d.date_declaration|date:"d/m/Y" }}</td>
+                                <td>{{ d.ru|default:"-" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Aucun départ déclaré</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <p class="empty-state-text">Aucun depart trouvé dans le système.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary-custom btn-sm" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade custom-modal" id="modalChangement" tabindex="-1" aria-labelledby="modalListeN2Label"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="modal-title-icon icon-violet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h5 class="modal-title" id="modalListeN2Label">Changements non appliqués</h5>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {% if liste_changements_non_faits %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom</th>
+                                <th>Date déclaration</th>
+                                <th>Changements détectés</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in liste_changements_non_faits %}
+                            <tr>
+                                <td>{{ c.it }}</td>
+                                <td>{{ c.nom }}</td>
+                                <td>{{ c.date_declaration|date:"d/m/Y" }}</td>
+                                <td>
+                                    <ul class="mb-0 ps-3">
+                                        {% for champ, valeurs in c.diffs.items %}
+                                        <li>{{ champ }} : {{ valeurs.ancien|default:"-" }} &rarr; {{valeurs.nouveau }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Aucun changement en attente</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <p class="empty-state-text">Aucun depart trouvé dans le système.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary-custom btn-sm" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ===== POPUP : LISTE DES N+2 ===== -->
+<div class="modal fade custom-modal" id="modalListeN2" tabindex="-1" aria-labelledby="modalListeN2Label"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="modal-title-icon icon-violet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h5 class="modal-title" id="modalListeN2Label">Responsables N+2</h5>
+                        <p class="modal-subtitle">Liste complète des responsables de niveau N+2</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {% if liste_n2_totale %}
+                <div class="table-responsive">
+                    <table class="table modal-custom-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">#</th>
+                                <th>Utilisateur</th>
+                                <th>Nom &amp; Prénom</th>
+                                <th>Matricule</th>
+                                <th>Département</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for n2 in liste_n2_totale %}
+                            <tr>
+                                <td class="text-muted fw-medium">{{ forloop.counter }}</td>
+                                <td class="fw-semibold text-primary-dark">{{ n2.it|default:"-" }}</td>
+                                <td class="fw-semibold">{{ n2.nom_complete|default:"-" }}</td>
+                                <td><span class="custom-badge">{{ n2.matricule|default:"-" }}</span></td>
+                                <td class="text-secondary">{{ n2.departement_id|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <p class="empty-state-text">Aucun responsable N+2 trouvé dans le système.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary-custom btn-sm" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== POPUP : LISTE DES N+3 ===== -->
+<div class="modal fade custom-modal" id="modalListeN3" tabindex="-1" aria-labelledby="modalListeN3Label"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="modal-title-icon icon-violet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h5 class="modal-title" id="modalListeN3Label">Responsables N+3</h5>
+                        <p class="modal-subtitle">Liste complète des responsables de niveau N+3</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {% if liste_n3_totale %}
+                <div class="table-responsive">
+                    <table class="table modal-custom-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">#</th>
+                                <th>Utilisateur</th>
+                                <th>Nom &amp; Prénom</th>
+                                <th>Matricule</th>
+                                <th>Département</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for n3 in liste_n3_totale %}
+                            <tr>
+                                <td class="text-muted fw-medium">{{ forloop.counter }}</td>
+                                <td class="fw-semibold text-primary-dark">{{ n3.it|default:"-" }}</td>
+                                <td class="fw-semibold">{{ n3.nom_complete|default:"-" }}</td>
+                                <td><span class="custom-badge">{{ n3.matricule|default:"-" }}</span></td>
+                                <td class="text-secondary">{{ n3.departement_id|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <p class="empty-state-text">Aucun responsable N+3 trouvé dans le système.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary-custom btn-sm" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block script %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-    /* ---- Graphique 1 : Évolution Réel sur 7 jours ---- */
-    new Chart(document.getElementById("chart-global"), {
-        type: "line",
-        data: {
-            labels: {{ chart_labels_json| safe }},
-        datasets: [{
-            label: "Évolution Réel",
-            data: {{ chart_data_json| safe }},
-        borderColor: "#2563eb",
-        backgroundColor: "rgba(37, 99, 235, 0.1)",
+    const tooltipConfig = {
+        enabled: true,
+        mode: "index",
+        intersect: false,
+        backgroundColor: "rgba(16, 24, 40, 0.95)",
+        titleColor: "#ffffff",
+        titleFont: { size: 13, weight: "bold" },
+        titleMarginBottom: 8,
+        bodyColor: "#e5e7eb",
+        bodyFont: { size: 12 },
+        padding: 12,
+        cornerRadius: 8,
+        boxPadding: 4,
+        usePointStyle: true,
+        callbacks: {
+            title: function (items) {
+                return items.length ? items[0].label : "";
+            },
+            label: function (context) {
+                const valeur = context.parsed.y;
+                const texte = (valeur !== null && valeur !== undefined) ? valeur.toLocaleString("fr-FR") : "-";
+                return " " + context.dataset.label + ": " + texte;
+            }
+        }
+    };
+
+    /* ---- Graphique : Par Mois (Jours du mois en cours) ---- */
+    const elGlobal = document.getElementById("chart-global");
+    let chartGlobal = null;
+    if (elGlobal) {
+        chartGlobal = new Chart(elGlobal, {
+            type: "line",
+            data: {
+                labels: {{ chart_labels_json| safe }},
+    datasets: [{
+        label: "Évolution Réel",
+        data: {{ chart_data_json| safe }},
+        borderColor: "#2C5F8A",
+        backgroundColor: "rgba(44, 95, 138, 0.1)",
         fill: true,
         tension: 0.3,
-        pointBackgroundColor: "#2563eb",
+        pointBackgroundColor: "#2C5F8A",
         pointRadius: 4,
+                }]
+            },
+    options: {
+        responsive: true,
+            maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: tooltipConfig },
+        scales: { y: { beginAtZero: true } }
+    }
+        });
+    }
+
+    /* ---- Graphique : RÉEL vs Système vs Maquette par LOT ---- */
+    const elLot = document.getElementById("chart-lot");
+    if (elLot) {
+        new Chart(elLot, {
+            type: "bar",
+            data: {
+                labels: {{ lot_labels| safe }},
+    datasets: [
+        { label: "Réel", data: {{ lot_reel| safe }}, backgroundColor: "#2C5F8A", barThickness: 18 },
+        { label: "Système", data: {{ lot_systeme| safe }}, backgroundColor: "#15805F", barThickness: 18 },
+        { label: "Maquette", data: {{ lot_maquette| safe }}, backgroundColor: "#B0741C", barThickness: 18 }
+    ]
+            },
+    options: {
+        responsive: true,
+            maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: "top" }, tooltip: tooltipConfig },
+        scales: { y: { beginAtZero: true } }
+    }
+        });
+    }
+
+    /* ---- Graphique : Vue globale (12 Mois de l'année) ---- */
+    const elMensuel = document.getElementById("chart-mensuel");
+    let chartMensuel = null;
+
+    if (elMensuel) {
+        const labelsParAnnee = {{ evolution_mensuelle_labels_par_annee_json| safe}};
+    const dataParAnnee = {{ evolution_mensuelle_data_par_annee_json| safe }};
+    const selectAnnee = document.getElementById("select-annee-evolution");
+
+    const MOIS_NOMS = {
+        "01": "Jan", "02": "Fév", "03": "Mar", "04": "Avr",
+        "05": "Mai", "06": "Juin", "07": "Juil", "08": "Août",
+        "09": "Sep", "10": "Oct", "11": "Nov", "12": "Déc"
+    };
+
+    function labelsLisibles(anneeStr) {
+        const bruts = labelsParAnnee[anneeStr] || [];
+        return bruts.map(m => MOIS_NOMS[m] || m);
+    }
+
+    const initialAnnee = selectAnnee ? selectAnnee.value : (Object.keys(labelsParAnnee)[0] || "");
+
+    chartMensuel = new Chart(elMensuel, {
+        type: "line",
+        data: {
+            labels: labelsLisibles(initialAnnee),
+            datasets: [{
+                label: "Évolution Réel",
+                data: dataParAnnee[initialAnnee] || [],
+                borderColor: "#5B4E96",
+                backgroundColor: "rgba(91, 78, 150, 0.1)",
+                fill: true,
+                tension: 0.3,
+                pointBackgroundColor: "#5B4E96",
+                pointRadius: 4,
             }]
         },
         options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
-    }
-    });
-
-    /* ---- Graphique 2 : Réel vs Système vs Maquette PAR LOT (Barres normales) ---- */
-    new Chart(document.getElementById("chart-lot"), {
-        type: "bar",
-        data: {
-            labels: {{ lot_labels| safe }},
-        datasets: [
-        {
-            label: "Réel",
-            data: {{ lot_reel| safe }},
-        backgroundColor: "#dc2626",
-        barThickness: 18,
-                },
-        {
-            label: "Système",
-            data: {{ lot_systeme| safe }},
-        backgroundColor: "#16a34a",
-        barThickness: 18,
-                },
-        {
-            label: "Maquette",
-            data: {{ lot_maquette| safe }},
-        backgroundColor: "#f59e0b",
-        barThickness: 18,
-                }
-    ]
-        },
-        options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: true, position: "top" } },
-        scales: {
-            y: {
-                beginAtZero: true,
-                title: { display: true, text: "Effectifs" }
-            }
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: tooltipConfig },
+            scales: { y: { beginAtZero: true } }
         }
-    }
     });
 
-    /* ---- Graphique 3 : Réel vs Système vs Maquette PAR RU (Barres normales) ---- */
-    const nbRu = {{ liste_ru_stats| length }};
-    const largeurCanvasRu = Math.max(900, nbRu * 45);
-    const canvasRu = document.getElementById("chart-comparatif");
-    canvasRu.parentElement.style.width = largeurCanvasRu + "px";
-
-    new Chart(canvasRu, {
-        type: "bar",
-        data: {
-            labels: [
-                {% for stat in liste_ru_stats %}"{{ stat.n1.nom_complete|escapejs }}",{% endfor %}
-            ],
-        datasets: [
-        {
-            label: "Réel",
-            data: [{% for stat in liste_ru_stats %}{{ stat.reel1 |default:0 }}, {% endfor %}],
-        backgroundColor: "#dc2626",
-        barThickness: 12,
-                },
-        {
-            label: "Système",
-            data: [{% for stat in liste_ru_stats %}{{ stat.systeme1 |default:0 }}, {% endfor %}],
-        backgroundColor: "#16a34a",
-        barThickness: 12,
-                },
-        {
-            label: "Maquette",
-            data: [{% for stat in liste_ru_stats %}{{ stat.maquette1 |default:0 }}, {% endfor %}],
-        backgroundColor: "#f59e0b",
-        barThickness: 12,
-                }
-            ]
-        },
-        options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: true, position: "top" } },
-        scales: {
-            x: {
-                ticks: { autoSkip: false, maxRotation: 60, minRotation: 60 }
-            },
-            y: {
-                beginAtZero: true,
-                title: { display: true, text: "Effectifs" }
-            }
-        }
+    if (selectAnnee) {
+        selectAnnee.addEventListener("change", function () {
+            const annee = this.value;
+            chartMensuel.data.labels = labelsLisibles(annee);
+            chartMensuel.data.datasets[0].data = dataParAnnee[annee] || [];
+            chartMensuel.update();
+        });
     }
-    });
+    }
+
+    /* ---- Bascule des onglets ---- */
+    const btnVueGlobale = document.getElementById("btn-vue-globale");
+    const btnParMois = document.getElementById("btn-par-mois");
+    const canvasGlobal = document.getElementById("chart-global");
+    const canvasMensuel = document.getElementById("chart-mensuel");
+    const selectAnneeNav = document.getElementById("select-annee-evolution");
+
+    if (btnVueGlobale && btnParMois) {
+        // Clic sur "Vue globale" -> Affiche les 12 mois
+        btnVueGlobale.addEventListener("click", function () {
+            btnVueGlobale.classList.add("active");
+            btnParMois.classList.remove("active");
+
+            canvasMensuel.style.display = "block";
+            canvasGlobal.style.display = "none";
+            if (selectAnneeNav) selectAnneeNav.style.display = "inline-block";
+
+            if (chartMensuel) chartMensuel.resize();
+        });
+
+        // Clic sur "Par mois" -> Affiche le mois actuel
+        btnParMois.addEventListener("click", function () {
+            btnParMois.classList.add("active");
+            btnVueGlobale.classList.remove("active");
+
+            canvasMensuel.style.display = "none";
+            canvasGlobal.style.display = "block";
+            if (selectAnneeNav) selectAnneeNav.style.display = "none";
+
+            if (chartGlobal) chartGlobal.resize();
+        });
+    }
 </script>
 
 <script>
@@ -331,10 +801,7 @@
         }
 
         function normaliser(texte) {
-            return String(texte)
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "");
+            return String(texte).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         }
 
         function lignesCorrespondantes() {
@@ -369,21 +836,15 @@
             if (total === 0 && rechercheInput.value.trim() !== "") {
                 const ligneVide = document.createElement("tr");
                 ligneVide.className = "empty-row-recherche";
-                ligneVide.innerHTML = '<td colspan="10" class="empty-row text-center">Aucun responsable trouvé pour cette recherche.</td>';
+                ligneVide.innerHTML = '<td colspan="10" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
                 tbody.appendChild(ligneVide);
             }
 
-            if (infoEl) {
-                infoEl.textContent = total > 0 ? `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}` : "";
-            }
-            if (pagesEl) {
-                pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
-            }
+            if (infoEl) infoEl.textContent = total > 0 ? `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}` : "";
+            if (pagesEl) pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
             if (btnPrec) btnPrec.disabled = pageActuelle <= 1;
             if (btnSuiv) btnSuiv.disabled = pageActuelle >= totalPages;
-            if (barreEl) {
-                barreEl.style.display = (total <= LIGNES_PAR_PAGE) ? "none" : "flex";
-            }
+            if (barreEl) barreEl.style.display = (total <= LIGNES_PAR_PAGE) ? "none" : "flex";
         }
 
         rechercheInput.addEventListener("input", function () {
@@ -391,19 +852,8 @@
             afficher();
         });
 
-        if (btnPrec) {
-            btnPrec.addEventListener("click", function () {
-                pageActuelle -= 1;
-                afficher();
-            });
-        }
-
-        if (btnSuiv) {
-            btnSuiv.addEventListener("click", function () {
-                pageActuelle += 1;
-                afficher();
-            });
-        }
+        if (btnPrec) btnPrec.addEventListener("click", function () { pageActuelle -= 1; afficher(); });
+        if (btnSuiv) btnSuiv.addEventListener("click", function () { pageActuelle += 1; afficher(); });
 
         afficher();
     });

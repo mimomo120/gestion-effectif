@@ -1,180 +1,316 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 /* =========================================================
-   VARIABLES & DESIGN SYSTEM
+   DESIGN TOKENS
+   Palette pensée pour un tableau de bord d'exploitation :
+   bleu-acier (donnée réelle), vert (donnée système),
+   ocre (maquette/plan), rouge-brique et violet (alertes RH).
 ========================================================= */
 :root {
-    --primary: #2563eb;
-    --primary-hover: #1d4ed8;
-    --bg-main: #eef2f5;
-    --card-bg: #ffffff;
-    --text-main: #0f172a;
-    --text-muted: #64748b;
-    --border-color: #e2e8f0;
+    --ink: #101828;
+    --ink-soft: #475467;
+    --ink-faint: #98A2B3;
+    --paper: #F3F5F8;
+    --card: #ffffff;
+    --line: #E4E8EE;
 
-    --success: #10b981;
-    --success-bg: #ecfdf5;
-    --danger: #ef4444;
-    --danger-bg: #fef2f2;
-    --warning: #f59e0b;
-    --warning-bg: #fffbeb;
-    --info: #3b82f6;
-    --info-bg: #eff6ff;
+    --brand: #2C5F8A;
+    --brand-ink: #1B3F5C;
+    --brand-soft: #E8F0F7;
 
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 16px;
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+    --teal: #15805F;
+    --teal-soft: #E4F5EE;
+
+    --amber: #B0741C;
+    --amber-soft: #FAF1E1;
+
+    --red: #B0392D;
+    --red-soft: #FAEAE7;
+
+    --violet: #5B4E96;
+    --violet-soft: #ECEAF7;
+
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 18px;
+    --shadow-card: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 6px rgba(16, 24, 40, .04);
+    --shadow-raised: 0 20px 25px -5px rgba(16, 24, 40, 0.1), 0 8px 10px -6px rgba(16, 24, 40, 0.1);
 }
 
 body {
-    background-color: var(--bg-main) !important;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: var(--text-main);
+    background-color: var(--paper) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
 }
 
-/* Base Container */
 .page-container {
-    padding: 1.5rem 2rem;
+    padding: 1.75rem 2.25rem 3rem;
     min-height: 100vh;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    color: var(--text-main);
+    color: var(--ink);
+    max-width: 1440px;
+    margin: 0 auto;
 }
 
-/* En-tête (partagé N2 / N3) */
+/* =========================================================
+   EN-TÊTE
+========================================================= */
 .dashboard-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
+    align-items: flex-start;
+    margin-bottom: 1.75rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--line);
 }
 
 .dashboard-title {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--text-main);
+    font-size: 1.65rem;
+    font-weight: 800;
+    color: var(--ink);
     letter-spacing: -0.02em;
+    margin: 0 0 .3rem;
+}
+
+.dashboard-header::after {
+    content: "";
+}
+
+.dashboard-subtitle {
+    font-size: .875rem;
+    color: var(--ink-soft);
     margin: 0;
 }
 
 .date-picker-badge {
-    background-color: var(--card-bg);
-    padding: 0.5rem 1rem;
+    background-color: var(--card);
+    padding: .55rem 1rem;
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--line);
     font-weight: 600;
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    box-shadow: var(--shadow-sm);
+    font-size: .82rem;
+    color: var(--ink-soft);
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.actions-bar {
+    display: flex;
+    gap: .6rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.actions-bar .btn {
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: .82rem;
+    padding: .55rem 1rem;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--line);
+}
+
+.btn-outline-primary.btn-sm {
+    color: var(--brand-ink);
+    border-color: var(--brand);
+    background: var(--brand-soft);
+}
+
+.btn-outline-primary.btn-sm:hover {
+    background: var(--brand);
+    color: #fff;
+}
+
+.btn-outline-warning.btn-sm {
+    color: var(--amber);
+    border-color: var(--amber-soft);
+    background: var(--amber-soft);
+}
+
+.btn-outline-warning.btn-sm:hover {
+    background: var(--amber);
+    color: #fff;
+    border-color: var(--amber);
+}
+
+.btn-outline-warning.btn-sm .badge {
+    background: var(--red) !important;
 }
 
 /* =========================================================
-   CARTE STATISTIQUES (KPIs)
+   ICÔNES (badges circulaires réutilisables)
 ========================================================= */
-.statistique-cards {
+.stat-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.stat-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2;
+}
+
+.stat-icon.icon-brand {
+    background: var(--brand-soft);
+    color: var(--brand);
+}
+
+.stat-icon.icon-teal {
+    background: var(--teal-soft);
+    color: var(--teal);
+}
+
+.stat-icon.icon-amber {
+    background: var(--amber-soft);
+    color: var(--amber);
+}
+
+.stat-icon.icon-red {
+    background: var(--red-soft);
+    color: var(--red);
+}
+
+.stat-icon.icon-violet {
+    background: var(--violet-soft);
+    color: var(--violet);
+}
+
+/* =========================================================
+   CARTES PRINCIPALES — EFFECTIFS
+========================================================= */
+.kpi-primary-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.25rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
 }
 
 .stat-card {
-    background: var(--card-bg);
-    padding: 1.25rem;
+    background: var(--card);
+    padding: 1.25rem 1.4rem;
     border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-card);
     display: flex;
     flex-direction: column;
+    gap: .65rem;
+}
+
+.stat-card .stat-card-top {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
 }
 
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
 .stat-card h3 {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.75rem;
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin: 0;
+    letter-spacing: 0.01em;
 }
 
 .stat-valeur-group {
     display: flex;
     align-items: baseline;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    gap: .4rem;
     flex-wrap: wrap;
 }
 
 .stat-valeur-group .valeur {
-    font-size: 2rem;
+    font-size: 2.1rem;
     font-weight: 800;
-    color: var(--text-main);
+    color: var(--ink);
     line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
 }
 
 .stat-valeur-group .unite {
-    font-size: 0.875rem;
-    color: var(--text-muted);
+    font-size: .82rem;
+    color: var(--ink-faint);
     font-weight: 500;
 }
 
-/* Badges Écarts (+/-) */
 .badge-vs {
     display: inline-flex;
     align-items: center;
-    padding: 0.25rem 0.6rem;
+    gap: .25rem;
+    padding: .2rem .55rem;
     border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: .74rem;
+    font-weight: 700;
     width: fit-content;
 }
 
 .badge-vs.positive {
-    background-color: var(--success-bg);
-    color: var(--success);
+    background-color: var(--teal-soft);
+    color: var(--teal);
 }
 
 .badge-vs.negative {
-    background-color: var(--danger-bg);
-    color: var(--danger);
+    background-color: var(--red-soft);
+    color: var(--red);
 }
 
-/* Variantes de couleur des cartes KPI (N2 : reel/systeme/maquette/warning) */
-.stat-card.card-reel .valeur {
-    color: var(--primary);
+/* =========================================================
+   BANDE D'ALERTES RH
+========================================================= */
+.alert-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: .75rem;
+    margin-bottom: 2rem;
 }
 
-.stat-card.card-systeme .valeur {
-    color: var(--success);
+.alert-pill {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: .8rem .95rem;
+    display: flex;
+    align-items: center;
+    gap: .7rem;
 }
 
-.stat-card.card-maquette .valeur {
-    color: var(--warning);
+.alert-pill .stat-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
 }
 
-.stat-card.card-warning .valeur {
-    color: var(--danger);
+.alert-pill .stat-icon svg {
+    width: 17px;
+    height: 17px;
 }
 
-/* Variantes de couleur des cartes KPI (N3 : directs/N1/N2) */
-.stat-card.card-direct .valeur {
-    color: var(--info);
+.alert-pill-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
 }
 
-.stat-card.card-n1 .valeur {
-    color: var(--primary);
+.alert-pill-value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
 }
 
-.stat-card.card-n2 .valeur {
-    color: #7c3aed;
+.alert-pill-label {
+    font-size: .74rem;
+    color: var(--ink-soft);
+    font-weight: 600;
 }
 
 /* =========================================================
@@ -183,94 +319,244 @@ body {
 .charts-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2.5rem;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 1200px) {
+    .charts-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 700px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .ru-card {
-    background: var(--card-bg);
+    background: var(--card);
     border-radius: var(--radius-md);
-    padding: 1.5rem;
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
+    padding: 1.4rem 1.5rem;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-card);
 }
 
 .ru-card h4 {
-    font-size: 1rem;
+    font-size: .95rem;
     font-weight: 700;
-    color: var(--text-main);
-    margin-bottom: 1.25rem;
+    color: var(--ink);
+    margin-bottom: 1rem;
+}
+
+/* Carte qui doit occuper toute la largeur de la grille de graphiques */
+.ru-card--full {
+    grid-column: 1 / -1;
 }
 
 .chart-container {
     position: relative;
     height: 300px;
     width: 100%;
+    margin-top: .5rem;
+}
+
+.chart-container canvas {
+    max-width: 100% !important;
+    max-height: 100% !important;
+}
+
+/* Variante pour le graphique comparatif par RU : défilement horizontal
+   quand il y a beaucoup de responsables d'unité */
+.chart-container--wide {
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.chart-scroll-inner {
+    height: 100%;
+}
+
+.tabs-mois-annee {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 1rem;
+}
+
+.tab-btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all .15s ease;
+}
+
+.tab-btn.active {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+}
+
+.ru-select-bar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 1.1rem;
+    flex-wrap: wrap;
+    background-color: var(--paper);
+    padding: .55rem 1rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+}
+
+.ru-select-bar label {
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0;
+    white-space: nowrap;
+}
+
+.ru-select-bar select,
+#ru-select {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: .4rem .8rem;
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--brand-ink);
+    background-color: #fff;
+    outline: none;
+    cursor: pointer;
+}
+
+.ru-select-bar select:focus,
+#ru-select:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
 }
 
 /* =========================================================
-   SECTIONS & TABLEAU DE DONNÉES
+   RECHERCHE PAR NOM (figure 2) — input + dropdown filtrable
 ========================================================= */
-.section {
-    margin-bottom: 2rem;
+.ru-search-select {
+    position: relative;
 }
 
+.ru-search-input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: .4rem .8rem;
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--brand-ink);
+    background-color: #fff;
+    outline: none;
+}
+
+.ru-search-input:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.ru-search-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    max-height: 220px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 4px 0;
+    list-style: none;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-raised);
+}
+
+.ru-search-dropdown.open {
+    display: block;
+}
+
+.ru-search-option {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: .85rem;
+    color: var(--ink);
+}
+
+.ru-search-option:hover {
+    background: var(--paper);
+}
+
+.ru-search-dropdown.no-results .ru-search-option {
+    display: none !important;
+}
+
+/* =========================================================
+   SECTION TABLEAU
+========================================================= */
 .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: .75rem;
     margin-bottom: 1rem;
 }
 
 .section-header h2 {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 700;
-    color: var(--text-main);
+    color: var(--ink);
     margin: 0;
 }
 
-/* Barre de recherche (avec ou sans icône SVG) */
 .recherche-ru {
     position: relative;
 }
 
 .recherche-ru .icon-search {
     position: absolute;
-    left: 0.75rem;
+    left: .75rem;
     top: 50%;
     transform: translateY(-50%);
     width: 16px;
     height: 16px;
-    color: var(--text-muted);
+    color: var(--ink-faint);
     pointer-events: none;
 }
 
 .recherche-ru input {
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    width: 260px;
-    transition: all 0.2s ease;
-}
-
-.recherche-ru:has(.icon-search) input {
-    padding-left: 2.25rem;
+    border: 1px solid var(--line);
+    padding: .55rem 1rem .55rem 2.25rem;
+    font-size: .85rem;
+    width: 280px;
+    background-color: #fff;
 }
 
 .recherche-ru input:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
 }
 
 .table-container {
-    background: var(--card-bg);
+    background: var(--card);
     border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-card);
     overflow-x: auto;
 }
 
@@ -281,22 +567,21 @@ body {
 }
 
 .table-ru th {
-    background-color: #f1f5f9;
-    color: var(--text-muted);
-    font-size: 0.75rem;
+    background-color: var(--paper);
+    color: var(--ink-soft);
+    font-size: .72rem;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 1rem;
-    border-bottom: 1px solid var(--border-color);
+    letter-spacing: 0.03em;
+    padding: .8rem 1rem;
+    border-bottom: 1px solid var(--line);
     white-space: nowrap;
 }
 
 .table-ru td {
-    padding: 0.875rem 1rem;
-    font-size: 0.875rem;
-    border-bottom: 1px solid var(--border-color);
-    color: var(--text-main);
+    padding: .8rem 1rem;
+    font-size: .85rem;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink);
 }
 
 .table-ru tbody tr:last-child td {
@@ -304,30 +589,36 @@ body {
 }
 
 .table-ru tbody tr:hover {
-    background-color: #f8fafc;
+    background-color: var(--paper);
 }
 
 .cell-stat-container {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: .5rem;
 }
 
 .valeur-chiffre {
-    font-weight: 600;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
 
-/* Ligne / cellule "aucune donnée" */
+.matricule {
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+}
+
 .empty-row {
     text-align: center;
     padding: 1.5rem 1rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    color: var(--ink-faint);
+    font-size: .9rem;
 }
 
-/* Contrôles de Pagination */
+/* Pagination */
 .pagination-bar {
-    padding: 1rem 0;
+    padding: .9rem 1rem;
+    border-top: 1px solid var(--line);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -335,259 +626,452 @@ body {
 
 .pagination-info,
 .pagination-pages {
-    font-size: 0.875rem;
-    color: var(--text-muted);
+    font-size: .82rem;
+    color: var(--ink-soft);
 }
 
-.pagination-controls .btn,
 .pagination-btn {
     border-radius: var(--radius-sm);
-    font-weight: 500;
-    padding: 0.375rem 0.85rem;
-    font-size: 0.875rem;
-    border: 1px solid var(--border-color);
-    background: var(--card-bg);
-    color: var(--text-main);
+    font-weight: 600;
+    padding: .35rem .8rem;
+    font-size: .82rem;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
     cursor: pointer;
 }
 
 .pagination-btn:hover:not(:disabled) {
-    background-color: #f1f5f9;
+    background-color: var(--paper);
 }
 
 .pagination-btn:disabled {
-    opacity: 0.5;
+    opacity: .5;
     cursor: not-allowed;
 }
 
-/* =========================================================
-   BOUTON "DERNIERS MOUVEMENTS"
-========================================================= */
-.btn-mouvements {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    background-color: var(--info-bg);
-    border: 1px solid transparent;
-    color: var(--primary);
-    font-size: 0.8rem;
-    font-weight: 600;
-    padding: 0.4rem 0.75rem;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.btn-mouvements i {
-    font-size: 0.8rem;
-}
-
-.btn-mouvements:hover {
-    background-color: var(--primary);
-    color: #ffffff;
-    box-shadow: var(--shadow-sm);
-}
-
-.btn-mouvements:active {
-    transform: scale(0.97);
-}
-
-.btn-mouvements:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
-}
-
-.btn-mouvements .badge {
-    background-color: var(--primary) !important;
-    color: #ffffff;
-    font-size: 0.7rem;
-    font-weight: 700;
-    padding: 0.2rem 0.45rem;
-    border-radius: 999px;
-    line-height: 1;
-    transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.btn-mouvements:hover .badge {
-    background-color: #ffffff !important;
-    color: var(--primary);
-}
-
-.table-ru td.text-center>.text-muted {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-}
-
-/* =========================================================
-   MODAL "DERNIERS MOUVEMENTS"
-========================================================= */
-#modal-mouvements-ru .modal-content {
-    border: none;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
-    overflow: hidden;
-}
-
-#modal-mouvements-ru .modal-header {
-    background-color: var(--card-bg);
-    border-bottom: 1px solid var(--border-color);
-    padding: 1.1rem 1.5rem;
-}
-
-#modal-mouvements-ru .modal-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-main);
+.pagination-controls {
     display: flex;
     align-items: center;
-}
-
-#modal-mouvements-ru .modal-title i {
-    color: var(--primary);
-}
-
-#modal-mouvements-ru #mouvement-ru-nom {
-    color: var(--primary);
-    font-weight: 700;
-    margin-left: 0.3rem;
-}
-
-#modal-mouvements-ru .modal-body {
-    padding: 1rem 1.5rem;
-    max-height: 360px;
-    overflow-y: auto;
-}
-
-#modal-mouvements-ru .modal-footer {
-    border-top: 1px solid var(--border-color);
-    padding: 0.85rem 1.5rem;
-}
-
-#liste-mouvements-body .list-group-item {
-    border: none;
-    border-bottom: 1px solid var(--border-color);
-    padding: 0.75rem 0.25rem;
-    font-size: 0.875rem;
-    color: var(--text-main);
-    background: transparent;
-}
-
-#liste-mouvements-body .list-group-item:last-child {
-    border-bottom: none;
-}
-
-#liste-mouvements-body .list-group-item strong {
-    color: var(--primary);
-    font-weight: 700;
-    margin-right: 0.25rem;
-}
-
-#liste-mouvements-body .list-group-item small {
-    white-space: nowrap;
-    color: var(--text-muted);
+    gap: .6rem;
 }
 
 /* =========================================================
-   GROUPES N+2 (accordéon, page N3 uniquement)
+   MODALE DÉPARTS & CHANGEMENTS (ancienne modale unique à onglets
+   — conservée pour compatibilité avec d'autres pages)
 ========================================================= */
-.n2-group-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 1rem;
+.modal-backdrop.show {
+    background-color: rgba(16, 24, 40, 0.4);
+    backdrop-filter: blur(4px);
+}
+
+#modalDepartsChangements .modal-dialog {
+    max-width: 850px;
+    margin: 1.75rem auto;
+}
+
+#modalDepartsChangements .modal-content {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-raised);
+    background-color: var(--card);
     overflow: hidden;
 }
 
-.n2-group-header {
+/* Modal Header */
+#modalDepartsChangements .modal-header {
+    background-color: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 1.25rem 1.5rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 1.25rem;
-    cursor: pointer;
-    list-style: none;
+}
+
+#modalDepartsChangements .modal-title {
+    font-size: 1.1rem;
     font-weight: 700;
-    color: var(--text-main);
-    background-color: #f8fafc;
-    transition: background-color 0.15s ease;
-}
-
-.n2-group-header::-webkit-details-marker {
-    display: none;
-}
-
-.n2-group-header:hover {
-    background-color: #f1f5f9;
-}
-
-.n2-group-header::before {
-    content: "\25B8";
-    margin-right: 0.6rem;
-    color: var(--primary);
-    transition: transform 0.15s ease;
-    display: inline-block;
-}
-
-details[open]>.n2-group-header::before {
-    transform: rotate(90deg);
-}
-
-.n2-group-title {
-    font-size: 0.95rem;
-}
-
-.n2-group-meta {
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-muted);
-}
-
-.n2-group-card .table-container {
-    border: none;
-    border-top: 1px solid var(--border-color);
-    border-radius: 0;
-    box-shadow: none;
-}
-
-.n2-subsection-title {
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-muted);
-    padding: 0.75rem 1.25rem 0.25rem;
+    color: var(--ink);
     margin: 0;
 }
 
-.n2-directs-subsection {
-    border-top: 1px solid var(--border-color);
+#modalDepartsChangements .btn-close {
+    background-size: 0.8rem;
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    transition: background-color 0.15s ease;
 }
 
-.n2-directs-subsection .table-container {
+#modalDepartsChangements .btn-close:focus {
+    box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+/* Nav Tabs */
+#modalDepartsChangements .modal-body {
+    padding: 1.5rem;
+}
+
+#modalDepartsChangements .nav-tabs {
+    border-bottom: 1px solid var(--line);
+    gap: 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+#modalDepartsChangements .nav-tabs .nav-link {
+    color: var(--ink-soft);
+    font-weight: 600;
+    font-size: .875rem;
     border: none;
-    box-shadow: none;
-}
-/* Correations layout & scroll graphique RU */
-.chart-container--wide {
-    overflow-x: auto;
-    overflow-y: hidden;
-}
-
-.ru-card--full {
-    width: 100%;
-    margin-bottom: 2rem;
-}
-
-.chart-scroll-inner {
-    height: 100%;
-    min-width: 100%;
-}
-
-/* Alignement du header */
-.header-dashboard-flex {
-    display: flex;
-    justify-content: space-between;
+    padding: 0.6rem 0.25rem;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    display: inline-flex;
     align-items: center;
-    margin-bottom: 2rem;
+    gap: .5rem;
+    transition: all 0.15s ease;
+}
+
+#modalDepartsChangements .nav-tabs .nav-link:hover {
+    color: var(--ink);
+}
+
+#modalDepartsChangements .nav-tabs .nav-link.active {
+    color: var(--brand);
+    border-bottom-color: var(--brand);
+    background: transparent;
+}
+
+#modalDepartsChangements .badge.bg-secondary {
+    background-color: var(--paper) !important;
+    color: var(--ink-soft);
+    font-weight: 700;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+}
+
+#modalDepartsChangements .nav-link.active .badge.bg-secondary {
+    background-color: var(--brand-soft) !important;
+    color: var(--brand-ink);
+    border-color: transparent;
+}
+
+/* Contenu des tableaux dans la Modale */
+#modalDepartsChangements .table {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-bottom: 0;
+}
+
+#modalDepartsChangements .table th {
+    background-color: var(--paper);
+    color: var(--ink-soft);
+    font-size: .75rem;
+    font-weight: 700;
+    border-bottom: 1px solid var(--line);
+    padding: .75rem 1rem;
+}
+
+#modalDepartsChangements .table td {
+    padding: .75rem 1rem;
+    font-size: .85rem;
+    color: var(--ink);
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+}
+
+#modalDepartsChangements .table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Modal Footer */
+#modalDepartsChangements .modal-footer {
+    border-top: 1px solid var(--line);
+    padding: 1rem 1.5rem;
+    background-color: var(--paper);
+    display: flex;
+    justify-content: flex-end;
+}
+
+#modalDepartsChangements .modal-footer .btn {
+    border-radius: var(--radius-sm);
+    font-size: .85rem;
+    font-weight: 600;
+    padding: .5rem 1.25rem;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .kpi-primary-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ==========================================================================
+   MODALES CUSTOM (N+2 / N+3 / Départs / Changements)
+   Toutes les popups déclenchées depuis les pastilles d'alerte partagent
+   la classe .custom-modal et doivent avoir un rendu identique, y compris
+   celles qui n'utilisent pas la classe .modal-custom-table sur leur
+   <table> (cas des popups Départs et Changements).
+   ========================================================================== */
+
+.custom-modal .modal-content {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+/* En-tête */
+.custom-modal .modal-header {
+    padding: 1.25rem 1.5rem;
+    background-color: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.modal-title-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(124, 58, 237, 0.1);
+    color: #7c3aed;
+}
+
+.custom-modal .modal-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.custom-modal .modal-subtitle {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin: 2px 0 0 0;
+}
+
+/* Tableau — variante avec la classe .modal-custom-table (N+2 / N+3) */
+.modal-custom-table {
+    margin: 0;
+    width: 100%;
+}
+
+.modal-custom-table thead th {
+    background-color: #f8fafc;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-custom-table tbody td {
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.875rem;
+    color: #334155;
+}
+
+.modal-custom-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.modal-custom-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+/* Tableau — variante "table table-sm table-hover align-middle"
+   utilisée par les popups Départs et Changements (#modalDepart et
+   #modalChangement). Avant ce correctif ces deux tables n'héritaient
+   d'aucun style custom-modal et gardaient le rendu Bootstrap brut,
+   ce qui les faisait trancher visuellement avec les popups N+2/N+3.
+   On applique ici le même habillage, sans devoir toucher au HTML. */
+.custom-modal .modal-body .table-responsive {
+    margin: 0;
+}
+
+.custom-modal .modal-body .table-responsive table {
+    margin: 0;
+    width: 100%;
+}
+
+.custom-modal .modal-body .table-responsive thead th {
+    background-color: #f8fafc;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.custom-modal .modal-body .table-responsive tbody td {
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.875rem;
+    color: #334155;
+    vertical-align: middle;
+}
+
+.custom-modal .modal-body .table-responsive tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.custom-modal .modal-body .table-responsive tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+/* Liste des champs modifiés dans la popup Changements
+   (c.diffs.items, cellule "Changements détectés") */
+.custom-modal .modal-body .table-responsive td ul {
+    list-style: none;
+    padding-left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.custom-modal .modal-body .table-responsive td ul li {
+    font-size: 0.82rem;
+    color: #334155;
+}
+
+/* Badges & Styles de texte */
+.text-primary-dark {
+    color: #1e293b;
+}
+
+.custom-badge {
+    display: inline-block;
+    padding: 0.25em 0.6em;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+}
+
+/* État vide — commun à toutes les popups custom-modal
+   (N+2, N+3, Départs, Changements) */
+.empty-state {
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+}
+
+.empty-state-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background-color: #f1f5f9;
+    color: #94a3b8;
+    margin-bottom: 0.75rem;
+}
+
+.empty-state-text {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Pied de la modale */
+.custom-modal .modal-footer {
+    padding: 0.85rem 1.5rem;
+    background-color: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+.btn-secondary-custom {
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 0.4rem 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary-custom:hover {
+    background-color: #f1f5f9;
+    border-color: #94a3b8;
+    color: #1e293b;
+}
+
+/* =========================================================
+   Icônes des pastilles cliquables ouvrant une popup
+   (Départs = rouge, Changements = ambre) — la modal-title-icon
+   utilisait le violet pour toutes les popups par défaut ; on
+   ajoute des variantes cohérentes avec les icônes de la pastille
+   déclenchant chaque modale.
+========================================================= */
+#modalDepart .modal-title-icon {
+    background-color: var(--red-soft);
+    color: var(--red);
+}
+
+#modalChangement .modal-title-icon {
+    background-color: var(--amber-soft);
+    color: var(--amber);
+}
+
+/* Container des badges Blue/White collars */
+.collars-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+/* Style de base des badges */
+.collar-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 12px;
+    line-height: 1.2;
+}
+
+.collar-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Blue Collars (Thème Bleu) */
+.blue-collar {
+    background-color: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
+.blue-collar .collar-dot {
+    background-color: #2563eb;
+}
+
+/* White Collars (Thème Vert/Émeraude ou Gris Clair) */
+.white-collar {
+    background-color: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.white-collar .collar-dot {
+    background-color: #059669;
 }

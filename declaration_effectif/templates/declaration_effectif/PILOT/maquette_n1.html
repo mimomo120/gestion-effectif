@@ -1,0 +1,337 @@
+{% extends 'utilisateur/navbar_N1.html' %}
+{% load static %}
+
+{% block title %}Maquette N+1 - {{ departement.abreviation }}{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'utilisateur/css/maquette_n1.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+    <!-- En-tête MODULA -->
+    <header class="header-section">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h1><i class="fa-solid fa-sliders-up me-2" style="color: black;"></i> Maquette {{ departement.abreviation }}
+                </h1>
+                <p>Gestion et ajustement des quotas d'affectation par responsable</p>
+            </div>
+            <div>
+                <form method="post" action="{% url 'synchroniser_maquettes_n1' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-primary-action">
+                        <i class="fa-solid fa-rotate me-1"></i> Synchroniser
+                    </button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <!-- Carte principale -->
+    <div class="content-card">
+
+        <!-- Barre d'outils / Filtres -->
+        <div class="toolbar">
+            <form method="get" action="{% url 'maquette' %}" id="filterForm" class="filters-left">
+
+                <!-- Code IT -->
+                <div class="filter-item">
+                    <div class="search-box">
+                        <i class="fa-solid fa-laptop code-icon"></i>
+                        <input type="text" name="filter_it" id="filterIt" class="input-control" placeholder="Code IT..."
+                            value="{{ filter_it|default:'' }}" autocomplete="off">
+                    </div>
+                </div>
+
+                <!-- Nom complet -->
+                <div class="filter-item">
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" name="filter_nom" id="filterNom" class="input-control"
+                            placeholder="Nom complet..." value="{{ filter_nom|default:'' }}" autocomplete="off">
+                    </div>
+                </div>
+
+                <!-- Action Reset -->
+                {% if filter_nom or filter_it %}
+                <div class="filter-item">
+                    <a href="{% url 'maquette' %}" class="btn-secondary">
+                        <i class="fa-solid fa-rotate-left"></i> Réinitialiser
+                    </a>
+                </div>
+                {% endif %}
+
+            </form>
+        </div>
+
+        {% if messages %}
+        <div class="messages-container">
+            {% for message in messages %}
+            <div class="alert-banner alert-{{ message.tags|default:'info' }}">
+                <i class="fa-solid fa-circle-info me-2"></i> {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Tableau -->
+        <div class="table-responsive">
+            <table class="enterprise-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>IT</th>
+                        <th>Matricule</th>
+                        <th>Nom complet</th>
+                        <th class="text-center">Lot C</th>
+                        <th class="text-center">Lot E</th>
+                        <th class="text-center">Lot P</th>
+                        <th class="text-center">Lot A</th>
+                        <th class="text-center">Total</th>
+                        <th class="text-center" style="width: 110px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if page_obj %}
+                    {% for item in page_obj %}
+                    {% with n1=item.n1 m=item.maquette %}
+                    <tr class="table-row">
+                        <td class="font-mono text-muted">{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                        <td class="font-mono"><code>{{ n1.it }}</code></td>
+                        <td class="font-mono">{{ n1.matricule|default:"-" }}</td>
+                        <td class="font-medium">
+                            <i class="fa-regular fa-user text-muted me-2"></i>{{ n1.nom_complete }}
+                        </td>
+                        <td class="text-center font-mono">{{ m.C|default:"0" }}</td>
+                        <td class="text-center font-mono">{{ m.T|default:"0" }}</td>
+                        <td class="text-center font-mono">{{ m.P|default:"0" }}</td>
+                        <td class="text-center font-mono">{{ m.A|default:"0" }}</td>
+                        <td class="text-center font-mono text-primary font-bold">{{ m.total|default:"0" }}</td>
+                        <td class="text-center">
+                            <button type="button" class="btn-action-edit btn-edit" data-it="{{ n1.it }}"
+                                data-nom="{{ n1.nom_complete|escapejs }}" data-a="{{ m.A|default:0 }}"
+                                data-t="{{ m.T|default:0 }}" data-p="{{ m.P|default:0 }}" data-c="{{ m.C|default:0 }}">
+                                <i class="fa-solid fa-pen-to-square me-1"></i> Modifier
+                            </button>
+                        </td>
+                    </tr>
+                    {% endwith %}
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="empty-state">
+                            <i class="fa-solid fa-inbox"></i>
+                            <div>Aucun résultat trouvé.</div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="table-footer">
+            <div class="footer-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ page_obj.paginator.count }}
+                éléments
+            </div>
+            <ul class="pagination">
+                {% if page_obj.has_previous %}
+                <li>
+                    <a class="page-link"
+                        href="?page={{ page_obj.previous_page_number }}&filter_nom={{ filter_nom|default:'' }}&filter_it={{ filter_it|default:'' }}">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li><span class="page-link disabled"><i class="fa-solid fa-chevron-left"></i></span></li>
+                {% endif %}
+
+                {% for i in page_obj.paginator.page_range %}
+                {% if page_obj.number == i %}
+                <li><span class="page-link active">{{ i }}</span></li>
+                {% else %}
+                <li>
+                    <a class="page-link"
+                        href="?page={{ i }}&filter_nom={{ filter_nom|default:'' }}&filter_it={{ filter_it|default:'' }}">{{i }}</a>
+                </li>
+                {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li>
+                    <a class="page-link"
+                        href="?page={{ page_obj.next_page_number }}&filter_nom={{ filter_nom|default:'' }}&filter_it={{ filter_it|default:'' }}">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li><span class="page-link disabled"><i class="fa-solid fa-chevron-right"></i></span></li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+<!-- Modale d'édition MODULA -->
+<div class="modal-overlay" id="modalMaquetteEdit" tabindex="-1" style="display: none;">
+    <div class="modal-card">
+        <form id="formMaquetteEdit" method="post" action="{% url 'maquette_n1_update' %}">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5><i class="fa-solid fa-sliders me-2 text-primary"></i>Modifier la maquette</h5>
+                <button type="button" class="btn-close-modal" id="closeModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-subtext" id="modalNom"></p>
+                <input type="hidden" name="n1_it" id="inputN1It" value="">
+
+                <div class="grid-2x2"> 
+                    <div class="form-group">
+                        <label> Lot C</label>
+                        <input type="number" min="0" class="input-control" name="C" id="inputC" required>
+                    </div> 
+                    <div class="form-group">
+                        <label> Lot E</label>
+                        <input type="number" min="0" class="input-control" name="T" id="inputT" required>
+                    </div>
+                    <div class="form-group">
+                        <label> Lot P</label>
+                        <input type="number" min="0" class="input-control" name="P" id="inputP" required>
+                    </div>
+                    <div class="form-group">
+                        <label> Lot A</label>
+                        <input type="number" min="0" class="input-control" name="A" id="inputA" required>
+                    </div>
+                   
+                </div>
+
+                <div class="modal-notice">
+                    <i class="fa-solid fa-shield-halved me-1"></i> Seul le PILOT a l'autorisation de modifier. Les
+                    changements seront historisés.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="cancelModalBtn">Annuler</button>
+                <button type="submit" class="btn-primary-action">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // --- FILTRAGE AUTO ---
+        const filterForm = document.getElementById('filterForm');
+        const filterIt = document.getElementById('filterIt');
+        const filterNom = document.getElementById('filterNom');
+        let debounceTimer = null;
+
+        function submitCombinedFilters() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const activeEl = document.activeElement;
+                if (activeEl === filterIt || activeEl === filterNom) {
+                    sessionStorage.setItem('activeInputId', activeEl.id);
+                    sessionStorage.setItem('cursorPosition', activeEl.selectionStart);
+                }
+                filterForm.submit();
+            }, 450);
+        }
+
+        if (filterIt && filterNom) {
+            filterIt.addEventListener('input', submitCombinedFilters);
+            filterNom.addEventListener('input', submitCombinedFilters);
+
+            const activeInputId = sessionStorage.getItem('activeInputId');
+            const cursorPos = sessionStorage.getItem('cursorPosition');
+
+            if (activeInputId) {
+                const elToFocus = document.getElementById(activeInputId);
+                if (elToFocus) {
+                    elToFocus.focus();
+                    const pos = cursorPos ? parseInt(cursorPos, 10) : elToFocus.value.length;
+                    elToFocus.setSelectionRange(pos, pos);
+                }
+                sessionStorage.removeItem('activeInputId');
+                sessionStorage.removeItem('cursorPosition');
+            }
+        }
+
+        // --- GESTION DE LA MODALE ---
+        const modalEl = document.getElementById('modalMaquetteEdit');
+        const modalNom = document.getElementById('modalNom');
+        const inputN1It = document.getElementById('inputN1It');
+        const inputA = document.getElementById('inputA');
+        const inputT = document.getElementById('inputT');
+        const inputP = document.getElementById('inputP');
+        const inputC = document.getElementById('inputC');
+        const form = document.getElementById('formMaquetteEdit');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const cancelModalBtn = document.getElementById('cancelModalBtn');
+
+        function showModal() {
+            modalEl.style.display = 'flex';
+        }
+
+        function hideModal() {
+            modalEl.style.display = 'none';
+        }
+
+        document.querySelectorAll('.btn-edit').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const it = btn.dataset.it;
+                const nom = btn.dataset.nom || it;
+                const A = btn.dataset.a || 0;
+                const T = btn.dataset.t || 0;
+                const P = btn.dataset.p || 0;
+                const C = btn.dataset.c || 0;
+
+                modalNom.textContent = `${nom} (${it})`;
+                inputN1It.value = it;
+                inputA.value = A;
+                inputT.value = T;
+                inputP.value = P;
+                inputC.value = C;
+
+                showModal();
+            });
+        });
+
+        if (closeModalBtn) closeModalBtn.addEventListener('click', hideModal);
+        if (cancelModalBtn) cancelModalBtn.addEventListener('click', hideModal);
+
+        modalEl.addEventListener('click', (e) => {
+            if (e.target === modalEl) hideModal();
+        });
+
+        form.addEventListener('submit', function (ev) {
+            ev.preventDefault();
+            const url = form.action;
+            const data = new FormData(form);
+
+            fetch(url, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: data
+            }).then(r => {
+                if (!r.ok) throw r;
+                return r.json ? r.json() : r.text();
+            }).then(() => {
+                window.location.reload();
+            }).catch(err => {
+                console.error(err);
+                form.submit();
+            });
+        });
+    });
+</script>
+{% endblock %}

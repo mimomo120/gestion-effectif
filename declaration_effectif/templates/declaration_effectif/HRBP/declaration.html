@@ -12,52 +12,48 @@
 <div class="page-container">
 
     <!-- En-tête de la page -->
-    <header class="header">
-        <h1>Validation des Déclarations</h1>
+    <header class="header-section">
+        <h1><i class="fa-solid fa-user-clock me-2" style="color: black;"></i>Déclarations d’effectif en attente</h1>
+        <p>Responsables d'unité n'ayant pas encore validé leur déclaration du jour.</p>
     </header>
 
-    <!-- Carte de Résumé KPI -->
-    <div class="stats-summary">
-        <div class="summary-card">
-            <div class="summary-info">
-                <span>Non Validés</span>
-                <h3 id="count-ru">{{ non_valides|length|default:"0" }}</h3>
-            </div>
-            <div class="summary-icon warning">
-                &#9888;
-            </div>
-        </div>
-    </div>
-
-    <!-- Carte principale avec le tableau -->
-    <div class="card-table">
+    <!-- Carte principale -->
+    <div class="content-card">
 
         <!-- Barre d'outils -->
-        <div class="table-toolbar">
-            <div class="date-filter-group">
-                <label for="date">Date de déclaration :</label>
-                <input type="date" class="date-input" id="date">
+        <div class="toolbar">
+            <div class="filters-left">
+                <div class="filter-item">
+                    <span class="filter-label">Date de déclaration :</span>
+                    <input type="date" class="input-control" id="date">
+                </div>
+
+                <div class="filter-item search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" class="input-control" id="filtre-nom"
+                        placeholder="Nom, matricule ou utilisateur...">
+                </div>
+
+                <span class="badge-status-warning">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <strong id="count-ru">{{ non_valides|length|default:"0" }}</strong>&nbsp;non validés
+                </span>
             </div>
-            <div class="name-filter-group">
-                <label for="filtre-nom">Rechercher :</label>
-                <input type="text" class="name-input" id="filtre-nom" placeholder="Nom, matricule ou utilisateur...">
-            </div>
-            <div class="reset-filter-group">
-                <button type="button" class="btn btn-outline-secondary filter-btn-reset" onclick="resetFilters()">
-                    <i class="fa-solid fa-rotate-left"></i> Effacer
-                </button>
-            </div>
+
+            <button type="button" class="btn-secondary" onclick="resetFilters()">
+                <i class="fa-solid fa-rotate-left"></i> Effacer
+            </button>
         </div>
 
         <!-- Tableau des données -->
-        <div class="table-wrapper">
-            <table class="custom-table">
+        <div class="table-responsive">
+            <table class="enterprise-table">
                 <thead id="titre">
                     <tr>
                         <th>Matricule</th>
                         <th>Utilisateur</th>
-                        <th>Nom & Prénom</th>
-                        <th> DPT </th>
+                        <th>Nom &amp; Prénom</th>
+                        <th>DPT</th>
                         <th class="text-center">Lot</th>
                         <th class="text-center">Date</th>
                         <th class="text-end">Action</th>
@@ -66,58 +62,75 @@
                 <tbody id="result">
                     {% for operateur in ru %}
                     <tr>
-                        <td class="cell-mono">{{ operateur.matricule }}</td>
-                        <td class="cell-mono">{{ operateur.it }}</td>
-                        <td class="cell-name">{{ operateur.nom_complete }}</td>
-                        <td class="cell-name">{{ operateur.departement.abreviation }}</td>
+                        <td class="font-mono">{{ operateur.matricule }}</td>
+                        <td class="font-mono">{{ operateur.it }}</td>
+                        <td class="font-medium">{{ operateur.nom_complete }}</td>
+                        <td class="font-medium">{{ operateur.departement.abreviation }}</td>
                         <td class="text-center">
-                            <span class="badge-circle">{{ operateur.lot }}</span>
+                            <span class="lot-badge">{{ operateur.lot }}</span>
                         </td>
                         <td class="text-center">{{ date }}</td>
                         <td class="text-end">
-                            <button class="alert_btn" data-ru_it="{{ operateur.it }}">Alerter</button>
+                            <button class="btn-alert alert_btn" data-ru_it="{{ operateur.it }}">
+                                <i class="fa-solid fa-bell"></i> Alerter
+                            </button>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="empty-row text-center">Aucun responsable d'unité sans validation trouvé.
+                        <td colspan="7" class="empty-state">
+                            <i class="fa-solid fa-circle-check"></i>
+                            Aucun responsable d'unité sans validation trouvé.
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
-            <p id="empty-search-row" class="empty-row text-center" style="display:none; padding: 1rem;">
+
+            <p id="empty-search-row" class="empty-state" style="display:none;">
                 Aucun résultat pour cette recherche.
             </p>
-            {% if page_obj.paginator.num_pages > 1 %}
-            <div class="pagination-container">
+        </div>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="table-footer">
+            <ul class="pagination">
                 {% if page_obj.has_previous %}
-                <a class="page-btn"
-                    href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">&laquo;
-                    Précédent</a>
+                <li>
+                    <a class="page-link"
+                        href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
+                        &laquo; Précédent
+                    </a>
+                </li>
                 {% else %}
-                <span class="page-btn" aria-disabled="true">&laquo; Précédent</span>
+                <li><span class="page-link disabled">&laquo; Précédent</span></li>
                 {% endif %}
 
                 {% for num in page_obj.paginator.page_range %}
                 {% if num == page_obj.number %}
-                <span class="page-btn active">{{ num }}</span>
-                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <a class="page-btn"
-                    href="?page={{ num }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
-                    {{ num }}</a>
+                <li><span class="page-link active">{{ num }}</span></li>
+                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <li>
+                    <a class="page-link"
+                        href="?page={{ num }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
+                        {{ num }}
+                    </a>
+                    </li>
                     {% endif %}
                     {% endfor %}
 
                     {% if page_obj.has_next %}
-                    <a class="page-btn"
-                        href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">Suivant
-                        &raquo;</a>
+                    <li>
+                        <a class="page-link"
+                            href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
+                            Suivant &raquo;
+                        </a>
+                    </li>
                     {% else %}
-                    <span class="page-btn" aria-disabled="true">Suivant &raquo;</span>
+                    <li><span class="page-link disabled">Suivant &raquo;</span></li>
                     {% endif %}
-            </div>
-            {% endif %}
+            </ul>
         </div>
+        {% endif %}
 
     </div>
 </div>
@@ -197,7 +210,7 @@
         let visibles = 0;
 
         lignes.forEach(function (ligne) {
-            if (ligne.querySelector("td.empty-row") || ligne.cells.length < 3) {
+            if (ligne.querySelector("td.empty-state") || ligne.cells.length < 3) {
                 return;
             }
 
@@ -222,7 +235,7 @@
         if (countRu && terme !== "") {
             countRu.textContent = visibles;
         } else if (countRu && terme === "") {
-            const validRows = Array.from(lignes).filter(r => !r.querySelector("td.empty-row") && r.cells.length >= 3);
+            const validRows = Array.from(lignes).filter(r => !r.querySelector("td.empty-state") && r.cells.length >= 3);
             countRu.textContent = validRows.length;
         }
     }
@@ -233,7 +246,7 @@
         if (!date) {
             resultContainer.innerHTML = `
             <tr>
-                <td colspan="7" class="empty-row text-center">Sélectionnez une date</td>
+                <td colspan="7" class="empty-state">Sélectionnez une date</td>
             </tr>
         `;
             if (countRu) countRu.textContent = "0";
@@ -262,11 +275,11 @@
 
                     resultContainer.innerHTML = data.resultats.map(op => `
                     <tr>
-                        <td class="cell-mono">${escapeHtml(op.matricule)}</td>
-                        <td class="cell-mono">${escapeHtml(op.it)}</td>
-                        <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                        <td class="font-mono">${escapeHtml(op.matricule)}</td>
+                        <td class="font-mono">${escapeHtml(op.it)}</td>
+                        <td class="font-medium">${escapeHtml(op.nom_complete)}</td>
                         <td class="text-center">
-                            <span class="badge-circle">${escapeHtml(op.lot || '-')}</span>
+                            <span class="lot-badge">${escapeHtml(op.lot || '-')}</span>
                         </td>
                         <td class="text-center">${escapeHtml(date)}</td>
                     </tr>
@@ -286,15 +299,17 @@
 
                     resultContainer.innerHTML = data.resultats.map(op => `
                     <tr>
-                        <td class="cell-mono">${escapeHtml(op.matricule)}</td>
-                        <td class="cell-mono">${escapeHtml(op.it)}</td>
-                        <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                        <td class="font-mono">${escapeHtml(op.matricule)}</td>
+                        <td class="font-mono">${escapeHtml(op.it)}</td>
+                        <td class="font-medium">${escapeHtml(op.nom_complete)}</td>
                         <td class="text-center">
-                            <span class="badge-circle">${escapeHtml(op.lot || '-')}</span>
+                            <span class="lot-badge">${escapeHtml(op.lot || '-')}</span>
                         </td>
                         <td class="text-center">${escapeHtml(date)}</td>
                         <td class="text-end">
-                            <button class="alert_btn" data-ru_it="${escapeHtml(op.it)}">Alerter</button>
+                            <button class="btn-alert alert_btn" data-ru_it="${escapeHtml(op.it)}">
+                                <i class="fa-solid fa-bell"></i> Alerter
+                            </button>
                         </td>
                     </tr>
                 `).join("");
@@ -306,7 +321,7 @@
                 if (countRu) countRu.textContent = "0";
                 resultContainer.innerHTML = `
                 <tr>
-                    <td colspan="7" class="empty-row text-center">Aucune donnée pour cette date.</td>
+                    <td colspan="7" class="empty-state">Aucune donnée pour cette date.</td>
                 </tr>
             `;
             }
@@ -315,7 +330,7 @@
             if (countRu) countRu.textContent = "0";
             resultContainer.innerHTML = `
             <tr>
-                <td colspan="7" class="empty-row text-center" style="color: #ef4444;">Erreur lors du chargement des données.</td>
+                <td colspan="7" class="empty-state" style="color: #ef4444;">Erreur lors du chargement des données.</td>
             </tr>
         `;
         } finally {
@@ -347,7 +362,7 @@
                 return response.json();
             })
             .then(data => {
-                btn.textContent = "Envoyé";
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Envoyé';
                 btn.classList.add("sent");
                 btn.disabled = true;
             })

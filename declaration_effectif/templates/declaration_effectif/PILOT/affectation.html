@@ -1,137 +1,243 @@
 {% extends "utilisateur/navbar_N1.html" %}
 {% load static %}
 
-{% block title %}Liste des affectations{% endblock %}
+{% block title %}Liste des affectations - MODULA{% endblock %}
 
 {% block css %}
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="{% static 'utilisateur/css/N1/affectation.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="affectations-container">
+<div class="page-container">
 
-    <!-- En-tête de page -->
-    <header class="header">
-        <h1>Liste des affectations</h1>
+    <!-- En-tête épuré comme validation.html -->
+    <header class="header-section">
+        <h1><i class="fa-solid fa-arrows-rotate me-2" style="color: black;"></i>Liste des Affectations</h1>
+        <p>Consultez et filtrez les affectations des collaborateurs entre unités</p>
     </header>
 
-    <!-- Barre de filtres -->
-    <div class="filter-bar">
-        <div class="filter-group">
-            <input type="text" id="searchInput" class="filter-input" placeholder="Rechercher par nom, RU ou état..." />
-        </div>
-        <div class="filter-box">
-            <select id="statusFilter" class="filter-select" onchange="applyFilters()">
-                <option value="all" {% if status == "all" or not status %}selected{% endif %}>Tous les états</option>
-                <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
-                <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
-                <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés</option>
-            </select>
-        </div>
-        <div class="filter-box">
-            <button type="button" class="btn btn-outline-secondary filter-btn-reset" onclick="resetFilters()">
-                <i class="fa-solid fa-rotate-left"></i> Effacer
-            </button>
-        </div>
-    </div>
+    <!-- Carte principale -->
+    <div class="content-card">
 
-    <div class="sections-wrapper">
-        <div class="section-card">
-            <div class="table-scroll">
-                <table class="table-affectations" id="affectationsTable">
-                    <thead>
-                        <tr>
-                            <th>Nom complet Collaborateur</th>
-                            <th>Nom complet RU initial</th>
-                            <th>DPT initial</th>
-                            <th>Nom complet RU cible</th>
-                            <th>DPT cible</th>
-                            <th class="text-center">État</th>
-                        </tr>
-                    </thead>
-                    <tbody id="result">
-                        {% for affectation in info %}
-                        <tr class="table-row">
-                            <td class="cell-primary">
-                                {{ affectation.collaborateur|default:"—" }}
-                            </td>
-                            <td>
-                                {{ affectation.initial|default:"—" }}
-                            </td>
-                            <td>
-                                {{ affectation.dpt_init|default:"—" }}
-                            </td>
-                            <td>
-                                {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
-                                {{ affectation.acceuil }}
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {{ affectation.dpt_acceuil|default:"—" }}
-                            </td>
-                            <td class="text-center">
-                                {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                                <span class="badge {{ affectation.badge_class }}">
-                                    {{ affectation.etat }}
-                                </span>
-                                {% else %}
-                                <span class="badge badge-en-attente">En attente</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr id="noDataRow">
-                            <td colspan="6" class="empty-row">Aucune affectation trouvée.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <!-- Barre d'outils / Filtres -->
+        <div class="toolbar">
+            <div class="filters-left">
+
+                <!-- Recherche rapide tableau -->
+                <div class="filter-item">
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="searchInput" class="input-control"
+                            placeholder="Rechercher dans la page..." onkeyup="filterTable()" />
+                    </div>
+                </div>
+
+                <!-- Dropdown RU Initial -->
+                <div class="filter-item custom-dropdown">
+                    <button class="filter-select-btn" type="button" onclick="toggleDropdown('dropdownRuInit')">
+                        <span>{% if ru_init_selected and ru_init_selected != "all" %}{{ ru_init_selected }}{% else%}Tous les RU Initiaux{% endif %}</span>
+                        <i class="fa-solid fa-chevron-down ms-2"></i>
+                    </button>
+                    <div id="dropdownRuInit" class="custom-dropdown-menu">
+                        <div class="p-2 border-bottom">
+                            <input type="text" class="input-control input-sm" placeholder="Rechercher RU Initial..."
+                                onkeyup="filterList(this, 'listRuInit')">
+                        </div>
+                        <ul id="listRuInit" class="dropdown-options-list">
+                            <li><a class="dropdown-option {% if ru_init_selected == 'all' or not ru_init_selected %}active{% endif %}"
+                                    href="#" onclick="applyFilter('ru_init', 'all')">Tous les RU Initiaux</a></li>
+                            {% for ru in ru_init_list %}
+                            <li><a class="dropdown-option {% if ru_init_selected == ru %}active{% endif %}" href="#"
+                                    onclick="applyFilter('ru_init', '{{ ru|escapejs }}')">{{ ru }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Dropdown RU Cible -->
+                <div class="filter-item custom-dropdown">
+                    <button class="filter-select-btn" type="button" onclick="toggleDropdown('dropdownRuAcceuil')">
+                        <span>{% if ru_acceuil_selected and ru_acceuil_selected != "all" %}{{ ru_acceuil_selected }}{%else %}Tous les RU Cibles{% endif %}</span>
+                        <i class="fa-solid fa-chevron-down ms-2"></i>
+                    </button>
+                    <div id="dropdownRuAcceuil" class="custom-dropdown-menu">
+                        <div class="p-2 border-bottom">
+                            <input type="text" class="input-control input-sm" placeholder="Rechercher RU Cible..."
+                                onkeyup="filterList(this, 'listRuAcceuil')">
+                        </div>
+                        <ul id="listRuAcceuil" class="dropdown-options-list">
+                            <li><a class="dropdown-option {% if ru_acceuil_selected == 'all' or not ru_acceuil_selected %}active{% endif %}"
+                                    href="#" onclick="applyFilter('ru_acceuil', 'all')">Tous les RU Cibles</a></li>
+                            {% for ru in ru_acceuil_list %}
+                            <li><a class="dropdown-option {% if ru_acceuil_selected == ru %}active{% endif %}" href="#"
+                                    onclick="applyFilter('ru_acceuil', '{{ ru|escapejs }}')">{{ ru }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Select Statut -->
+                <div class="filter-item">
+                    <select id="statusFilter" class="input-control select-control"
+                        onchange="applyFilter('status', this.value)">
+                        <option value="all" {% if status == "all" or not status %}selected{% endif %}>Tous les états
+                        </option>
+                        <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
+                        <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
+                        <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés
+                        </option>
+                    </select>
+                </div>
+
             </div>
 
-            <!-- Pagination -->
-            {% if page_obj.paginator.num_pages > 1 %}
-            <div class="pagination-container">
+            <!-- Bouton Réinitialiser -->
+            <div>
+                <button type="button" class="btn-secondary" onclick="resetFilters()">
+                    <i class="fa-solid fa-rotate-left"></i> Réinitialiser
+                </button>
+            </div>
+        </div>
+
+        <!-- Tableau -->
+        <div class="table-responsive">
+            <table class="enterprise-table" id="affectationsTable">
+                <thead>
+                    <tr>
+                        <th>Collaborateur</th>
+                        <th>RU Initial</th>
+                        <th>DPT Initial</th>
+                        <th>RU Cible</th>
+                        <th>DPT Cible</th>
+                        <th class="text-center">État</th>
+                    </tr>
+                </thead>
+                <tbody id="result">
+                    {% for affectation in info %}
+                    <tr class="table-row">
+                        <td class="font-medium">{{ affectation.collaborateur|default:"—" }}</td>
+                        <td>{{ affectation.initial|default:"—" }}</td>
+                        <td class="font-mono">{{ affectation.dpt_init|default:"—" }}</td>
+                        <td>
+                            {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
+                            {{ affectation.acceuil }}
+                            {% else %}
+                            <span class="text-subtle">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="font-mono">{{ affectation.dpt_acceuil|default:"—" }}</td>
+                        <td class="text-center">
+                            {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
+                            <span class="badge {{ affectation.custom_badge }}">{{ affectation.etat }}</span>
+                            {% else %}
+                            <span class="badge badge-warning">En attente</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <i class="fa-solid fa-inbox"></i>
+                            <div>Aucune affectation trouvée.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="table-footer">
+            <ul class="pagination">
                 {% if page_obj.has_previous %}
-                <a class="page-btn"
-                    href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">&laquo;
-                    Précédent</a>
+                <li>
+                    <a class="page-link" href="#"
+                        onclick="goToPage({{ page_obj.previous_page_number }}); return false;">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </a>
+                </li>
                 {% else %}
-                <span class="page-btn" aria-disabled="true">&laquo; Précédent</span>
+                <li><span class="page-link disabled"><i class="fa-solid fa-chevron-left"></i></span></li>
                 {% endif %}
 
                 {% for num in page_obj.paginator.page_range %}
                 {% if num == page_obj.number %}
-                <span class="page-btn active">{{ num }}</span>
-                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <a class="page-btn"
-                    href="?page={{ num }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
-                    {{ num }}</a>
+                <li><span class="page-link active">{{ num }}</span></li>
+                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <li><a class="page-link"
+                        href="#" onclick="goToPage({{ num }}); return false;">{{ num }}</a></li>
                     {% endif %}
                     {% endfor %}
 
                     {% if page_obj.has_next %}
-                    <a class="page-btn"
-                        href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">Suivant
-                        &raquo;</a>
+                    <li>
+                        <a class="page-link" href="#"
+                            onclick="goToPage({{ page_obj.next_page_number }}); return false;">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </a>
+                    </li>
                     {% else %}
-                    <span class="page-btn" aria-disabled="true">Suivant &raquo;</span>
+                    <li><span class="page-link disabled"><i class="fa-solid fa-chevron-right"></i></span></li>
                     {% endif %}
-            </div>
-            {% endif %}
+            </ul>
         </div>
-    </div>
+        {% endif %}
 
+    </div>
 </div>
 {% endblock %}
+
 {% block script %}
 {{ block.super }}
 <script>
-    function applyFilters() {
-        const status = document.getElementById("statusFilter").value;
-        window.location.href = '?status=' + encodeURIComponent(status);
+    function toggleDropdown(id) {
+        const dropdown = document.getElementById(id);
+        const isOpen = dropdown.classList.contains('show');
+        closeAllDropdowns();
+        if (!isOpen) {
+            dropdown.classList.add('show');
+        }
+    }
+
+    function closeAllDropdowns() {
+        document.querySelectorAll('.custom-dropdown-menu').forEach(menu => {
+            menu.classList.remove('show');
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.custom-dropdown')) {
+            closeAllDropdowns();
+        }
+    });
+
+    function filterList(input, listId) {
+        const filter = input.value.toLowerCase();
+        const list = document.getElementById(listId);
+        const items = list.getElementsByTagName('li');
+
+        for (let i = 0; i < items.length; i++) {
+            const text = items[i].textContent || items[i].innerText;
+            items[i].style.display = text.toLowerCase().includes(filter) ? "" : "none";
+        }
+    }
+
+    function applyFilter(key, value) {
+        const url = new URL(window.location.href);
+        if (value && value !== 'all') {
+            url.searchParams.set(key, value);
+        } else {
+            url.searchParams.delete(key);
+        }
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+
+    function goToPage(page) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', page);
+        window.location.href = url.toString();
     }
 
     function resetFilters() {
@@ -152,16 +258,10 @@
 
     document.addEventListener("DOMContentLoaded", function () {
         const searchInput = document.getElementById("searchInput");
-
         if (localStorage.getItem("savedSearch")) {
             searchInput.value = localStorage.getItem("savedSearch");
             filterTable();
         }
-
-        searchInput.addEventListener("keyup", function () {
-            localStorage.setItem("savedSearch", searchInput.value);
-            filterTable();
-        });
     });
 </script>
 {% endblock %}

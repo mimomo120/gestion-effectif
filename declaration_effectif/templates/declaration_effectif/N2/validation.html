@@ -11,44 +11,41 @@
 <div class="page-container">
 
     <!-- En-tête de la page -->
-    <header class="header">
+    <div class="header-section">
         <h1>Validation des Déclarations</h1>
-    </header>
-
-    <!-- Carte de Résumé KPI -->
-    <div class="stats-summary">
-        <div class="summary-card">
-            <div class="summary-info">
-                <span>Non Validés</span>
-                <h3 id="count-ru">{{ non_valides|length|default:"0" }}</h3>
-            </div>
-            <div class="summary-icon warning">
-                &#9888;
-            </div>
-        </div>
+        <p>Suivi et relance des responsables d'unité n'ayant pas encore validé leur déclaration.</p>
     </div>
 
     <!-- Carte principale avec le tableau -->
-    <div class="card-table">
+    <div class="content-card">
 
         <!-- Barre d'outils -->
-        <div class="table-toolbar">
-            <div class="date-filter-group">
-                <label for="date">Date de déclaration :</label>
-                <input type="date" class="date-input" id="date">
+        <div class="toolbar">
+            <div class="filters-left">
+                <div class="filter-item">
+                    <label for="date" class="filter-label">Date de déclaration :</label>
+                    <input type="date" class="input-control" id="date">
+                </div>
+
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" class="input-control" id="search" placeholder="Matricule, utilisateur ou nom...">
+                </div>
             </div>
-            <div class="search-filter-group">
-                <label for="search">Recherche :</label>
-                <input type="text" class="search-input" id="search" placeholder="Matricule, utilisateur ou nom...">
-                <button type="button" class="btn btn-outline-secondary filter-btn-reset" id="resetBtn">
+
+            <div class="filters-left">
+                <span class="badge-status-warning">
+                    &#9888; <strong id="count-ru">{{ non_valides|length|default:"0" }}</strong> non validé(s)
+                </span>
+                <button type="button" class="btn-secondary" id="resetBtn">
                     <i class="fa-solid fa-rotate-left"></i> Effacer
                 </button>
             </div>
         </div>
 
         <!-- Tableau des données -->
-        <div class="table-wrapper">
-            <table class="custom-table">
+        <div class="table-responsive">
+            <table class="enterprise-table">
                 <thead id="titre">
                     <tr>
                         <th>Matricule</th>
@@ -62,20 +59,22 @@
                 <tbody id="result">
                     {% for operateur in non_valides %}
                     <tr>
-                        <td class="cell-mono">{{ operateur.matricule }}</td>
-                        <td class="cell-mono">{{ operateur.it }}</td>
-                        <td class="cell-name">{{ operateur.nom_complete }}</td>
+                        <td class="font-mono">{{ operateur.matricule }}</td>
+                        <td class="font-mono">{{ operateur.it }}</td>
+                        <td class="font-medium">{{ operateur.nom_complete }}</td>
                         <td class="text-center">
-                            <span class="badge-circle">{{ operateur.lot }}</span>
+                            <span class="lot-badge">{{ operateur.lot }}</span>
                         </td>
                         <td class="text-center">{{ date }}</td>
                         <td class="text-end">
-                            <button class="alert_btn" data-ru_it="{{ operateur.it }}">Alerter</button>
+                            <button class="btn-alert" data-ru_it="{{ operateur.it }}">Alerter</button>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="empty-row text-center">Aucun responsable d'unité sans validation trouvé.
+                        <td colspan="6" class="empty-state">
+                            <i class="fa-solid fa-circle-check"></i>
+                            Aucun responsable d'unité sans validation trouvé.
                         </td>
                     </tr>
                     {% endfor %}
@@ -163,10 +162,10 @@
                 return;
             }
 
-            const cellsMono = row.querySelectorAll(".cell-mono");
+            const cellsMono = row.querySelectorAll(".font-mono");
             const matricule = cellsMono[0]?.textContent.toLowerCase() || "";
             const utilisateur = cellsMono[1]?.textContent.toLowerCase() || "";
-            const nom = row.querySelector(".cell-name")?.textContent.toLowerCase() || "";
+            const nom = row.querySelector(".font-medium")?.textContent.toLowerCase() || "";
 
             const match = matricule.includes(term) || utilisateur.includes(term) || nom.includes(term);
             row.style.display = match ? "" : "none";
@@ -179,7 +178,7 @@
         if (!date) {
             resultContainer.innerHTML = `
             <tr>
-                <td colspan="6" class="empty-row text-center">Sélectionnez une date</td>
+                <td colspan="6" class="empty-state">Sélectionnez une date</td>
             </tr>
         `;
             if (countRu) countRu.textContent = "0";
@@ -208,11 +207,11 @@
 
                     resultContainer.innerHTML = data.resultats.map(op => `
                     <tr>
-                        <td class="cell-mono">${escapeHtml(op.matricule)}</td>
-                        <td class="cell-mono">${escapeHtml(op.it)}</td>
-                        <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                        <td class="font-mono">${escapeHtml(op.matricule)}</td>
+                        <td class="font-mono">${escapeHtml(op.it)}</td>
+                        <td class="font-medium">${escapeHtml(op.nom_complete)}</td>
                         <td class="text-center">
-                            <span class="badge-circle">${escapeHtml(op.lot || '-')}</span>
+                            <span class="lot-badge">${escapeHtml(op.lot || '-')}</span>
                         </td>
                         <td class="text-center">${escapeHtml(date)}</td>
                     </tr>
@@ -232,15 +231,15 @@
 
                     resultContainer.innerHTML = data.resultats.map(op => `
                     <tr>
-                        <td class="cell-mono">${escapeHtml(op.matricule)}</td>
-                        <td class="cell-mono">${escapeHtml(op.it)}</td>
-                        <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                        <td class="font-mono">${escapeHtml(op.matricule)}</td>
+                        <td class="font-mono">${escapeHtml(op.it)}</td>
+                        <td class="font-medium">${escapeHtml(op.nom_complete)}</td>
                         <td class="text-center">
-                            <span class="badge-circle">${escapeHtml(op.lot || '-')}</span>
+                            <span class="lot-badge">${escapeHtml(op.lot || '-')}</span>
                         </td>
                         <td class="text-center">${escapeHtml(date)}</td>
                         <td class="text-end">
-                            <button class="alert_btn" data-ru_it="${escapeHtml(op.it)}">Alerter</button>
+                            <button class="btn-alert" data-ru_it="${escapeHtml(op.it)}">Alerter</button>
                         </td>
                     </tr>
                 `).join("");
@@ -252,7 +251,7 @@
                 if (countRu) countRu.textContent = "0";
                 resultContainer.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty-row text-center">Aucune donnée pour cette date.</td>
+                    <td colspan="6" class="empty-state">Aucune donnée pour cette date.</td>
                 </tr>
             `;
             }
@@ -261,7 +260,7 @@
             if (countRu) countRu.textContent = "0";
             resultContainer.innerHTML = `
             <tr>
-                <td colspan="6" class="empty-row text-center" style="color: #ef4444;">Erreur lors du chargement des données.</td>
+                <td colspan="6" class="empty-state" style="color: #ef4444;">Erreur lors du chargement des données.</td>
             </tr>
         `;
         }
@@ -270,7 +269,7 @@
     }
 
     function attachAlertListeners() {
-        const alertButtons = resultContainer.querySelectorAll(".alert_btn");
+        const alertButtons = resultContainer.querySelectorAll(".btn-alert");
         alertButtons.forEach(function (btn) {
             btn.addEventListener("click", function () {
                 const ru_it = btn.dataset.ru_it;

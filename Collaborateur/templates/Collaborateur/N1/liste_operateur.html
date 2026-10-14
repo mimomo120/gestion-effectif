@@ -10,70 +10,87 @@
 {% endblock %}
 
 {% block content %}
-<div class="operateurs-container">
-<header class="header">
-    <h1>Collaborateurs</h1>
-    <div class="time">
-        <span id="counter" aria-live="polite">Total : {{ count }}</span>
+<div class="page-container">
+    <div class="header-section">
+        <h1><i class="fa-solid fa-user-group me-2" style="color: black;"></i>Collaborateurs</h1>
+        <p>Gestion et suivi des équipes et opérateurs</p>
     </div>
-</header>
-    <!-- Filters Section -->
-    <div class="filters-section">
-        <div class="filter-group">
-            <input type="text" placeholder="Rechercher par matricule ou nom" class="filter-input search-input"
-                id="search">
 
-            <select class="filter-select" id="choix">
-                <option value="">Tous les lots</option>
-                <option value="A">Lot A</option>
-                <option value="O">Lot O</option>
-                <option value="P">Lot P</option>
-                <option value="E">Lot E</option>
-                <option value="C">Lot C</option>
-            </select>
+    <div class="content-card">
+        <!-- Barre de filtres / Toolbar -->
+        <div class="toolbar">
+            <div class="filters-left">
+            <div class="filter-item search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" placeholder="Matricule, nom ou utilisateur" class="input-control" id="search">
+            </div>
 
-            <input type="date" class="filter-input date-input" id="date">
+                <div class="filter-item">
+                    <select class="input-control select-control" id="choix">
+                        <option value="">Tous les lots</option>
+                        <option value="A">Lot A</option>
+                        <option value="O">Lot O</option>
+                        <option value="P">Lot P</option>
+                    </select>
+                </div>
 
-            <button class="btn btn-reset" id="resetBtn">
-                <i class="fas fa-redo me-2"></i>Réinitialiser
-            </button>
+                <div class="filter-item">
+                    <input type="date" class="input-control" id="date">
+                </div>
+
+                <div class="filter-item">
+                    <button class="btn-secondary" id="resetBtn">
+                        <i class="fas fa-redo"></i>Réinitialiser
+                    </button>
+                </div>
+            </div>
+
+            <div class="badge-status-info">
+                <span>Total :</span>
+                <strong id="counter">{{ count }}</strong>
+            </div>
         </div>
-    </div>
 
-    <!-- Table Section -->
-    <div class="table-container">
-        <table class="table-operateurs">
-            <thead>
-                <tr>
-                    <th>Matricule</th>
-                    <th>Utilisateur</th>
-                    <th>Nom & Prénom</th>
-                    <th>Lot</th>
-                    <th>DPT</th>
-                </tr>
-            </thead>
-            <tbody id="result">
-                {% for operateur in operateurs_finaux %}
-                <tr class="table-row">
-                    <td class="cell-matricule">{{ operateur.matricule }}</td>
-                    <td class="cell-utilisateur">{{ operateur.it }}</td>
-                    <td class="cell-nom">{{ operateur.nom_complete }}</td>
-                    <td class="cell-lot">{{ operateur.lot }}</td>
-                    <td class="cell-lot">{{ operateur.departement.abreviation }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4" class="empty-row">
-                        <i class="fas fa-inbox"></i> Aucun opérateur trouvé
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        <!-- Tableau -->
+        <div class="table-responsive">
+            <table class="enterprise-table">
+                <thead>
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Utilisateur</th>
+                        <th>Nom & Prénom</th>
+                        <th>Équipe</th>
+                        <th class="text-center">Lot</th>
+                        <th>DPT</th>
+                    </tr>
+                </thead>
+                <tbody id="result">
+                    {% for operateur in operateurs_finaux %}
+                    <tr>
+                        <td class="font-mono">{{ operateur.matricule }}</td>
+                        <td class="text-muted">{{ operateur.it }}</td>
+                        <td class="font-medium">{{ operateur.nom_complete }}</td>
+                        <td>{{ operateur.eq }}</td>
+                        <td class="text-center">
+                            <span class="lot-badge">{{ operateur.lot }}</span>
+                        </td>
+                        <td>{{ operateur.departement.abreviation }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <div>Aucun opérateur trouvé</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-    <!-- Pagination -->
-    <div class="pagination-container" id="pagination"></div>
+        <!-- Pagination -->
+        <div id="pagination"></div>
+    </div>
 </div>
 {% endblock %}
 
@@ -91,7 +108,7 @@
 
         let currentPage = 1;
 
-        // Set today's date on load
+        // Date du jour par défaut
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, "0");
@@ -112,7 +129,7 @@
             return String(text).replace(/[&<>"']/g, m => map[m]);
         }
 
-        // Construit les boutons de pagination (précédent / numéros / suivant)
+        // Pagination dynamisée avec le style css
         function renderPagination(page, numPages, hasPrev, hasNext) {
             if (numPages <= 1) {
                 pagination.innerHTML = "";
@@ -121,31 +138,30 @@
 
             let html = "";
 
-            html += `<button class="page-btn" data-page="${page - 1}" ${hasPrev ? "" : "disabled"}>&laquo; Précédent</button>`;
+            html += `<button class="page-link" data-page="${page - 1}" ${hasPrev ? "" : "disabled"}>&laquo; Précédent</button>`;
 
-            // Affiche au maximum 5 numéros de page autour de la page courante
             const start = Math.max(1, page - 2);
             const end = Math.min(numPages, page + 2);
 
             if (start > 1) {
-                html += `<button class="page-btn" data-page="1">1</button>`;
-                if (start > 2) html += `<span class="page-ellipsis">…</span>`;
+                html += `<button class="page-link" data-page="1">1</button>`;
+                if (start > 2) html += `<span class="ellipsis">…</span>`;
             }
 
             for (let p = start; p <= end; p++) {
-                html += `<button class="page-btn ${p === page ? "active" : ""}" data-page="${p}">${p}</button>`;
+                html += `<button class="page-link ${p === page ? "active" : ""}" data-page="${p}">${p}</button>`;
             }
 
             if (end < numPages) {
-                if (end < numPages - 1) html += `<span class="page-ellipsis">…</span>`;
-                html += `<button class="page-btn" data-page="${numPages}">${numPages}</button>`;
+                if (end < numPages - 1) html += `<span class="ellipsis">…</span>`;
+                html += `<button class="page-link" data-page="${numPages}">${numPages}</button>`;
             }
 
-            html += `<button class="page-btn" data-page="${page + 1}" ${hasNext ? "" : "disabled"}>Suivant &raquo;</button>`;
+            html += `<button class="page-link" data-page="${page + 1}" ${hasNext ? "" : "disabled"}>Suivant &raquo;</button>`;
 
             pagination.innerHTML = html;
 
-            pagination.querySelectorAll(".page-btn:not([disabled])").forEach(btn => {
+            pagination.querySelectorAll(".page-link:not([disabled])").forEach(btn => {
                 btn.addEventListener("click", () => {
                     currentPage = Number(btn.dataset.page);
                     applyFilters();
@@ -153,7 +169,7 @@
             });
         }
 
-        // Fonction unifiée pour filtrer les données
+        // Filtrage AJAX
         async function applyFilters() {
             const query = searchInput.value.trim();
             const lot = lotSelect.value;
@@ -176,23 +192,23 @@
 
                 if (results.length > 0) {
                     resultat.innerHTML = results.map(op => `
-                        <tr class="table-row">
-                            <td class="cell-matricule">${escapeHtml(op.matricule || '')}</td>
-                            <td class="cell-utilisateur">${escapeHtml(op.it || '')}</td>
-                            <td class="cell-nom">${escapeHtml(op.nom_complete || '')}</td>
-                            <td class="cell-lot">
-                                    ${escapeHtml(op.lot)}
+                        <tr>
+                            <td class="font-mono">${escapeHtml(op.matricule || '')}</td>
+                            <td class="text-muted">${escapeHtml(op.it || '')}</td>
+                            <td class="font-medium">${escapeHtml(op.nom_complete || '')}</td>
+                            <td>${escapeHtml(op.eq || '')}</td>
+                            <td class="text-center">
+                                <span class="lot-badge">${escapeHtml(op.lot || '')}</span>
                             </td>
-                            <td class="cell-lot">
-                                    ${escapeHtml(op.departement_id)}
-                            </td>
+                            <td>${escapeHtml(op.departement_id || '')}</td>
                         </tr>
                     `).join("");
                 } else {
                     resultat.innerHTML = `
                         <tr>
-                            <td colspan="4" class="empty-row">
-                                <i class="fas fa-search"></i> Aucun opérateur trouvé
+                            <td colspan="6" class="empty-state">
+                                <i class="fas fa-search"></i>
+                                <div>Aucun opérateur trouvé</div>
                             </td>
                         </tr>
                     `;
@@ -208,8 +224,9 @@
                 console.error("Erreur de filtrage :", error);
                 resultat.innerHTML = `
                     <tr>
-                        <td colspan="4" class="empty-row error">
-                            <i class="fas fa-exclamation-circle"></i> Une erreur s'est produite lors du filtrage
+                        <td colspan="6" class="empty-state">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <div>Une erreur s'est produite lors du filtrage</div>
                         </td>
                     </tr>
                 `;
@@ -217,7 +234,6 @@
             }
         }
 
-        // Réinitialisation des filtres
         function resetFilters() {
             searchInput.value = "";
             lotSelect.value = "";
@@ -226,21 +242,19 @@
             applyFilters();
         }
 
-        // Debounce pour l'input de recherche
         let searchTimeout;
         searchInput.addEventListener("input", () => {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
-                currentPage = 1; // toute nouvelle recherche repart de la page 1
+                currentPage = 1;
                 applyFilters();
             }, 300);
         });
 
-        // Tout changement de filtre repart de la page 1
         lotSelect.addEventListener("change", () => { currentPage = 1; applyFilters(); });
         dateInput.addEventListener("change", () => { currentPage = 1; applyFilters(); });
         resetBtn.addEventListener("click", resetFilters);
-        
+
         applyFilters();
     });
 </script>

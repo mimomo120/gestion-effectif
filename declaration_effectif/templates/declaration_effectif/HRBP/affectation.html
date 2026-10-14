@@ -10,129 +10,152 @@
 {% endblock %}
 
 {% block content %}
-<div class="affectations-container">
+<div class="page-container">
 
     <!-- En-tête de page -->
-    <header class="header">
-        <h1>Liste des affectations</h1>
+    <header class="header-section">
+        <h1> <i class="fa-solid fa-user-pen me-2" style="color: black;"></i>Liste des affectations</h1>
+        <p>Suivi des changements d'affectation déclarés.</p>
     </header>
 
-    <!-- Barre de filtres -->
-    <div class="filter-bar">
-        <div class="filter-group">
-            <input type="text" id="searchInput" class="filter-input" placeholder="Rechercher par nom, RU ou état..." />
-        </div>
-        <div class="filter-box">
-            <select id="statusFilter" class="filter-select" onchange="applyFilters()">
-                <option value="all" {% if status  ==  "all" or not status %}selected{% endif %}>Tous les états</option>
-                <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
-                <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
-                <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés</option>
-            </select>
-        </div>
-        <div class="filter-box">
-            <select id="dptFilter" class="filter-select" onchange="applyFilters()">
-                <option value="all" {% if dpt_filtre == "all" or not dpt_filtre %}selected{% endif %}>Tous les
-                    départements</option>
-                {% for dpt in departements %}
-                <option value="{{ dpt }}" {% if dpt_filtre == dpt %}selected{% endif %}>{{ dpt }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="filter-box">
-            <button type="button" class="btn btn-outline-secondary filter-btn-reset" onclick="resetFilters()">
+    <!-- Carte principale -->
+    <div class="content-card">
+
+        <!-- Barre de filtres -->
+        <div class="toolbar">
+            <div class="filters-left">
+                <div class="filter-item search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" class="input-control"
+                        placeholder="Rechercher par nom, RU ou état...">
+                </div>
+
+                <div class="filter-item">
+                    <select id="statusFilter" class="input-control select-control" onchange="applyFilters()">
+                        <option value="all" {% if status == "all" or not status %}selected{% endif %}>Tous les états
+                        </option>
+                        <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
+                        <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
+                        <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés
+                        </option>
+                    </select>
+                </div>
+
+                <div class="filter-item">
+                    <select id="dptFilter" class="input-control select-control" onchange="applyFilters()">
+                        <option value="all" {% if dpt_filtre == "all" or not dpt_filtre %}selected{% endif %}>Tous les
+                            départements</option>
+                        {% for dpt in departements %}
+                        <option value="{{ dpt }}" {% if dpt_filtre == dpt %}selected{% endif %}>{{ dpt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <button type="button" class="btn-secondary" onclick="resetFilters()">
                 <i class="fa-solid fa-rotate-left"></i> Effacer
             </button>
         </div>
-    </div>
 
-    <div class="sections-wrapper">
-        <div class="section-card">
-            <div class="table-scroll">
-                <table class="table-affectations" id="affectationsTable">
-                    <thead>
-                        <tr>
-                            <th>Nom complet Collaborateur</th>
-                            <th>Nom complet RU initial</th>
-                            <th>DPT initial</th>
-                            <th>Nom complet RU cible</th>
-                            <th>DPT cible</th>
-                            <th class="text-center">État</th>
-                        </tr>
-                    </thead>
-                    <tbody id="result">
-                        {% for affectation in info %}
-                        <tr class="table-row">
-                            <td class="cell-primary">
-                                {{ affectation.collaborateur|default:"—" }}
-                            </td>
-                            <td>
-                                {{ affectation.initial|default:"—" }}
-                            </td>
-                            <td>
-                                {{ affectation.dpt_init|default:"—" }}
-                            </td>
-                            <td>
-                                {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
-                                {{ affectation.acceuil }}
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {{ affectation.dpt_acceuil|default:"—" }}
-                            </td>
-                            <td class="text-center">
-                                {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
-                                <span class="badge {{ affectation.badge_class }}">
-                                    {{ affectation.etat }}
-                                </span>
-                                {% else %}
-                                <span class="badge badge-en-attente">En attente</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr id="noDataRow">
-                            <td colspan="6" class="empty-row">Aucune affectation trouvée.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <!-- Tableau -->
+        <div class="table-responsive">
+            <table class="enterprise-table" id="affectationsTable">
+                <thead>
+                    <tr>
+                        <th>Nom complet Collaborateur</th>
+                        <th>Nom complet RU initial</th>
+                        <th>DPT initial</th>
+                        <th>Nom complet RU cible</th>
+                        <th>DPT cible</th>
+                        <th class="text-center">État</th>
+                    </tr>
+                </thead>
+                <tbody id="result">
+                    {% for affectation in info %}
+                    <tr class="table-row">
+                        <td class="font-medium">
+                            {{ affectation.collaborateur|default:"—" }}
+                        </td>
+                        <td class="font-mono">
+                            {{ affectation.initial|default:"—" }}
+                        </td>
+                        <td>
+                            {{ affectation.dpt_init|default:"—" }}
+                        </td>
+                        <td class="font-mono">
+                            {% if affectation.acceuil and affectation.acceuil|stringformat:"s" != "nan" %}
+                            {{ affectation.acceuil }}
+                            {% else %}
+                            <span class="text-subtle">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ affectation.dpt_acceuil|default:"—" }}
+                        </td>
+                        <td class="text-center">
+                            {% if affectation.etat and affectation.etat|stringformat:"s" != "nan" %}
+                            <span class="badge {{ affectation.badge_class }}">
+                                {{ affectation.etat }}
+                            </span>
+                            {% else %}
+                            <span class="badge badge-en-attente">En attente</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr id="noDataRow">
+                        <td colspan="6" class="empty-state">
+                            <i class="fa-solid fa-circle-check"></i>
+                            Aucune affectation trouvée.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-            <!-- Pagination -->
-            {% if page_obj.paginator.num_pages > 1 %}
-            <div class="pagination-container">
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="table-footer">
+            <ul class="pagination">
                 {% if page_obj.has_previous %}
-                <a class="page-btn"
-                    href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">&laquo;
-                    Précédent</a>
+                <li>
+                    <a class="page-link"
+                        href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
+                        &laquo; Précédent
+                    </a>
+                </li>
                 {% else %}
-                <span class="page-btn" aria-disabled="true">&laquo; Précédent</span>
+                <li><span class="page-link disabled">&laquo; Précédent</span></li>
                 {% endif %}
 
                 {% for num in page_obj.paginator.page_range %}
                 {% if num == page_obj.number %}
-                <span class="page-btn active">{{ num }}</span>
-                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <a class="page-btn"
-                    href="?page={{ num }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
-                    {{ num }}</a>
+                <li><span class="page-link active">{{ num }}</span></li>
+                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <li>
+                    <a class="page-link"
+                        href="?page={{ num }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
+                        {{ num }}
+                    </a>
+                    </li>
                     {% endif %}
                     {% endfor %}
 
                     {% if page_obj.has_next %}
-                    <a class="page-btn"
-                        href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">Suivant
-                        &raquo;</a>
+                    <li>
+                        <a class="page-link"
+                            href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
+                            Suivant &raquo;
+                        </a>
+                    </li>
                     {% else %}
-                    <span class="page-btn" aria-disabled="true">Suivant &raquo;</span>
+                    <li><span class="page-link disabled">Suivant &raquo;</span></li>
                     {% endif %}
-            </div>
-            {% endif %}
+            </ul>
         </div>
-    </div>
+        {% endif %}
 
+    </div>
 </div>
 {% endblock %}
 

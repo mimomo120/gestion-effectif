@@ -1,10 +1,10 @@
 import pandas as pd
 from datetime import datetime, time
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
 from .forms import MultipleImportForm
-from Collaborateur.models import Collaborateur, Departement, Unite
+from Collaborateur.models import Collaborateur, Departement
 from declaration_effectif.models import historique
 from .models import histo_import, histo_import_detail
 from utilisateur.decorators import role_required
@@ -12,9 +12,8 @@ from declaration_effectif.models import declaration_effectif as DeclarationEffec
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from django.utils import timezone
-from django.http import HttpResponse
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
+from django.http import HttpResponse, JsonResponse
+import unicodedata
 
 # ------------------------------------------------------------------
 # FONCTIONS AUXILIAIRES
@@ -25,7 +24,12 @@ def clean_val(val):
         return None
     if isinstance(val, float) and val.is_integer():
         return str(int(val))
-    return str(val).strip()
+    # normalise les espaces et supprime caractères invisibles en tête/queue
+    try:
+        s = str(val).strip()
+        return s
+    except Exception:
+        return str(val)
 
 def clean_int(val, default=0):
     try:
@@ -37,12 +41,7 @@ def clean_int(val, default=0):
 
 def read_uploaded_file(fichier):
     """
-    OPTIM :
-    - dtype=str évite l'inférence de type colonne par colonne (coûteuse) et
-      les surprises du style matricule "1234.0".
-    - engine="calamine" (pip install python-calamine) est un moteur Rust
-      nettement plus rapide qu'openpyxl sur les gros fichiers Excel.
-      Fallback automatique sur openpyxl si le paquet n'est pas installé.
+    Lecture optimisée : dtype=str pour éviter conversions surprises.
     """
     if fichier.name.endswith(".csv"):
         df = pd.read_csv(fichier, dtype=str)
@@ -56,9 +55,7 @@ def read_uploaded_file(fichier):
 
 def iter_rows(df):
     """
-    OPTIM : to_dict("records") est nettement plus rapide que df.iterrows(),
-    qui reconstruit une Series pandas (avec tout son overhead) à chaque tour
-    de boucle. On garde l'index (i) pour les messages d'erreur "Ligne {i+2}".
+    to_dict("records") est plus rapide que iterrows()
     """
     return enumerate(df.to_dict("records"))
 
@@ -67,8 +64,6 @@ def iter_rows(df):
 # ------------------------------------------------------------------
 
 def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
-    # OPTIM : collaborateurs_map peut être fourni par l'appelant pour éviter
-    # de refaire la même requête que importer_collaborateurs().
     if collaborateurs_map is None:
         collaborateurs_map = {c.it: c for c in Collaborateur.objects.all()}
 
@@ -88,10 +83,11 @@ def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
             rh_val = clean_val(row.get("HRBP"))
             admin_val = clean_val(row.get("ADMIN"))
             drh_val = clean_val(row.get("DRH"))
-
+            pilot_val = clean_val(row.get("PILOT"))
             rh_obj = collaborateurs_map.get(rh_val) if rh_val else None
             admin_obj = collaborateurs_map.get(admin_val) if admin_val else None
             drh_obj = collaborateurs_map.get(drh_val) if drh_val else None
+            pilot_obj = collaborateurs_map.get(pilot_val) if pilot_val else None
 
             if rh_val and not rh_obj:
                 erreurs.append(f"Départements Ligne {i+2}: HRBP '{rh_val}' introuvable.")
@@ -99,13 +95,15 @@ def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
                 erreurs.append(f"Départements Ligne {i+2}: ADMIN '{admin_val}' introuvable.")
             if drh_val and not drh_obj:
                 erreurs.append(f"Départements Ligne {i+2}: DRH '{drh_val}' introuvable.")
+            if pilot_val and not pilot_obj:
+                erreurs.append(f"Départements Ligne {i+2}: PILOT '{pilot_val}' introuvable.")
 
             data = dict(
                 nom_departement=nom_dpt,
                 HRBP=rh_obj,
                 ADMIN=admin_obj,
                 DRH=drh_obj,
-                maquette=clean_int(row.get("Maquette")),
+                PILOT=pilot_obj
             )
 
             if abbrev in departements_existants:
@@ -126,85 +124,36 @@ def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
             Departement.objects.bulk_create(a_creer, batch_size=1000)
         if a_maj:
             Departement.objects.bulk_update(
-                a_maj, ["nom_departement", "HRBP", "ADMIN", "DRH", "maquette"], batch_size=1000
+                a_maj, ["nom_departement", "HRBP", "ADMIN", "DRH", "PILOT"], batch_size=1000
             )
 
     return len(a_creer) + len(a_maj)
 
-# ------------------------------------------------------------------
-# IMPORT UNITÉS
-# ------------------------------------------------------------------
 
-def importer_unites(df_unite, erreurs):
-    unites_existantes = {u.abreviation: u for u in Unite.objects.all()}
-    a_creer = []
-    a_maj = []
-
-    for i, row in iter_rows(df_unite):
-        try:
-            abbrev = clean_val(row.get("abreviation") or row.get("Abreviation"))
-            if not abbrev:
-                erreurs.append(f"Unités Ligne {i+2}: Abréviation manquante.")
-                continue
-
-            data = dict(
-                nom=row.get("nom") or abbrev,
-                maquette=clean_int(row.get("maquette"), 0),
-                A=clean_int(row.get("A"), 0),
-                T=clean_int(row.get("T"), 0),
-                P=clean_int(row.get("P"), 0),
-                C=clean_int(row.get("C"), 0),
-            )
-
-            if abbrev in unites_existantes:
-                obj = unites_existantes[abbrev]
-                for k, v in data.items():
-                    setattr(obj, k, v)
-                a_maj.append(obj)
-            else:
-                obj = Unite(abreviation=abbrev, **data)
-                a_creer.append(obj)
-                unites_existantes[abbrev] = obj
-
-        except Exception as e:
-            erreurs.append(f"Unités Ligne {i+2}: {e}")
-
-    with transaction.atomic():
-        if a_creer:
-            Unite.objects.bulk_create(a_creer, batch_size=1000)
-        if a_maj:
-            Unite.objects.bulk_update(a_maj, ["nom", "maquette", "A", "T", "P", "C"], batch_size=1000)
-
-    return len(a_creer) + len(a_maj)
-
-# ------------------------------------------------------------------
-# IMPORT COLLABORATEURS — avec suivi détaillé
-# ------------------------------------------------------------------
-
-# Champs à comparer pour détecter une "vraie" modification
-CHAMPS_SUIVIS = ["matricule", "nom_complete", "lot", "departement", "unite", "eq", "shift", "sexe"]
+CHAMPS_SUIVIS = ["matricule", "nom_complete", "lot", "departement", "eq", "shift", "sexe"]
 
 def _val_affichable(v):
-    """Convertit une valeur (y compris FK) en texte lisible pour le détail d'import."""
     if v is None:
         return ""
     if hasattr(v, "abreviation"):
         return v.abreviation
     return str(v)
 
-def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_map=None):
-    """
-    Retourne un tuple :
-        (nb_lignes_traitees, collaborateurs_dans_fichier)
-    où collaborateurs_dans_fichier est le set des "it" présents dans le
-    fichier importé. Ce set est réutilisé ensuite pour comparer l'état du
-    fichier aux dernières déclarations enregistrées dans declaration_effectif.
-    """
-    departements_map = {d.abreviation: d for d in Departement.objects.all()}
-    unites_map = {u.abreviation: u for u in Unite.objects.all()}
+def _normalize_for_match(s):
+    if s is None:
+        return ""
+    s = str(s).strip()
+    # remove multiple spaces
+    s = " ".join(s.split())
+    # remove accents
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return s.lower()
 
-    # OPTIM : collaborateurs_map peut être fourni par l'appelant (partagé avec
-    # importer_departements) pour éviter de charger deux fois toute la table.
+
+def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_map=None):
+    # maps existants (cache) : clé = abbreviation stripped
+    departements_map = {d.abreviation.strip(): d for d in Departement.objects.all()}
     if collaborateurs_map is None:
         collaborateurs_map = {c.it: c for c in Collaborateur.objects.all()}
 
@@ -216,11 +165,11 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
     a_maj = []
     ru_a_resoudre = []
     collaborateurs_dans_fichier = set()
-    details_a_creer = []  # histo_import_detail en attente
+    details_a_creer = []
 
     for i, row in iter_rows(df_collab):
         try:
-            utilisateur_it = clean_val(row.get("Utilisateur"))
+            utilisateur_it = clean_val(row.get("Utilisateur") or row.get("IT") or row.get("it"))
             if not utilisateur_it:
                 erreurs.append(f"Collaborateurs Ligne {i+2}: Identifiant Utilisateur manquant.")
                 continue
@@ -228,36 +177,31 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
             collaborateurs_dans_fichier.add(utilisateur_it)
 
             dpt_code = clean_val(row.get("DPT"))
-            dpt_obj = departements_map.get(dpt_code) if dpt_code else None
+            dpt_obj = departements_map.get(dpt_code.strip()) if dpt_code else None
             if dpt_code and not dpt_obj:
                 erreurs.append(f"Collaborateurs Ligne {i+2}: Département '{dpt_code}' introuvable.")
 
-            unite_code = clean_val(row.get("Unite"))
-            unite_obj = unites_map.get(unite_code) if unite_code else None
-            if unite_code and not unite_obj:
-                erreurs.append(f"Collaborateurs Ligne {i+2}: Unité '{unite_code}' introuvable.")
-
             ru_mat = clean_val(row.get("RU"))
-            nom = str(row.get("Nom") or "").strip()
-            prenom = str(row.get("Prénom") or "").strip()
+
+            # FIX: utiliser clean_val() (qui gère correctement pd.isna) au lieu de
+            # "row.get(...) or ''" qui laissait passer le float NaN (nan est truthy)
+            # et produisait la chaîne littérale "nan" une fois passé dans str().
+            nom = clean_val(row.get("Nom")) or ""
+            prenom = clean_val(row.get("Prénom")) or clean_val(row.get("Prenom")) or ""
 
             data = dict(
                 matricule=clean_val(row.get("Matricule")),
                 nom_complete=f"{nom} {prenom}".strip(),
-                lot=str(row.get("Lot", "") or "").strip(),
+                lot=clean_val(row.get("Lot")) or "",
                 departement=dpt_obj,
-                unite=unite_obj,
-                eq=str(row.get("Equipe", "") or ""),
+                eq=clean_val(row.get("Equipe")) or "",
                 shift=clean_val(row.get("Shift")),
                 sexe=clean_int(row.get("Sexe"), default=1),
             )
 
             matricule_val = data["matricule"]
 
-            # OPTIM : on construit systématiquement un objet Collaborateur "prêt
-            # à insérer", qu'il soit nouveau ou existant. Il est ensuite envoyé
-            # en une seule passe via bulk_create(update_conflicts=True), ce qui
-            # évite la double opération bulk_create + bulk_update d'origine.
+            # Crée un objet prêt pour bulk (nouveau ou mise à jour)
             obj = Collaborateur(it=utilisateur_it, **data)
 
             if utilisateur_it in collaborateurs_map:
@@ -309,7 +253,7 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
                     message_erreur=str(e),
                 ))
 
-    # Collaborateurs présents en base mais absents du nouveau fichier
+    # suppression/diff et persistence (identique à l'existant)
     collaborateurs_a_supprimer = set(collaborateurs_map.keys()) - collaborateurs_dans_fichier
 
     if import_log is not None:
@@ -325,16 +269,60 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
 
     with transaction.atomic():
         tous_objets = a_creer + a_maj
+
+        # ----------------------------------------------------------------
+        # FIX (UNIQUE constraint failed: Collaborateur_collaborateur.matricule)
+        # ----------------------------------------------------------------
+        # bulk_create(update_conflicts=True, unique_fields=["it"]) ne résout
+        # les conflits QUE sur la colonne "it". La contrainte unique sur
+        # "matricule" reste vérifiée ligne par ligne par SQLite pendant
+        # l'exécution du batch (elle n'est pas différée en fin de transaction).
+        #
+        # Résultat : si un matricule change de propriétaire d'un import à
+        # l'autre (ex: A avait 100 et passe à 101, B reprend 100), SQLite peut
+        # tenter d'écrire le nouveau matricule de B avant que celui de A ait
+        # été libéré -> UNIQUE constraint failed.
+        #
+        # Solution : avant le bulk_create, on détecte tous les matricules
+        # entrants déjà attribués en base à un AUTRE "it", et on les vide
+        # (None) au préalable. Le bulk_create peut alors s'exécuter sans
+        # jamais rencontrer de doublon de matricule.
+        matricules_entrants = {
+            obj.matricule: obj.it for obj in tous_objets if obj.matricule
+        }
+        if matricules_entrants:
+            conflits = list(
+                Collaborateur.objects.filter(matricule__in=matricules_entrants.keys())
+            )
+            a_liberer = [
+                c for c in conflits if matricules_entrants.get(c.matricule) != c.it
+            ]
+            if a_liberer:
+                if import_log is not None:
+                    for c in a_liberer:
+                        details_a_creer.append(histo_import_detail(
+                            import_parent=import_log,
+                            action="REATTRIBUTION_MATRICULE",
+                            matricule=c.matricule,
+                            it=c.it,
+                            nom_complete=getattr(c, "nom_complete", None),
+                            champ_modifie="matricule",
+                            ancienne_valeur=_val_affichable(c.matricule),
+                            nouvelle_valeur="(réattribué à un autre collaborateur)",
+                        ))
+                for c in a_liberer:
+                    c.matricule = None
+                Collaborateur.objects.bulk_update(a_liberer, ["matricule"], batch_size=1000)
+        # ----------------------------------------------------------------
+
         if tous_objets:
-            # OPTIM : une seule requête bulk pour créer ET mettre à jour,
-            # au lieu de bulk_create() + bulk_update() séparés.
             Collaborateur.objects.bulk_create(
                 tous_objets,
                 update_conflicts=True,
                 unique_fields=["it"],
                 update_fields=[
                     "matricule", "nom_complete", "lot",
-                    "departement", "unite", "eq", "shift", "sexe",
+                    "departement", "eq", "shift", "sexe",
                 ],
                 batch_size=1000,
             )
@@ -369,7 +357,6 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
         if a_maj_ru:
             Collaborateur.objects.bulk_update(a_maj_ru, ["ru_it"], batch_size=1000)
 
-    # Mise à jour des compteurs sur le log si fourni
     if import_log is not None:
         import_log.depar = len(a_creer)
         import_log.modif = len([d for d in details_a_creer if d.action == "MODIFICATION"])
@@ -380,7 +367,7 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
     return len(a_creer) + len(a_maj) + len(collaborateurs_a_supprimer), collaborateurs_dans_fichier
 
 # ------------------------------------------------------------------
-# IMPORT CHANGEMENTS D'AFFECTATION
+# IMPORT CHANGEMENTS D'AFFECTATION (inchangé sauf noms DPT)
 # ------------------------------------------------------------------
 
 def importer_changements(df_chg, erreurs):
@@ -428,34 +415,13 @@ def importer_changements(df_chg, erreurs):
     return len(a_creer)
 
 # ------------------------------------------------------------------
-# SUIVI DES DÉCLARATIONS (declaration_effectif) VS FICHIER IMPORTÉ
+# SUIVI DES DÉCLARATIONS VS FICHIER IMPORTÉ
 # ------------------------------------------------------------------
 
 def _snapshot_ru(collaborateurs_map):
-    """
-    Capture l'affectation (ru_it_id) de chaque collaborateur AVANT le
-    traitement du nouveau fichier. Sert de référence pour "l'ancienne
-    affectation" lors de la comparaison avec les déclarations de changement.
-    """
     return {it: getattr(c, "ru_it_id", None) for it, c in collaborateurs_map.items()}
 
-
 def analyser_declarations_vs_import(ancien_ru_map, collaborateurs_dans_fichier):
-    """
-    Compare les DERNIÈRES déclarations de départ ('D') et de changement
-    d'affectation ('C') de declaration_effectif à l'état du fichier
-    collaborateurs qui vient d'être importé.
-
-    - Un départ est considéré "effectué" si le collaborateur n'est plus
-      présent dans le nouveau fichier (collaborateurs_dans_fichier).
-    - Un changement est considéré "effectué" si l'affectation actuelle du
-      collaborateur (après import) correspond à la nouvelle RU déclarée
-      (nv_Ru) dans declaration_effectif.
-
-    Seule la dernière déclaration ('D' ou 'C') de chaque collaborateur est
-    prise en compte, afin d'éviter les doublons et les déclarations déjà
-    obsolètes/remplacées.
-    """
     declarations = (
         DeclarationEffectif.objects
         .filter(nature__in=["D", "C"])
@@ -463,7 +429,6 @@ def analyser_declarations_vs_import(ancien_ru_map, collaborateurs_dans_fichier):
         .order_by("collaborateur_it_id", "-date", "-id")
     )
 
-    # On ne garde que la dernière déclaration par collaborateur.
     dernieres = {}
     for d in declarations:
         cid = d.collaborateur_it_id
@@ -481,7 +446,7 @@ def analyser_declarations_vs_import(ancien_ru_map, collaborateurs_dans_fichier):
 
     for cid, decl in dernieres.items():
         collab_actuel = collaborateurs_apres.get(cid)
-        collab_declare = decl.collaborateur_it  # peut être None si SET_NULL
+        collab_declare = decl.collaborateur_it
 
         matricule = (collab_actuel.matricule if collab_actuel
                      else getattr(collab_declare, "matricule", None))
@@ -537,16 +502,7 @@ def analyser_declarations_vs_import(ancien_ru_map, collaborateurs_dans_fichier):
         "nb_effectuees": len(effectuees),
     }
 
-
 def _serialiser_synthese(synthese):
-    """
-    Convertit la synthèse en une structure 100% JSON-sérialisable (les objets
-    date ne le sont pas nativement) afin de pouvoir la stocker en base
-    (histo_import.synthese_json).
-    Elle est ensuite réutilisée pour : (1) réafficher le bouton "Voir la
-    synthèse" après un rechargement de page OU une reconnexion, (2) générer
-    l'export Excel.
-    """
     def _conv_liste(liste):
         out = []
         for item in liste:
@@ -565,17 +521,7 @@ def _serialiser_synthese(synthese):
         "nb_effectuees": synthese["nb_effectuees"],
     }
 
-
 def _derniere_synthese():
-    """
-    NOUVEAU : récupère la synthèse du DERNIER import collaborateurs qui en
-    possède une, directement depuis la base de données (histo_import.synthese_json).
-
-    Contrairement à request.session (qui est propre à un utilisateur/navigateur
-    et disparaît au logout ou à l'expiration de la session), cette fonction
-    renvoie toujours la même synthèse à tout utilisateur autorisé, qu'il vienne
-    de se reconnecter, de changer de navigateur, ou de recharger la page.
-    """
     dernier = (
         histo_import.objects
         .exclude(synthese_json__isnull=True)
@@ -584,9 +530,6 @@ def _derniere_synthese():
     )
     return dernier.synthese_json if dernier else None
 
-# ------------------------------------------------------------------
-# VUE PRINCIPALE
-# ------------------------------------------------------------------
 @role_required(['SUPER', "DRH"])
 def importer_fichiers_combines(request):
     role = request.session.get('role')
@@ -606,10 +549,6 @@ def importer_fichiers_combines(request):
         for _ in storage:
             pass
 
-        # NOUVEAU : la synthèse est lue en base (dernier import avec
-        # synthese_json renseigné), donc elle reste disponible même après un
-        # logout/reconnexion, un changement de navigateur, etc. Elle ne
-        # s'ouvre pas automatiquement dans ce cas (just_imported=False).
         return render(request, "import_data/import.html", {
             "form": MultipleImportForm(),
             "template_de_base": template_de_base,
@@ -629,11 +568,10 @@ def importer_fichiers_combines(request):
         })
 
     f_collab = request.FILES.get("fichier_collaborateur")
-    f_unite = request.FILES.get("fichier_unite")
     f_dpt = request.FILES.get("fichier_departement")
     f_chg = request.FILES.get("fichier_changement")
 
-    if not (f_collab or f_unite or f_dpt or f_chg):
+    if not (f_collab or f_dpt or f_chg):
         messages.error(request, "Veuillez fournir au moins un fichier à importer.", extra_tags="import")
         return render(request, "import_data/import.html", {
             "form": form,
@@ -644,26 +582,21 @@ def importer_fichiers_combines(request):
         })
 
     erreurs = []
-    crees_dpts = crees_unites = crees_collabs = crees_chgs = 0
+    crees_dpts = crees_collabs = crees_chgs = 0
     import_log = None
     debut = timezone.now()
     synthese_declarations = None
     collaborateurs_dans_fichier = set()
 
-    # OPTIM : une seule lecture de la table Collaborateur, partagée entre
-    # importer_departements (résolution HRBP/ADMIN/DRH) et importer_collaborateurs.
     collaborateurs_map = None
     if f_dpt or f_collab:
         collaborateurs_map = {
             c.it: c for c in Collaborateur.objects.only(
                 "it", "matricule", "nom_complete", "lot",
-                "departement_id", "unite_id", "eq", "shift", "sexe", "ru_it_id",
+                "departement_id","eq", "shift", "sexe", "ru_it_id",
             )
         }
 
-    # Snapshot de l'affectation AVANT le traitement du nouveau fichier
-    # collaborateurs. Sert de point de référence ("ancienne affectation")
-    # pour la comparaison avec les déclarations de changement.
     ancien_ru_map = _snapshot_ru(collaborateurs_map) if collaborateurs_map else {}
 
     if f_dpt:
@@ -672,13 +605,6 @@ def importer_fichiers_combines(request):
             crees_dpts = importer_departements(df_dpt, erreurs, collaborateurs_map=collaborateurs_map)
         except Exception as e:
             messages.error(request, f"Erreur de lecture du fichier Départements : {e}", extra_tags="import")
-
-    if f_unite:
-        try:
-            df_unite = read_uploaded_file(f_unite)
-            crees_unites = importer_unites(df_unite, erreurs)
-        except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Unités : {e}", extra_tags="import")
 
     if f_collab:
         try:
@@ -694,17 +620,10 @@ def importer_fichiers_combines(request):
             import_log.statut = "SUCCES" if not erreurs else "PARTIEL"
             import_log.save(update_fields=["statut"])
 
-            # Comparaison des dernières déclarations (declaration_effectif)
-            # avec l'état réel du fichier qui vient d'être importé.
             synthese_declarations = analyser_declarations_vs_import(
                 ancien_ru_map, collaborateurs_dans_fichier
             )
 
-            # NOUVEAU : la synthèse est persistée EN BASE, rattachée à cet
-            # import précis (import_log.synthese_json), et non plus dans
-            # request.session. Elle reste donc accessible après un logout,
-            # une reconnexion, ou depuis un autre poste, pour tout
-            # utilisateur SUPER/DRH.
             synthese_serialisee = _serialiser_synthese(synthese_declarations)
             import_log.synthese_json = synthese_serialisee
             import_log.save(update_fields=["synthese_json"])
@@ -724,8 +643,6 @@ def importer_fichiers_combines(request):
     resume = []
     if f_dpt:
         resume.append(f"Départements: {crees_dpts} ligne(s) importée(s) avec succès")
-    if f_unite:
-        resume.append(f"Unités: {crees_unites} ligne(s) importée(s) avec succès")
     if f_collab:
         detail_msg = f"Collaborateurs: {crees_collabs} ligne(s) traitée(s)"
         if import_log:
@@ -737,11 +654,9 @@ def importer_fichiers_combines(request):
     messages.success(request, "Importation terminée : " + " | ".join(resume), extra_tags="import")
 
     if erreurs:
-        messages.warning(request, f"{len(erreurs)} avertissement(s) : " + " | ".join(erreurs[:5]), extra_tags="import")
+        messages.warning(request, f"{len(erreurs)} avertissement(s) : " + " | ".join(erreurs[:20]), extra_tags="import")
 
     fin = timezone.now()
-    # OPTIM / FIX : import_log peut être None si aucun fichier collaborateurs
-    # n'a été fourni — on protège l'accès pour éviter l'AttributeError.
     if import_log is not None:
         duree = fin - debut
         import_log.duree = duree.total_seconds()
@@ -761,14 +676,14 @@ def importer_fichiers_combines(request):
     })
 
 # ============================================================
-# (le reste du fichier : get_collaborateurs_reels, export_effectif_reel — inchangé)
+# get_collaborateurs_reels, export_effectif_reel (adaptés)
 # ============================================================
 
 def get_collaborateurs_reels(departements):
     collaborateurs = (
         Collaborateur.objects
         .filter(departement_id__in=departements)
-        .select_related("departement", "unite", "ru_it")
+        .select_related("departement", "ru_it")
     )
 
     ids = list(collaborateurs.values_list("it", flat=True))
@@ -825,9 +740,6 @@ def export_effectif_reel(request):
 
     resultats = get_collaborateurs_reels(departements)
 
-    # Build an it -> (matricule, nom_complete) lookup for all RU codes present
-    # in the results, so we can display the RU's matricule and full name
-    # instead of just their "it" code.
     ru_its = {r["ru"] for r in resultats if r.get("ru")}
     ru_info_map = {
         it_val: (matricule, nom_complete)
@@ -839,7 +751,7 @@ def export_effectif_reel(request):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Effectif Réel"
-    headers = ["Matricule", "IT", "Nom", "Prénom", "Département", "Unité", "Lot", "EP", "RU(utilisateur)","Nom Prénom"]
+    headers = ["Matricule", "IT", "Nom", "Prénom", "Département", "Equipe", "Lot","RU(utilisateur)", "Nom Prénom"]
     ws.append(headers)
 
     header_fill = PatternFill(start_color="1e293b", end_color="1e293b", fill_type="solid")
@@ -853,10 +765,10 @@ def export_effectif_reel(request):
         c = r["collaborateur"]
         ru_matricule, ru_nom_prenom = ru_info_map.get(r["ru"], ("-", "-")) if r.get("ru") else ("-", "-")
 
-        # 1er mot = Nom, le reste = Prénom
         parts = (c.nom_complete or "").split(None, 1)
         nom = parts[0] if parts else "-"
         prenom = parts[1] if len(parts) > 1 else "-"
+
 
         ws.append([
             c.matricule,
@@ -864,9 +776,8 @@ def export_effectif_reel(request):
             nom,
             prenom,
             c.departement.abreviation if c.departement else "-",
-            c.unite_id if c.unite_id else "-",
-            c.lot,
             c.eq,
+            c.lot,
             ru_matricule,
             ru_nom_prenom,
         ])
@@ -884,7 +795,6 @@ def export_effectif_reel(request):
 
     return response
 
-
 @role_required(['SUPER', "DRH"])
 def import_details_json(request, import_id):
     import_log = get_object_or_404(histo_import, pk=import_id)
@@ -894,9 +804,8 @@ def import_details_json(request, import_id):
     )
     return JsonResponse({"details": list(details)})
 
-
 # ------------------------------------------------------------------
-# HISTORIQUE COMPLET DES IMPORTS (popup + filtre par date)
+# HISTORIQUE COMPLET DES IMPORTS (inclus helpers d'export Excel)
 # ------------------------------------------------------------------
 
 STATUT_BADGES = {
@@ -906,11 +815,7 @@ STATUT_BADGES = {
     "EN_COURS": ("En cours", "bg-info-subtle text-info border border-info-subtle"),
 }
 
-
 def _parse_date(val):
-    """Parse une date au format YYYY-MM-DD envoyée par un <input type="date">.
-    Retourne None si absente ou invalide (le filtre correspondant est alors
-    simplement ignoré plutôt que de lever une erreur)."""
     if not val:
         return None
     try:
@@ -918,14 +823,8 @@ def _parse_date(val):
     except ValueError:
         return None
 
-
 @role_required(['SUPER', "DRH"])
 def historique_imports_json(request):
-    """
-    Retourne l'historique COMPLET des imports (pas seulement les 10 derniers),
-    avec un filtrage optionnel par plage de dates via les paramètres GET
-    `date_debut` et `date_fin` (format YYYY-MM-DD, bornes incluses).
-    """
     qs = histo_import.objects.order_by('-date')
 
     date_debut = _parse_date(request.GET.get("date_debut"))
@@ -955,7 +854,6 @@ def historique_imports_json(request):
 
     return JsonResponse({"resultats": resultats, "total": len(resultats)})
 
-
 # ------------------------------------------------------------------
 # EXPORT EXCEL DE LA SYNTHÈSE DES DÉCLARATIONS
 # ------------------------------------------------------------------
@@ -968,24 +866,13 @@ def _style_header_row(ws):
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center")
 
-
 def _autosize(ws):
     for col_cells in ws.columns:
         length = max((len(str(cell.value)) for cell in col_cells if cell.value is not None), default=0)
         ws.column_dimensions[col_cells[0].column_letter].width = max(length + 2, 12)
 
-
 @role_required(['SUPER', "DRH"])
 def export_synthese_declarations(request):
-    """
-    Exporte en Excel la dernière synthèse des déclarations (générée lors du
-    dernier import du fichier collaborateurs), avec 3 feuilles :
-    Départs non effectués / Changements non effectués / Déclarations effectuées.
-
-    NOUVEAU : la synthèse est lue depuis la base (histo_import.synthese_json
-    du dernier import qui en possède une) au lieu de request.session, afin
-    que l'export reste possible même après un logout/reconnexion.
-    """
     synthese = _derniere_synthese()
 
     if not synthese:
@@ -998,7 +885,7 @@ def export_synthese_declarations(request):
 
     wb = openpyxl.Workbook()
 
-    # --- Feuille 1 : Départs non effectués ---
+    # Feuille 1 : Départs non effectués
     ws1 = wb.active
     ws1.title = "Departs non effectues"
     ws1.append(["Matricule", "Nom complet", "RU", "Date déclaration", "Statut"])
@@ -1013,7 +900,7 @@ def export_synthese_declarations(request):
         ])
     _autosize(ws1)
 
-    # --- Feuille 2 : Changements non effectués ---
+    # Feuille 2 : Changements non effectués
     ws2 = wb.create_sheet("Changements non effectues")
     ws2.append([
         "Matricule", "Nom complet", "Ancienne affectation",
@@ -1031,7 +918,7 @@ def export_synthese_declarations(request):
         ])
     _autosize(ws2)
 
-    # --- Feuille 3 : Déclarations effectuées ---
+    # Feuille 3 : Déclarations effectuées
     ws3 = wb.create_sheet("Declarations effectuees")
     ws3.append(["Matricule", "Nom complet", "Type", "Date déclaration"])
     _style_header_row(ws3)

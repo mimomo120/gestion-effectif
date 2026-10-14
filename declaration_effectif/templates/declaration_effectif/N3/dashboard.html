@@ -1,7 +1,8 @@
 {% extends 'utilisateur/navbar_N1.html' %}
 {% load static %}
 
-{% block title %}Tableau de bord N3{% endblock %}
+{% block title %}Tableau de bord{% endblock %}
+
 {% block css %}
 <link rel="stylesheet" href="{% static 'utilisateur/css/N2/dashboard.css' %}">
 <style>
@@ -10,23 +11,99 @@
         height: 320px;
         width: 100%;
     }
+
+    /* Force l'affichage des 3 graphiques sur la même ligne */
+    .charts-grid-3-col {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+    }
+
+    @media (max-width: 1200px) {
+        .charts-grid-3-col {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Style personnalisé pour l'affichage Blue & White Collars */
+    .collars-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .collar-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        padding: 3px 8px;
+        border-radius: 12px;
+        line-height: 1.2;
+    }
+
+    .collar-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .blue-collar {
+        background-color: #eff6ff;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
+    }
+
+    .blue-collar .collar-dot {
+        background-color: #2563eb;
+    }
+
+    .white-collar {
+        background-color: #ecfdf5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+
+    .white-collar .collar-dot {
+        background-color: #059669;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-container">
+    <!-- ===== EN-TÊTE ===== -->
     <header class="dashboard-header">
-        <h1 class="dashboard-title">Tableau de bord N3</h1>
-        <div class="date-picker-badge">
-            <span id="time" aria-live="polite">{{ maint }}</span>
-            <i class="far fa-calendar ms-2"></i>
+        <div>
+            <h1 class="dashboard-title">Tableau de bord</h1>
+            <p class="dashboard-subtitle">Aperçu global et indicateurs clés de performance RH</p>
+        </div>
+        <div>
+            <div class="date-picker-badge">
+                <i class="far fa-calendar"></i>
+                <span>{{ maint|date:"d M Y" }}</span>
+            </div>
         </div>
     </header>
 
-    <!-- ===== STATISTIQUES GÉNÉRALES ===== -->
-    <div class="statistique-cards">
-        <div class="stat-card card-reel">
-            <h3>Effectif réel</h3>
+    <!-- ===== EFFECTIFS PRINCIPAUX (KPI) ===== -->
+    <div class="kpi-primary-row">
+        <!-- Effectif réel -->
+        <div class="stat-card">
+            <div class="stat-card-top">
+                <h3>Effectif réel</h3>
+                <div class="stat-icon icon-brand">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </div>
+            </div>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ total_r|default:"0" }}</span>
                 <span class="unite">collaborateurs</span>
@@ -37,8 +114,18 @@
                 {% endif %}
         </div>
 
-        <div class="stat-card card-systeme">
-            <h3>Effectif système</h3>
+        <!-- Effectif système -->
+        <div class="stat-card">
+            <div class="stat-card-top">
+                <h3>Effectif système</h3>
+                <div class="stat-icon icon-teal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+            </div>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ total_syst|default:"0" }}</span>
                 <span class="unite">collaborateurs</span>
@@ -49,85 +136,144 @@
                 {% endif %}
         </div>
 
-        <div class="stat-card card-maquette">
-            <h3>Effectif maquette</h3>
+        <!-- Effectif maquette -->
+        <div class="stat-card">
+            <div class="stat-card-top">
+                <h3>Effectif maquette</h3>
+                <div class="stat-icon icon-amber">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                </div>
+            </div>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ maquette_totale|default:"0" }}</span>
                 <span class="unite">collaborateurs</span>
-            </div>
-        </div>
-
-        <div class="stat-card card-warning">
-            <h3>RU non validés</h3>
-            <div class="stat-valeur-group">
-                <span class="valeur">{{ non_valides|default:"0" }}</span>
-                <span class="unite">responsables</span>
-            </div>
-        </div>
-
-        <div class="stat-card card-direct">
-            <h3>Collaborateurs directs (N+3)</h3>
-            <div class="stat-valeur-group">
-                <span class="valeur">{{ operateurs_directs_n3|default:"0" }}</span>
-                <span class="unite">opérateurs</span>
-            </div>
-        </div>
-
-        <div class="stat-card card-n1">
-            <h3>Responsables N+1</h3>
-            <div class="stat-valeur-group">
-                <span class="valeur">{{ nbr_n1_total|default:"0" }}</span>
-                <span class="unite">RU</span>
-            </div>
-        </div>
-
-        <div class="stat-card card-n2">
-            <h3>Responsables N+2</h3>
-            <div class="stat-valeur-group">
-                <span class="valeur">{{ nbr_n2_total|default:"0" }}</span>
-                <span class="unite">RU</span>
+                <div class="collars-badges">
+                    <span class="collar-badge blue-collar">
+                        <span class="collar-dot"></span> Blue collars : <strong>{{ somme_ap|default:"0" }}</strong>
+                    </span>
+                    <span class="collar-badge white-collar">
+                        <span class="collar-dot"></span> White collars : <strong>{{ somme_ce|default:"0" }}</strong>
+                    </span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- ===== GRAPHIQUES ===== -->
-    <div class="charts-grid">
+    <!-- ===== ALERTES / PILS ===== -->
+    <div class="alert-strip">
+        <div class="alert-pill">
+            <span class="stat-icon icon-red" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                    </path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ non_valides|default:"0" }} / {{ nbr_n1_total|default:"0" }}</span>
+                <span class="alert-pill-label">RU non validés</span>
+            </div>
+        </div>
+        <div class="alert-pill" data-bs-toggle="modal" data-bs-target="#modalListeN2" style="cursor: pointer;">
+            <span class="stat-icon icon-violet" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_n2_total|default:"0" }}</span>
+                <span class="alert-pill-label">Responsables N+2</span>
+            </div>
+        </div>
+
+        <div class="alert-pill" data-bs-toggle="modal" data-bs-target="#modalDepart" style="cursor: pointer;">
+            <span class="stat-icon icon-red" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M1 21v-2a4 4 0 0 1 4-4h4"></path>
+                    <line x1="17" y1="8" x2="22" y2="13"></line>
+                    <line x1="22" y1="8" x2="17" y2="13"></line>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_departs|default:"0" }}</span>
+                <span class="alert-pill-label">Départs déclarés</span>
+            </div>
+        </div>
+
+        <div class="alert-pill" data-bs-toggle="modal" data-bs-target="#modalChangement" style="cursor: pointer;">
+            <span class="stat-icon icon-amber" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <polyline points="17 1 21 5 17 9"></polyline>
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                    <polyline points="7 23 3 19 7 15"></polyline>
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_changements_non_faits|default:"0" }}</span>
+                <span class="alert-pill-label">Changements en attente</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 3 GRAPHIQUES SUR LA MÊME LIGNE ===== -->
+    <div class="charts-grid charts-grid-3-col">
         <div class="ru-card">
             <h4>Évolution Réel</h4>
             <div class="chart-container">
                 <canvas id="chart-global"></canvas>
             </div>
         </div>
+
         <div class="ru-card">
             <h4>Réel vs Système vs Maquette par RU</h4>
             <div class="chart-container">
                 <canvas id="chart-comparatif"></canvas>
             </div>
         </div>
+
         <div class="ru-card">
             <h4>Réel / Système / Maquette par Lot</h4>
             <div class="chart-container">
                 <canvas id="chart-lot"></canvas>
             </div>
-            <div id="lot-detail-panel" class="lot-detail-panel" style="display:none; margin-top:16px;">
-                <h5 id="lot-detail-title"></h5>
-                <table class="table-ru">
-                    <thead>
-                        <tr>
-                            <th>Nom</th>
-                            <th>Réel</th>
-                            <th>Système</th>
-                            <th>Maquette</th>
-                        </tr>
-                    </thead>
-                    <tbody id="lot-detail-body"></tbody>
-                </table>
-            </div>
+        </div>
+    </div>
+
+    <!-- Panneau de détail du Lot -->
+    <div id="lot-detail-panel" class="ru-card" style="display:none; margin-top: 1.5rem;">
+        <h5 id="lot-detail-title" style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem;"></h5>
+        <div class="table-container">
+            <table class="table-ru">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Réel</th>
+                        <th>Système</th>
+                        <th>Maquette</th>
+                    </tr>
+                </thead>
+                <tbody id="lot-detail-body"></tbody>
+            </table>
         </div>
     </div>
 
     <!-- ===== STATISTIQUES PAR RU ===== -->
-    <div class="section">
+    <div class="section" style="margin-top: 1.5rem;">
         <div class="section-header">
             <h2>Statistiques par responsable d'unité (vue globale)</h2>
             <div class="recherche-ru">
@@ -196,14 +342,232 @@
                     {% endfor %}
                 </tbody>
             </table>
-        </div>
 
-        <div class="pagination-bar" id="pagination-bar">
-            <span class="pagination-info" id="pagination-info"></span>
-            <div class="pagination-controls">
-                <button type="button" id="page-prec" class="pagination-btn">&laquo; Précédent</button>
-                <span class="pagination-pages" id="pagination-pages"></span>
-                <button type="button" id="page-suiv" class="pagination-btn">Suivant &raquo;</button>
+            <div class="pagination-bar" id="pagination-bar">
+                <span class="pagination-info" id="pagination-info"></span>
+                <div class="pagination-controls">
+                    <button type="button" id="page-prec" class="pagination-btn">&laquo; Précédent</button>
+                    <span class="pagination-pages" id="pagination-pages"></span>
+                    <button type="button" id="page-suiv" class="pagination-btn">Suivant &raquo;</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ===== POPUP : DÉPARTS ===== -->
+<div class="modal fade custom-modal" id="modalDepart" tabindex="-1" aria-labelledby="modalDepartLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="modal-title-icon icon-violet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h5 class="modal-title" id="modalDepartLabel">Départs non appliqués</h5>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {% if liste_departs %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom</th>
+                                <th>Lot</th>
+                                <th>Date déclaration</th>
+                                <th>Responsable</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in liste_departs %}
+                            <tr>
+                                <td>{{ d.it }}</td>
+                                <td>{{ d.nom }}</td>
+                                <td>{{ d.lot }}</td>
+                                <td>{{ d.date_declaration|date:"d/m/Y" }}</td>
+                                <td>{{ d.ru|default:"-" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Aucun départ déclaré</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <p class="empty-state-text">Aucun départ trouvé dans le système.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary-custom btn-sm" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ===== POPUP : CHANGEMENTS ===== -->
+<div class="modal fade custom-modal" id="modalChangement" tabindex="-1" aria-labelledby="modalChangementLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="modal-title-icon icon-violet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h5 class="modal-title" id="modalChangementLabel">Changements non appliqués</h5>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {% if liste_changements_non_faits %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom</th>
+                                <th>Date déclaration</th>
+                                <th>Changements détectés</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in liste_changements_non_faits %}
+                            <tr>
+                                <td>{{ c.it }}</td>
+                                <td>{{ c.nom }}</td>
+                                <td>{{ c.date_declaration|date:"d/m/Y" }}</td>
+                                <td>
+                                    <ul class="mb-0 ps-3">
+                                        {% for champ, valeurs in c.diffs.items %}
+                                        <li>{{ champ }} : {{ valeurs.ancien|default:"-" }} &rarr; {{valeurs.nouveau }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Aucun changement en attente</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <p class="empty-state-text">Aucun changement trouvé dans le système.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary-custom btn-sm" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ===== POPUP : LISTE DES N+2 ===== -->
+<div class="modal fade custom-modal" id="modalListeN2" tabindex="-1" aria-labelledby="modalListeN2Label"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="modal-title-icon icon-violet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h5 class="modal-title" id="modalListeN2Label">Responsables N+2</h5>
+                        <p class="modal-subtitle">Liste complète des responsables de niveau N+2</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {% if n2_list %}
+                <div class="table-responsive">
+                    <table class="table modal-custom-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">#</th>
+                                <th>Utilisateur</th>
+                                <th>Nom &amp; Prénom</th>
+                                <th>Matricule</th>
+                                <th>Département</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for n2 in n2_list %}
+                            <tr>
+                                <td class="text-muted fw-medium">{{ forloop.counter }}</td>
+                                <td class="fw-semibold text-primary-dark">{{ n2.it|default:"-" }}</td>
+                                <td class="fw-semibold">{{ n2.nom_complete|default:"-" }}</td>
+                                <td><span class="custom-badge">{{ n2.matricule|default:"-" }}</span></td>
+                                <td class="text-secondary">{{ n2.departement_id|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <p class="empty-state-text">Aucun responsable N+2 trouvé dans le système.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary-custom btn-sm" data-bs-dismiss="modal">Fermer</button>
             </div>
         </div>
     </div>
@@ -220,7 +584,6 @@
 {{ lot_systeme|json_script:"data-lot-systeme" }}
 {{ lot_maquette|json_script:"data-lot-maquette" }}
 {{ lot_details|json_script:"data-lot-details" }}
-
 {% endblock %}
 
 {% block script %}
@@ -231,8 +594,6 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-
-        // Enregistrement global du plugin datalabels
         if (typeof ChartDataLabels !== "undefined") {
             Chart.register(ChartDataLabels);
         }
@@ -247,21 +608,44 @@
             }
         }
 
-        // Config datalabels réutilisable pour tous les bar charts
-        var datalabelsConfig = {
-            anchor: "end",
-            align: "top",
-            offset: 2,
-            color: "#374151",
-            font: { size: 10, weight: "bold" },
-            formatter: function (value) {
-                return (value !== null && value !== undefined && value > 0) ? value : "";
+        function echapperHtml(texte) {
+            var div = document.createElement("div");
+            div.textContent = texte == null ? "" : String(texte);
+            return div.innerHTML;
+        }
+
+        var tooltipConfig = {
+            enabled: true,
+            mode: "index",
+            intersect: false,
+            backgroundColor: "rgba(16, 24, 40, 0.95)",
+            titleColor: "#ffffff",
+            titleFont: { size: 13, weight: "bold" },
+            titleMarginBottom: 8,
+            bodyColor: "#e5e7eb",
+            bodyFont: { size: 12 },
+            padding: 12,
+            cornerRadius: 8,
+            boxPadding: 4,
+            usePointStyle: true,
+            callbacks: {
+                title: function (items) {
+                    return items.length ? items[0].label : "";
+                },
+                label: function (context) {
+                    var valeur = context.parsed.y;
+                    var texte = (valeur !== null && valeur !== undefined)
+                        ? valeur.toLocaleString("fr-FR")
+                        : "-";
+                    return " " + context.dataset.label + ": " + texte;
+                },
+                labelPointStyle: function () {
+                    return { pointStyle: "rect", rotation: 0 };
+                }
             }
         };
 
-        // ==============================================================
         // 1. Évolution Réel
-        // ==============================================================
         var chartLabelsData = lireJson("data-chart-labels", []);
         var chartValuesData = lireJson("data-chart-values", []);
 
@@ -274,11 +658,11 @@
                     datasets: [{
                         label: "Évolution Réel",
                         data: chartValuesData,
-                        borderColor: "#2563eb",
-                        backgroundColor: "rgba(37, 99, 235, 0.1)",
+                        borderColor: "#2C5F8A",
+                        backgroundColor: "rgba(44, 95, 138, 0.1)",
                         fill: true,
                         tension: 0.3,
-                        pointBackgroundColor: "#2563eb",
+                        pointBackgroundColor: "#2C5F8A",
                         pointRadius: 4
                     }]
                 },
@@ -287,23 +671,15 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false },
-                        datalabels: {
-                            align: "top",
-                            anchor: "end",
-                            offset: 6,
-                            color: "#2563eb",
-                            font: { size: 11, weight: "bold" },
-                            formatter: function (value) { return value; }
-                        }
+                        datalabels: { display: false },
+                        tooltip: tooltipConfig
                     },
                     scales: { y: { beginAtZero: true } }
                 }
             });
         }
 
-        // ==============================================================
-        // 2. Comparatif RU (Réel / Système / Maquette)
-        // ==============================================================
+        // 2. Comparatif RU
         var labelsRu = lireJson("data-labels-ru", []);
         var dataReel = lireJson("data-reel", []);
         var dataSysteme = lireJson("data-systeme", []);
@@ -316,27 +692,27 @@
                 data: {
                     labels: labelsRu,
                     datasets: [
-                        { label: "Réel", data: dataReel, backgroundColor: "#dc2626", barThickness: 10, minBarLength: 3 },
-                        { label: "Système", data: dataSysteme, backgroundColor: "#16a34a", barThickness: 10, minBarLength: 3 },
-                        { label: "Maquette", data: dataMaquette, backgroundColor: "#f59e0b", barThickness: 10, minBarLength: 3 }
+                        { label: "Réel", data: dataReel, backgroundColor: "#2C5F8A", barThickness: 8, minBarLength: 3 },
+                        { label: "Système", data: dataSysteme, backgroundColor: "#15805F", barThickness: 8, minBarLength: 3 },
+                        { label: "Maquette", data: dataMaquette, backgroundColor: "#B0741C", barThickness: 8, minBarLength: 3 }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    layout: { padding: { top: 20 } },
+                    layout: { padding: { top: 10 } },
+                    interaction: { mode: "index", intersect: false },
                     plugins: {
                         legend: { display: true, position: "top" },
-                        datalabels: datalabelsConfig
+                        datalabels: { display: false },
+                        tooltip: tooltipConfig
                     },
                     scales: { y: { beginAtZero: true } }
                 }
             });
         }
 
-        // ==============================================================
         // 3. Réel / Système / Maquette par Lot
-        // ==============================================================
         var lotDetails = lireJson("data-lot-details", {});
         var lotLabels = lireJson("data-lot-labels", []);
         var lotReel = lireJson("data-lot-reel", []);
@@ -352,21 +728,24 @@
                 data: {
                     labels: lotLabels,
                     datasets: [
-                        { label: "Réel", data: lotReel, backgroundColor: "#dc2626", minBarLength: 3 },
-                        { label: "Système", data: lotSysteme, backgroundColor: "#16a34a", minBarLength: 3 },
-                        { label: "Maquette", data: lotMaquette, backgroundColor: "#f59e0b", minBarLength: 3 }
+                        { label: "Réel", data: lotReel, backgroundColor: "#2C5F8A", minBarLength: 3 },
+                        { label: "Système", data: lotSysteme, backgroundColor: "#15805F", minBarLength: 3 },
+                        { label: "Maquette", data: lotMaquette, backgroundColor: "#B0741C", minBarLength: 3 }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    layout: { padding: { top: 20 } },
+                    layout: { padding: { top: 10 } },
+                    interaction: { mode: "index", intersect: false },
                     plugins: {
                         legend: { display: true, position: "top" },
-                        datalabels: datalabelsConfig
+                        datalabels: { display: false },
+                        tooltip: tooltipConfig
                     },
                     scales: { y: { beginAtZero: true } },
                     onClick: function (evt) {
+                        if (!chartLot) return;
                         var points = chartLot.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
                         if (!points.length) return;
                         var idx = points[0].index;
@@ -381,7 +760,7 @@
             var panel = document.getElementById("lot-detail-panel");
             var title = document.getElementById("lot-detail-title");
             var body = document.getElementById("lot-detail-body");
-
+            if (!panel || !title || !body) return;
             var contributeurs = lotDetails[lotLabel] || [];
 
             title.textContent = "Détail du lot " + lotLabel + " (" + contributeurs.length + " contributeur(s))";
@@ -392,7 +771,7 @@
             } else {
                 contributeurs.forEach(function (c) {
                     var tr = document.createElement("tr");
-                    tr.innerHTML = "<td>" + (c.nom || '-') + "</td><td>" + (c.reel || 0) + "</td><td>" + (c.systeme || 0) + "</td><td>" + (c.maquette || 0) + "</td>";
+                    tr.innerHTML = "<td>" + echapperHtml(c.nom || '-') + "</td><td>" + echapperHtml(c.reel || 0) + "</td><td>" + echapperHtml(c.systeme || 0) + "</td><td>" + echapperHtml(c.maquette || 0) + "</td>";
                     body.appendChild(tr);
                 });
             }
@@ -401,9 +780,7 @@
             panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
 
-        // ==============================================================
-        // Recherche et Pagination dynamiques
-        // ==============================================================
+        // Recherche & Pagination
         var rechercheInput = document.getElementById("recherche-ru");
         var tbody = document.getElementById("corps-tableau-ru");
 

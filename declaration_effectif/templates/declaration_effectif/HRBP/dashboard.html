@@ -21,13 +21,25 @@
         <div class="actions-bar d-flex gap-2 align-items-center">
             <div class="date-badge">
                 <i class="far fa-calendar-alt me-2"></i>
-                <span>{{ today|default:"29 Août 2026" }}</span>
+                <span>{{ today|date:"d M Y" }}</span>
             </div>
-        </div>
-        <div class="actions-bar d-flex gap-2 align-items-center">
             <a href="{% url 'export_effectif_reel' %}" class="btn btn-outline-primary btn-sm">
-                <i class="fas fa-file-excel me-2"></i>Exporter le réel
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Exporter le réel
             </a>
+            <button type="button" class="btn-departs-changements position-relative" data-bs-toggle="modal"
+                data-bs-target="#modalDepartsChangements">
+                <i class="fas fa-people-arrows"></i>
+                Départs &amp; changements
+                {% if nbr_departs_total or nbr_changements_total %}
+                <span class="badge-count">{{ nbr_departs_total|add:nbr_changements_total|default:0 }}</span>
+                {% endif %}
+            </button>
         </div>
     </div>
 
@@ -41,9 +53,12 @@
                 <span class="kpi-title">Effectif Réel</span>
                 <div class="kpi-val-group">
                     <span class="kpi-value">{{ colReel|default:0 }}</span>
-                    {% if MR > 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MR}}</span>
+                    {% if MR > 0 %}
+                    <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MR }}</span>
+                    {% elif MR < 0 %} <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i> {{ MR
+                        }}</span>
                         {% else %}
-                        <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i> {{ MR }}</span>
+                        <span class="status-badge neutral">0</span>
                         {% endif %}
                 </div>
             </div>
@@ -56,10 +71,13 @@
             <div class="kpi-content">
                 <span class="kpi-title">Effectif Système</span>
                 <div class="kpi-val-group">
-                    <span class="kpi-value">{{ colSyst|default:"3496" }}</span>
-                    {% if MS > 0 %} <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MS}}</span>
+                    <span class="kpi-value">{{ colSyst|default:"0" }}</span>
+                    {% if MS > 0 %}
+                    <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MS }}</span>
+                    {% elif MS < 0 %} <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i> {{ MS
+                        }}</span>
                         {% else %}
-                        <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i>{{ MS }}</span>
+                        <span class="status-badge neutral">0</span>
                         {% endif %}
                 </div>
             </div>
@@ -72,7 +90,7 @@
             <div class="kpi-content">
                 <span class="kpi-title">Effectif Maquette</span>
                 <div class="kpi-val-group">
-                    <span class="kpi-value">{{ maquette|default:"3501" }}</span>
+                    <span class="kpi-value">{{ maquette|default:"0" }}</span>
                     <span class="status-badge neutral">Cible</span>
                 </div>
             </div>
@@ -86,6 +104,18 @@
                 <span class="kpi-title">Total Départs</span>
                 <div class="kpi-val-group">
                     <span class="kpi-value">{{ depart_TOT|default:"0" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon-wrapper icon-amber">
+                <i class="fas fa-triangle-exclamation"></i>
+            </div>
+            <div class="kpi-content">
+                <span class="kpi-title">RU non validés</span>
+                <div class="kpi-val-group">
+                    <span class="kpi-value">{{ non_valides|default:"0" }} / {{ ru_total|default:"0" }}</span>
                 </div>
             </div>
         </div>
@@ -155,98 +185,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-muted text-center py-3">Aucune donnée disponible</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- 3. Départs & Changements -->
-    <div class="list-grid mt-4">
-        <!-- Derniers départs -->
-        <div class="card-panel">
-            <div class="panel-header mb-3 d-flex justify-content-between align-items-center">
-                <h2 class="panel-title mb-0">Derniers Départs</h2>
-                <form method="GET" class="d-flex align-items-center gap-2">
-                    {% if date_changement %}
-                    <input type="hidden" name="date_changement" value="{{ date_changement }}">
-                    {% endif %}
-                    <input type="date" name="date_depart" value="{{ date_depart }}" class="form-control form-control-sm"
-                        onchange="this.form.submit()">
-                    {% if date_depart %}
-                    <a href="?{% if date_changement %}date_changement={{ date_changement }}{% endif %}"
-                        class="btn btn-sm btn-outline-secondary" title="Réinitialiser"><i class="fas fa-times"></i></a>
-                    {% endif %}
-                </form>
-            </div>
-            <div class="table-responsive">
-                <table class="table-dept">
-                    <thead>
-                        <tr>
-                            <th>Collaborateur</th>
-                            <th>Département</th>
-                            <th>Date</th>
-                            <th>Déclaré par</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for dep in liste_departs %}
-                        <tr>
-                            <td class="dept-name">{{ dep.collaborateur_it }}</td>
-                            <td class="text-muted">{{ dep.collaborateur_it.departement.abreviation }}</td>
-                            <td>{{ dep.date|date:"d/m/Y" }}</td>
-                            <td class="text-muted">{{ dep.Ru }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-muted text-center py-3">Aucun départ trouvé</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Derniers changements d'affectation -->
-        <div class="card-panel">
-            <div class="panel-header mb-3 d-flex justify-content-between align-items-center">
-                <h2 class="panel-title mb-0">Derniers Changements d'Affectation</h2>
-                <form method="GET" class="d-flex align-items-center gap-2">
-                    {% if date_depart %}
-                    <input type="hidden" name="date_depart" value="{{ date_depart }}">
-                    {% endif %}
-                    <input type="date" name="date_changement" value="{{ date_changement }}"
-                        class="form-control form-control-sm" onchange="this.form.submit()">
-                    {% if date_changement %}
-                    <a href="?{% if date_depart %}date_depart={{ date_depart }}{% endif %}"
-                        class="btn btn-sm btn-outline-secondary" title="Réinitialiser"><i class="fas fa-times"></i></a>
-                    {% endif %}
-                </form>
-            </div>
-            <div class="table-responsive">
-                <table class="table-dept">
-                    <thead>
-                        <tr>
-                            <th>Collaborateur</th>
-                            <th>Ancien Ru</th>
-                            <th>Nouveau Ru</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for chg in liste_changements %}
-                        <tr>
-                            <td class="dept-name">{{ chg.collaborateur_it }}</td>
-                            <td class="text-muted">{{ chg.Ru }}</td>
-                            <td class="text-muted">{{ chg.nv_Ru }}</td>
-                            <td>{{ chg.date|date:"d/m/Y" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-muted text-center py-3">Aucun changement trouvé</td>
+                            <td colspan="6" class="text-muted text-center py-3">Aucune donnée disponible</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -256,6 +195,144 @@
     </div>
 
 </div>
+
+<!-- ===== POPUP : DÉPARTS & CHANGEMENTS ===== -->
+<div class="modal fade" id="modalDepartsChangements" tabindex="-1" aria-labelledby="modalDepartsChangementsLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDepartsChangementsLabel">
+                    <i class="fas fa-people-arrows"></i>
+                    Départs et changements d'affectation
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="dcTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="tab-departs-btn" data-bs-toggle="tab"
+                            data-bs-target="#tab-departs" type="button" role="tab" aria-controls="tab-departs"
+                            aria-selected="true">
+                            <i class="fas fa-user-minus"></i>
+                            Départs <span class="badge bg-secondary">{{ nbr_departs_total|default:"0" }}</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-changements-btn" data-bs-toggle="tab"
+                            data-bs-target="#tab-changements" type="button" role="tab" aria-controls="tab-changements"
+                            aria-selected="false">
+                            <i class="fas fa-right-left"></i>
+                            Changements <span class="badge bg-secondary">{{ nbr_changements_total|default:"0" }}</span>
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content pt-3" id="dcTabsContent">
+                    <!-- Onglet Départs -->
+                    <div class="tab-pane fade show active" id="tab-departs" role="tabpanel"
+                        aria-labelledby="tab-departs-btn">
+
+                        <form method="GET" class="tab-filter-form">
+                            <input type="hidden" name="tab" value="departs">
+                            {% if date_changement %}
+                            <input type="hidden" name="date_changement" value="{{ date_changement }}">
+                            {% endif %}
+                            <label class="text-muted small mb-0"><i class="far fa-calendar-alt me-1"></i>Filtrer par
+                                date</label>
+                            <input type="date" name="date_depart" value="{{ date_depart }}"
+                                class="form-control form-control-sm" onchange="this.form.submit()">
+                            {% if date_depart %}
+                            <a href="?tab=departs{% if date_changement %}&date_changement={{ date_changement }}{% endif %}"
+                                class="btn btn-sm btn-outline-secondary" title="Réinitialiser"><i
+                                    class="fas fa-times"></i></a>
+                            {% endif %}
+                        </form>
+
+                        <div class="table-responsive">
+                            <table class="table-dept">
+                                <thead>
+                                    <tr>
+                                        <th>Collaborateur</th>
+                                        <th>Département</th>
+                                        <th>Date</th>
+                                        <th>Déclaré par</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for dep in liste_departs %}
+                                    <tr>
+                                        <td class="dept-name">{{ dep.collaborateur_it }}</td>
+                                        <td class="text-muted">{{ dep.collaborateur_it.departement.abreviation }}</td>
+                                        <td>{{ dep.date|date:"d/m/Y" }}</td>
+                                        <td class="text-muted">{{ dep.Ru }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-muted text-center py-3">Aucun départ trouvé</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Onglet Changements -->
+                    <div class="tab-pane fade" id="tab-changements" role="tabpanel"
+                        aria-labelledby="tab-changements-btn">
+
+                        <form method="GET" class="tab-filter-form">
+                            <input type="hidden" name="tab" value="changements">
+                            {% if date_depart %}
+                            <input type="hidden" name="date_depart" value="{{ date_depart }}">
+                            {% endif %}
+                            <label class="text-muted small mb-0"><i class="far fa-calendar-alt me-1"></i>Filtrer par
+                                date</label>
+                            <input type="date" name="date_changement" value="{{ date_changement }}"
+                                class="form-control form-control-sm" onchange="this.form.submit()">
+                            {% if date_changement %}
+                            <a href="?tab=changements{% if date_depart %}&date_depart={{ date_depart }}{% endif %}"
+                                class="btn btn-sm btn-outline-secondary" title="Réinitialiser"><i
+                                    class="fas fa-times"></i></a>
+                            {% endif %}
+                        </form>
+
+                        <div class="table-responsive">
+                            <table class="table-dept">
+                                <thead>
+                                    <tr>
+                                        <th>Collaborateur</th>
+                                        <th>Ancien Ru</th>
+                                        <th>Nouveau Ru</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for chg in liste_changements %}
+                                    <tr>
+                                        <td class="dept-name">{{ chg.collaborateur_it }}</td>
+                                        <td class="text-muted">{{ chg.Ru }}</td>
+                                        <td class="text-muted">{{ chg.nv_Ru }}</td>
+                                        <td>{{ chg.date|date:"d/m/Y" }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-muted text-center py-3">Aucun changement trouvé</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block script %}
@@ -273,10 +350,10 @@
             new Chart(chartCtx, {
                 type: 'line',
                 data: {
-                    labels: {{labels|safe}},
+                    labels: {{ labels| safe }},
         datasets: [{
             label: 'Effectif réel',
-            data: {{valeurs|safe}},
+            data: {{ valeurs| safe }},
         borderColor: '#2563eb',
         borderWidth: 2.5,
         pointBackgroundColor: '#2563eb',
@@ -310,6 +387,23 @@
                 }
             });
         }
+
+    // Rouvre la popup Départs/Changements et le bon onglet après un
+    // filtrage par date (le formulaire GET recharge la page).
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('date_depart') || params.has('date_changement') || params.has('tab')) {
+        const modalEl = document.getElementById('modalDepartsChangements');
+        if (modalEl && window.bootstrap) {
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+            if (params.get('tab') === 'changements') {
+                const trigger = document.getElementById('tab-changements-btn');
+                if (trigger) {
+                    new bootstrap.Tab(trigger).show();
+                }
+            }
+        }
+    }
     });
 </script>
 {% endblock %}

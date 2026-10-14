@@ -1,90 +1,263 @@
 {% extends 'utilisateur/navbar_N1.html' %}
 {% load static %}
 
-{% block title %}Liste Collaborateurs{% endblock %}
+{% block title %}Liste des Collaborateurs - MODULA{% endblock %}
 
 {% block css %}
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="{% static 'utilisateur/css/N1/liste.css' %}">
+<style>
+    /* ===== Combobox recherchable pour le filtre RU ===== */
+    .ru-combobox {
+        position: relative;
+    }
+
+    .ru-combobox-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        cursor: pointer;
+        min-width: 220px;
+        text-align: left;
+    }
+
+    .ru-combobox-trigger span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ru-combobox-caret {
+        flex-shrink: 0;
+        font-size: 0.75rem;
+        color: var(--text-subtle, #94a3b8);
+        transition: transform 0.15s ease;
+    }
+
+    .ru-combobox.open .ru-combobox-trigger {
+        border-color: var(--primary, #2563eb);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .ru-combobox.open .ru-combobox-caret {
+        transform: rotate(180deg);
+    }
+
+    .ru-combobox-panel {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        width: 280px;
+        max-width: 90vw;
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-color, #e2e8f0);
+        border-radius: var(--radius-md, 8px);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+        z-index: 40;
+        overflow: hidden;
+    }
+
+    .ru-combobox-search {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid var(--border-light, #f1f5f9);
+    }
+
+    .ru-combobox-search i {
+        color: var(--text-subtle, #94a3b8);
+        font-size: 0.8rem;
+    }
+
+    .ru-combobox-search input {
+        flex: 1;
+        border: none;
+        outline: none;
+        font-size: 0.875rem;
+        color: var(--text-main, #0f172a);
+        background: transparent;
+    }
+
+    .ru-combobox-list {
+        list-style: none;
+        margin: 0;
+        padding: 0.35rem 0;
+        max-height: 260px;
+        overflow-y: auto;
+    }
+
+    .ru-combobox-option {
+        padding: 0.55rem 0.9rem;
+        font-size: 0.875rem;
+        color: var(--text-main, #0f172a);
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .ru-combobox-option:hover {
+        background-color: var(--bg-subtle, #f1f5f9);
+    }
+
+    .ru-combobox-option.active {
+        background-color: var(--primary-light, #eff6ff);
+        color: var(--primary, #2563eb);
+        font-weight: 600;
+    }
+
+    .ru-combobox-option.hidden-option {
+        display: none;
+    }
+
+    .ru-combobox-empty {
+        padding: 0.85rem;
+        text-align: center;
+        font-size: 0.8125rem;
+        color: var(--text-subtle, #94a3b8);
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="operateurs-container">
-    <header class="header">
-        <h1>Collaborateurs</h1>
-        <div class="time">
-            <span id="counter" aria-live="polite">Total : {{ total_r }}</span>
-        </div>
+<div class="page-container">
+
+    <!-- En-tête épuré MODULA -->
+    <header class="header-section">
+        <h1><i class="fa-solid fa-user-group me-2 icon-black"></i>Liste des Collaborateurs</h1>
+        <p>Consultez, recherchez et filtrez l'annuaire complet des collaborateurs</p>
     </header>
-    <!-- Filters Section -->
-    <div class="filters-section">
-        <div class="filter-group">
-            <input type="text" placeholder="Rechercher par matricule ou nom" class="filter-input search-input"
-                id="search">
 
-            <select class="filter-select" id="choix">
-                <option value="">Tous les lots</option>
-                <option value="A">Lot A</option>
-                <option value="O">Lot O</option>
-                <option value="P">Lot P</option>
-                <option value="E">Lot E</option>
-                <option value="C">Lot C</option>
-            </select>
+    <!-- Carte principale -->
+    <div class="content-card">
 
-            <select class="filter-select" id="ru">
-                <option value="">Tous les RU</option>
-                {% for ru_it_val, ru_nom in ru_choices %}
-                <option value="{{ ru_it_val }}">{{ ru_nom }}</option>
-                {% endfor %}
-            </select>
+        <!-- Barre d'outils / Filtres -->
+        <div class="toolbar">
+            <div class="filters-left">
 
-            <input type="date" class="filter-input date-input" id="date">
+                <!-- Recherche par matricule / nom -->
+                <div class="filter-item">
+                    <div class="search-box">
+                        <input type="text" id="search" class="input-control"
+                            placeholder="Matricule, nom ou prénom..." />
+                    </div>
+                </div>
 
-            <button class="btn btn-reset" id="resetBtn">
-                <i class="fas fa-redo me-2"></i>Réinitialiser
-            </button>
+                <!-- Filtre Lot -->
+                <div class="filter-item">
+                    <select class="input-control select-control" id="choix">
+                        <option value=""> Tous les lots</option>
+                        <option value="A"> Lot A</option>
+                        <option value="O"> Lot O</option>
+                        <option value="P"> Lot P</option>
+                        <option value="E"> Lot E</option>
+                        <option value="C"> Lot C</option>
+                    </select>
+                </div>
+
+                <!-- Filtre Responsable d'Unité (RU) — combobox recherchable -->
+                <div class="filter-item">
+                    <div class="ru-combobox" id="ruCombobox">
+                        <button type="button" class="input-control select-control ru-combobox-trigger" id="ruTrigger"
+                            aria-haspopup="listbox" aria-expanded="false">
+                            <span id="ruTriggerLabel">Tous les RU</span>
+                            <i class="fa-solid fa-chevron-down ru-combobox-caret"></i>
+                        </button>
+
+                        <div class="ru-combobox-panel" id="ruPanel" hidden>
+                            <div class="ru-combobox-search">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="ruSearch" placeholder="Rechercher un RU...">
+                            </div>
+                            <ul class="ru-combobox-list" id="ruList" role="listbox">
+                                <li class="ru-combobox-option active" data-value="">Tous les RU</li>
+                                {% for ru_it_val, ru_nom in ru_choices %}
+                                <li class="ru-combobox-option" data-value="{{ ru_it_val }}">{{ ru_nom }}</li>
+                                {% endfor %}
+                            </ul>
+                            <div class="ru-combobox-empty" id="ruEmpty" hidden>Aucun RU trouvé</div>
+                        </div>
+
+                        <!-- Valeur réelle du filtre : conservée pour rester compatible
+                             avec la logique JS existante (ruSelect.value / applyFilters) -->
+                        <select id="ru" hidden>
+                            <option value="">Tous les RU</option>
+                            {% for ru_it_val, ru_nom in ru_choices %}
+                            <option value="{{ ru_it_val }}">{{ ru_nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Filtre Date -->
+                <div class="filter-item">
+                    <input type="date" class="input-control" id="date">
+                </div>
+            </div>
+
+            <!-- Bouton Réinitialiser -->
+            <div>
+                <button type="button" class="btn-secondary" id="resetBtn">
+                    <i class="fa-solid fa-rotate-left"></i> Réinitialiser
+                </button>
+            </div>
+            <div class="badge-status-info">
+                <i class="fa-solid fa-user-group"></i>
+                <span><strong id="counter">{{ total_r|default:"0" }}</strong> collaborateurs</span>
+            </div>
         </div>
-    </div>
 
-    <!-- Table Section -->
-    <div class="table-container">
-        <table class="table-operateurs">
-            <thead>
-                <tr>
-                    <th>Matricule</th>
-                    <th>Utilisateur</th>
-                    <th>Nom & Prénom</th>
-                    <th>Lot</th>
-                    <th>RU</th>
-                    <th>DPT</th>
-                </tr>
-            </thead>
-            <tbody id="result">
-                {% for operateur in collaborateur %}
-                <tr class="table-row">
-                    <td class="cell-matricule">{{ operateur.matricule }}</td>
-                    <td class="cell-utilisateur">{{ operateur.it }}</td>
-                    <td class="cell-nom">{{ operateur.nom_complete }}</td>
-                    <td class="cell-lot">{{ operateur.lot }}</td>
-                    <td class="cell-lot">{{ operateur.ru_it.nom_complete }}</td>
-                    <td class="cell-lot">{{ operateur.departement.abreviation }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="empty-row">
-                        <i class="fas fa-inbox"></i> Aucun opérateur trouvé
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        <!-- Tableau des données -->
+        <div class="table-responsive">
+            <table class="enterprise-table">
+                <thead>
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Utilisateur</th>
+                        <th>Nom & Prénom</th>
+                        <th class="text-center">Lot</th>
+                        <th>Responsable (RU)</th>
+                        <th>Département</th>
+                    </tr>
+                </thead>
+                <tbody id="result">
+                    {% for operateur in collaborateur %}
+                    <tr class="table-row">
+                        <td class="font-mono">{{ operateur.matricule }}</td>
+                        <td class="font-mono">{{ operateur.it }}</td>
+                        <td class="font-medium">
+                            <i class="fa-regular fa-circle-user text-muted me-1"></i>
+                            {{ operateur.nom_complete }}
+                        </td>
+                        <td class="text-center">
+                            <span class="lot-badge">{{ operateur.lot }}</span>
+                        </td>
+                        <td>{{ operateur.ru_it.nom_complete }}</td>
+                        <td class="font-mono">{{ operateur.departement.abreviation }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <i class="fa-solid fa-users-slash"></i>
+                            <div>Aucun collaborateur trouvé.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-    <!-- Pagination -->
-    <div class="pagination-container" id="pagination"></div>
+        <!-- Pagination dynamique JS -->
+        <div class="table-footer">
+            <ul class="pagination" id="pagination"></ul>
+        </div>
+
+    </div>
 </div>
 {% endblock %}
+
 {% block script %}
 {{ block.super }}
 <script>
@@ -102,7 +275,6 @@
         let currentPage = 1;
         let debounceTimer = null;
 
-        // Date du jour par défaut
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, "0");
@@ -110,7 +282,6 @@
         const defaultDate = `${year}-${month}-${day}`;
         dateInput.value = defaultDate;
 
-        // Échappement XSS
         function escapeHtml(text) {
             if (text === null || text === undefined) return '';
             const map = {
@@ -124,23 +295,29 @@
         }
 
         function renderRows(results) {
-            if (!results.length) {
+            if (!results || !results.length) {
                 resultat.innerHTML = `
                     <tr>
-                        <td colspan="6" class="empty-row">
-                            <i class="fas fa-inbox"></i> Aucun opérateur trouvé
+                        <td colspan="6" class="empty-state">
+                            <i class="fa-solid fa-users-slash"></i>
+                            <div>Aucun collaborateur trouvé.</div>
                         </td>
                     </tr>`;
                 return;
             }
             resultat.innerHTML = results.map(c => `
                 <tr class="table-row">
-                    <td class="cell-matricule">${escapeHtml(c.matricule)}</td>
-                    <td class="cell-utilisateur">${escapeHtml(c.it)}</td>
-                    <td class="cell-nom">${escapeHtml(c.nom_complete)}</td>
-                    <td class="cell-lot">${escapeHtml(c.lot)}</td>
-                    <td class="cell-lot">${escapeHtml(c.ru_nom)}</td>
-                    <td class="cell-lot">${escapeHtml(c.departement)}</td>
+                    <td class="font-mono">${escapeHtml(c.matricule)}</td>
+                    <td class="font-mono">${escapeHtml(c.it)}</td>
+                    <td class="font-medium">
+                        <i class="fa-regular fa-circle-user text-muted me-1"></i>
+                        ${escapeHtml(c.nom_complete)}
+                    </td>
+                    <td class="text-center">
+                        <span class="lot-badge">${escapeHtml(c.lot || '-')}</span>
+                    </td>
+                    <td>${escapeHtml(c.ru_nom || '—')}</td>
+                    <td class="font-mono">${escapeHtml(c.departement || '—')}</td>
                 </tr>
             `).join("");
         }
@@ -152,31 +329,47 @@
             }
 
             let html = "";
-            html += `<button class="page-btn" data-page="${page - 1}" ${hasPrev ? "" : "disabled"}>&laquo; Précédent</button>`;
+
+            // Précédent
+            if (hasPrev) {
+                html += `<li><a class="page-link" href="#" data-page="${page - 1}"><i class="fa-solid fa-chevron-left"></i></a></li>`;
+            } else {
+                html += `<li><span class="page-link disabled"><i class="fa-solid fa-chevron-left"></i></span></li>`;
+            }
 
             const start = Math.max(1, page - 2);
             const end = Math.min(numPages, page + 2);
 
             if (start > 1) {
-                html += `<button class="page-btn" data-page="1">1</button>`;
-                if (start > 2) html += `<span class="page-ellipsis">…</span>`;
+                html += `<li><a class="page-link" data-page="1" href="#">1</a></li>`;
+                if (start > 2) html += `<li><span class="page-link disabled">…</span></li>`;
             }
 
             for (let p = start; p <= end; p++) {
-                html += `<button class="page-btn ${p === page ? "active" : ""}" data-page="${p}">${p}</button>`;
+                if (p === page) {
+                    html += `<li><span class="page-link active">${p}</span></li>`;
+                } else {
+                    html += `<li><a class="page-link" data-page="${p}" href="#">${p}</a></li>`;
+                }
             }
 
             if (end < numPages) {
-                if (end < numPages - 1) html += `<span class="page-ellipsis">…</span>`;
-                html += `<button class="page-btn" data-page="${numPages}">${numPages}</button>`;
+                if (end < numPages - 1) html += `<li><span class="page-link disabled">…</span></li>`;
+                html += `<li><a class="page-link" data-page="${numPages}" href="#">${numPages}</a></li>`;
             }
 
-            html += `<button class="page-btn" data-page="${page + 1}" ${hasNext ? "" : "disabled"}>Suivant &raquo;</button>`;
+            // Suivant
+            if (hasNext) {
+                html += `<li><a class="page-link" href="#" data-page="${page + 1}"><i class="fa-solid fa-chevron-right"></i></a></li>`;
+            } else {
+                html += `<li><span class="page-link disabled"><i class="fa-solid fa-chevron-right"></i></span></li>`;
+            }
 
             pagination.innerHTML = html;
 
-            pagination.querySelectorAll(".page-btn:not([disabled])").forEach(btn => {
-                btn.addEventListener("click", () => {
+            pagination.querySelectorAll("a.page-link").forEach(btn => {
+                btn.addEventListener("click", (e) => {
+                    e.preventDefault();
                     currentPage = Number(btn.dataset.page);
                     applyFilters();
                 });
@@ -201,15 +394,16 @@
                 })
                 .then(data => {
                     renderRows(data.results);
-                    counter.textContent = `Total : ${data.total_r}`;
+                    if (counter) counter.textContent = data.total_r;
                     renderPagination(data.page, data.num_pages, data.has_previous, data.has_next);
                 })
                 .catch(err => {
                     console.error(err);
                     resultat.innerHTML = `
                         <tr>
-                            <td colspan="6" class="empty-row">
-                                <i class="fas fa-exclamation-triangle"></i> Erreur de chargement
+                            <td colspan="6" class="empty-state">
+                                <i class="fa-solid fa-triangle-exclamation text-danger"></i>
+                                <div>Erreur lors du chargement des collaborateurs.</div>
                             </td>
                         </tr>`;
                 });
@@ -225,16 +419,97 @@
 
         searchInput.addEventListener("input", debouncedApplyFilters);
         lotSelect.addEventListener("change", () => { currentPage = 1; applyFilters(); });
-        ruSelect.addEventListener("change", () => { currentPage = 1; applyFilters(); });
         dateInput.addEventListener("change", () => { currentPage = 1; applyFilters(); });
 
         resetBtn.addEventListener("click", () => {
             searchInput.value = "";
             lotSelect.value = "";
-            ruSelect.value = "";
             dateInput.value = defaultDate;
+            setRuValue("", "Tous les RU");
             currentPage = 1;
             applyFilters();
+        });
+
+        /* =========================================================
+           COMBOBOX RECHERCHABLE : FILTRE RU
+           ========================================================= */
+        const ruCombobox = document.getElementById("ruCombobox");
+        const ruTrigger = document.getElementById("ruTrigger");
+        const ruTriggerLabel = document.getElementById("ruTriggerLabel");
+        const ruPanel = document.getElementById("ruPanel");
+        const ruSearch = document.getElementById("ruSearch");
+        const ruList = document.getElementById("ruList");
+        const ruEmpty = document.getElementById("ruEmpty");
+        const ruOptions = Array.from(ruList.querySelectorAll(".ru-combobox-option"));
+
+        function normaliser(texte) {
+            return String(texte)
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+        }
+
+        function setRuValue(value, label) {
+            ruSelect.value = value;
+            ruTriggerLabel.textContent = label;
+            ruOptions.forEach(opt => {
+                opt.classList.toggle("active", opt.dataset.value === value);
+            });
+        }
+
+        function openRuPanel() {
+            ruPanel.hidden = false;
+            ruCombobox.classList.add("open");
+            ruTrigger.setAttribute("aria-expanded", "true");
+            ruSearch.value = "";
+            filterRuOptions("");
+            ruSearch.focus();
+        }
+
+        function closeRuPanel() {
+            ruPanel.hidden = true;
+            ruCombobox.classList.remove("open");
+            ruTrigger.setAttribute("aria-expanded", "false");
+        }
+
+        function filterRuOptions(terme) {
+            const requete = normaliser(terme.trim());
+            let visibles = 0;
+            ruOptions.forEach(opt => {
+                const correspond = requete === "" || normaliser(opt.textContent).includes(requete);
+                opt.classList.toggle("hidden-option", !correspond);
+                if (correspond) visibles++;
+            });
+            ruEmpty.hidden = visibles > 0;
+        }
+
+        ruTrigger.addEventListener("click", () => {
+            if (ruPanel.hidden) {
+                openRuPanel();
+            } else {
+                closeRuPanel();
+            }
+        });
+
+        ruSearch.addEventListener("input", () => filterRuOptions(ruSearch.value));
+
+        ruList.addEventListener("click", (e) => {
+            const option = e.target.closest(".ru-combobox-option");
+            if (!option) return;
+            setRuValue(option.dataset.value, option.textContent.trim());
+            closeRuPanel();
+            currentPage = 1;
+            applyFilters();
+        });
+
+        document.addEventListener("click", (e) => {
+            if (!ruCombobox.contains(e.target)) {
+                closeRuPanel();
+            }
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") closeRuPanel();
         });
 
         applyFilters();

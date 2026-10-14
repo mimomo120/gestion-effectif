@@ -1,19 +1,23 @@
 {% extends 'utilisateur/navbar_N1.html' %}
 {% load static %}
 
-{% block title %}Gestion des affectations{% endblock %}
+{% block title %}Liste des Affectations{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'utilisateur/css/N2/affectation.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 {% endblock %}
 
 {% block content %}
 <div class="affectations-container">
+
+    <!-- En-tête de la page -->
     <header class="header">
-        <h1>Gestion des affectations</h1>
+        <h1><i class="fa-solid fa-rotate"></i> Liste des Affectations</h1>
+        <p class="subtitle">Consultez et filtrez les affectations des collaborateurs entre unités</p>
     </header>
 
-    <!-- Onglets de navigation (Conserve le filtre d'état en paramètre URL) -->
+    <!-- Onglets (Masqués ou conservés selon vos rôles/navigation) -->
     <div class="tabs-switch" role="tablist">
         <a href="?tab=tab-mes{% if status %}&status={{ status }}{% endif %}"
             class="tab-btn {% if request.GET.tab != 'tab-toutes' %}active{% endif %}">
@@ -25,169 +29,165 @@
         </a>
     </div>
 
-    <!-- Barre de recherche et de filtres -->
-    <div class="filter-bar">
-        <div class="filter-group">
-            <input type="text" id="searchInput" class="filter-input" placeholder="Rechercher par nom, RU ou état..." />
-        </div>
-        <button type="button" class="btn btn-outline-secondary filter-btn-reset" id="resetBtn">
-            <i class="fa-solid fa-rotate-left"></i> Effacer
-        </button>
+    <!-- Carte Principale Contenant Filtres et Tableau -->
+    <main class="content-card">
 
-        <div class="filter-box">
-            <select id="statusFilter" class="filter-select" onchange="updateFilter('status', this.value)">
-                <option value="all" {% if status == "all" or not status %}selected{% endif %}>Tous les états</option>
-                <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
-                <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
-                <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés</option>
-            </select>
-        </div>
+        <!-- Barre de recherche et de filtres -->
+        <div class="filter-bar">
+            <div class="filters-left">
+                <!-- Recherche Texte -->
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" class="filter-input" placeholder="Rechercher dans la page..." />
+                </div>
 
-        <div class="filter-box">
-            <select id="ruInitFilter" class="filter-select" onchange="updateFilter('ru_init', this.value)">
-                <option value="">Tous les RU initiaux</option>
-                {% for ru in ru_initiaux %}
-                <option value="{{ ru }}" {% if ru_init == ru %}selected{% endif %}>{{ ru }}</option>
-                {% endfor %}
-            </select>
-        </div>
+                <!-- Autocomplete RU Initial -->
+                <div class="ru-search-wrapper" id="ru-init-wrapper">
+                    <i class="fa-solid fa-magnifying-glass search-icon-select"></i>
+                    <input type="text" class="filter-input input-with-icon" id="ru_init_search"
+                        placeholder="Tous les RU Initiaux" autocomplete="off"
+                        value="{% if ru_init %}{{ ru_init }}{% endif %}">
+                    <i class="fa-solid fa-chevron-down select-chevron"></i>
+                    <button type="button" class="ru-search-clear" id="ru_init_clear" aria-label="Effacer">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    <div class="ru-search-suggestions" id="ru_init_suggestions"></div>
+                </div>
 
-        <div class="filter-box">
-            <select id="ruAcceuilFilter" class="filter-select" onchange="updateFilter('ru_acceuil', this.value)">
-                <option value="">Tous les RU cibles</option>
-                {% for ru in ru_acceuils %}
-                <option value="{{ ru }}" {% if ru_acceuil == ru %}selected{% endif %}>{{ ru }}</option>
-                {% endfor %}
-            </select>
-        </div>
-    </div>
+                <!-- Autocomplete RU Cible -->
+                <div class="ru-search-wrapper" id="ru-acceuil-wrapper">
+                    <i class="fa-solid fa-magnifying-glass search-icon-select"></i>
+                    <input type="text" class="filter-input input-with-icon" id="ru_acceuil_search"
+                        placeholder="Tous les RU Cibles" autocomplete="off"
+                        value="{% if ru_acceuil %}{{ ru_acceuil }}{% endif %}">
+                    <i class="fa-solid fa-chevron-down select-chevron"></i>
+                    <button type="button" class="ru-search-clear" id="ru_acceuil_clear" aria-label="Effacer">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    <div class="ru-search-suggestions" id="ru_acceuil_suggestions"></div>
+                </div>
 
-    <div class="sections-wrapper">
-        {% if request.GET.tab == 'tab-toutes' %}
-        <!-- Section 2 : Toutes les affectations (N1) -->
-        <div class="section-card">
-            <div class="table-scroll">
-                <table class="table-affectations">
-                    <thead>
-                        <tr>
-                            <th>Collaborateur</th>
-                            <th>RU initial</th>
-                            <th>RU cible</th>
-                            <th class="text-center">État</th>
-                        </tr>
-                    </thead>
-                    <tbody id="result">
-                        {% for affectation in info %}
-                        <tr class="table-row">
-                            <td class="cell-primary">{{ affectation.collaborateur }}</td>
-                            <td>{{ affectation.initial }}</td>
-                            <td>
-                                {% if affectation.acceuil and affectation.acceuil %}
-                                {{ affectation.acceuil }}
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if affectation.etat and affectation.etat %}
-                                <span class="badge badge-{{ affectation.etat|slugify }}"
-                                    title="{{ affectation.etat|slugify }}">
-                                    {{ affectation.etat }}
-                                </span>
-                                {% else %}
-                                <span class="badge badge-en-attente">En attente</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="empty-row">Aucune affectation à afficher.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <!-- Select État -->
+                <div class="filter-box">
+                    <select id="statusFilter" class="filter-select" onchange="updateFilter('status', this.value)">
+                        <option value="all" {% if status == "all" or not status %}selected{% endif %}>Tous les états
+                        </option>
+                        <option value="valide" {% if status == "valide" %}selected{% endif %}>Validés</option>
+                        <option value="refuse" {% if status == "refuse" %}selected{% endif %}>Refusés</option>
+                        <option value="non_demarrer" {% if status == "non_demarrer" %}selected{% endif %}>Non démarrés
+                        </option>
+                    </select>
+                </div>
             </div>
 
-            {% if page_obj_n1.paginator.num_pages > 1 %}
-            <div class="pagination-container">
-                {% if page_obj_n1.has_previous %}
-                <a class="page-btn"
-                    href="?page_n1={{ page_obj_n1.previous_page_number }}&tab=tab-toutes{% if status %}&status={{ status }}{% endif %}{% if ru_init %}&ru_init={{ ru_init }}{% endif %}{% if ru_acceuil %}&ru_acceuil={{ ru_acceuil }}{% endif %}">&laquo;
-                    Précédent</a>
-                {% endif %}
-                <span class="page-btn active">{{ page_obj_n1.number }}</span>
-                {% if page_obj_n1.has_next %}
-                <a class="page-btn"
-                    href="?page_n1={{ page_obj_n1.next_page_number }}&tab=tab-toutes{% if status %}&status={{ status }}{% endif %}{% if ru_init %}&ru_init={{ ru_init }}{% endif %}{% if ru_acceuil %}&ru_acceuil={{ ru_acceuil }}{% endif %}">Suivant
-                    &raquo;</a>
-                {% endif %}
-            </div>
-            {% endif %}
+            <!-- Bouton Réinitialiser aligné à droite -->
+            <button type="button" class="btn-reset" id="resetBtn">
+                <i class="fa-solid fa-rotate-left"></i> Réinitialiser
+            </button>
         </div>
 
-        {% else %}
-        <!-- Section 1 : Affectations N2 (Vos changements) -->
-        <div class="section-card">
-            <div class="table-scroll">
-                <table class="table-affectations">
-                    <thead>
-                        <tr>
-                            <th>Collaborateur</th>
-                            <th>RU initial</th>
-                            <th>RU cible</th>
-                            <th class="text-center">État</th>
-                        </tr>
-                    </thead>
-                    <tbody id="result">
-                        {% for affectation in n2 %}
-                        <tr class="table-row">
-                            <td class="cell-primary">{{ affectation.collaborateur }}</td>
-                            <td>{{ affectation.initial }}</td>
-                            <td>
-                                {% if affectation.acceuil and affectation.acceuil %}
-                                {{ affectation.acceuil }}
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if affectation.etat and affectation.etat %}
-                                <span class="badge badge-{{ affectation.etat|slugify }}"
-                                    title="{{ affectation.etat|slugify }}">
-                                    {{ affectation.etat }}
-                                </span>
-                                {% else %}
-                                <span class="badge badge-en-attente">En attente</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="empty-row">Aucune affectation à afficher.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <!-- Tableau des données -->
+                <!-- Tableau des données -->
+                <div class="table-scroll">
+                    <table class="table-affectations">
+                        <thead>
+                            <tr>
+                                <th>COLLABORATEUR</th>
+                                <th>RU INITIAL</th>
+                                <th>DPT INITIAL</th>
+                                <th>RU CIBLE</th>
+                                <th>DPT CIBLE</th>
+                                <th class="text-center">ÉTAT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="result">
+                            {% if request.GET.tab == 'tab-toutes' %}
+                            {% for affectation in info %}
+                            <tr class="table-row">
+                                <td class="cell-primary">{{ affectation.collaborateur }}</td>
+                                <td>{{ affectation.initial|default:"—" }}</td>
+                                <td>{{ affectation.dpt_initial|default:"—" }}</td>
+                                <td>{{ affectation.acceuil|default:"—" }}</td>
+                                <td>{{ affectation.dpt_acceuil|default:"—" }}</td>
+                                <td class="text-center">
+                                    {% if affectation.etat %}
+                                    <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat }}">
+                                        {{ affectation.etat }}
+                                    </span>
+                                    {% else %}
+                                    <span class="badge badge-en-attente">En attente</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="empty-row">Aucune affectation à afficher.</td>
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            {% for affectation in n2 %}
+                            <tr class="table-row">
+                                <td class="cell-primary">{{ affectation.collaborateur }}</td>
+                                <td>{{ affectation.initial|default:"—" }}</td>
+                                <td>{{ affectation.dpt_initial|default:"—" }}</td>
+                                <td>{{ affectation.acceuil|default:"—" }}</td>
+                                <td>{{ affectation.dpt_acceuil|default:"—" }}</td>
+                                <td class="text-center">
+                                    {% if affectation.etat %}
+                                    <span class="badge badge-{{ affectation.etat|slugify }}" title="{{ affectation.etat }}">
+                                        {{ affectation.etat }}
+                                    </span>
+                                    {% else %}
+                                    <span class="badge badge-en-attente">En attente</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="empty-row">Aucune affectation à afficher.</td>
+                            </tr>
+                            {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                {% if request.GET.tab == 'tab-toutes' %}
+                {% if page_obj_n1.paginator.num_pages > 1 %}
+                <div class="pagination-container">
+                    {% if page_obj_n1.has_previous %}
+                    <a class="page-btn"
+                        href="?page_n1={{ page_obj_n1.previous_page_number }}&tab=tab-toutes{% if status %}&status={{ status }}{% endif %}{% if ru_init %}&ru_init={{ ru_init }}{% endif %}{% if ru_acceuil %}&ru_acceuil={{ ru_acceuil }}{% endif %}">&laquo;
+                        Précédent</a>
+                    {% endif %}
+                    <span class="page-btn active">{{ page_obj_n1.number }}</span>
+                    {% if page_obj_n1.has_next %}
+                    <a class="page-btn"
+                        href="?page_n1={{ page_obj_n1.next_page_number }}&tab=tab-toutes{% if status %}&status={{ status }}{% endif %}{% if ru_init %}&ru_init={{ ru_init }}{% endif %}{% if ru_acceuil %}&ru_acceuil={{ ru_acceuil }}{% endif %}">Suivant
+                        &raquo;</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% else %}
+                {% if page_obj_n2.paginator.num_pages > 1 %}
+                <div class="pagination-container">
+                    {% if page_obj_n2.has_previous %}
+                    <a class="page-btn"
+                        href="?page_n2={{ page_obj_n2.previous_page_number }}&tab=tab-mes{% if status %}&status={{ status }}{% endif %}{% if ru_init %}&ru_init={{ ru_init }}{% endif %}{% if ru_acceuil %}&ru_acceuil={{ ru_acceuil }}{% endif %}">&laquo;
+                        Précédent</a>
+                    {% endif %}
+                    <span class="page-btn active">{{ page_obj_n2.number }}</span>
+                    {% if page_obj_n2.has_next %}
+                    <a class="page-btn"
+                        href="?page_n2={{ page_obj_n2.next_page_number }}&tab=tab-mes{% if status %}&status={{ status }}{% endif %}{% if ru_init %}&ru_init={{ ru_init }}{% endif %}{% if ru_acceuil %}&ru_acceuil={{ ru_acceuil }}{% endif %}">Suivant
+                        &raquo;</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% endif %}
 
-            {% if page_obj_n2.paginator.num_pages > 1 %}
-            <div class="pagination-container">
-                {% if page_obj_n2.has_previous %}
-                <a class="page-btn"
-                    href="?page_n2={{ page_obj_n2.previous_page_number }}&tab=tab-mes{% if status %}&status={{ status }}{% endif %}{% if ru_init %}&ru_init={{ ru_init }}{% endif %}{% if ru_acceuil %}&ru_acceuil={{ ru_acceuil }}{% endif %}">&laquo;
-                    Précédent</a>
-                {% endif %}
-                <span class="page-btn active">{{ page_obj_n2.number }}</span>
-                {% if page_obj_n2.has_next %}
-                <a class="page-btn"
-                    href="?page_n2={{ page_obj_n2.next_page_number }}&tab=tab-mes{% if status %}&status={{ status }}{% endif %}{% if ru_init %}&ru_init={{ ru_init }}{% endif %}{% if ru_acceuil %}&ru_acceuil={{ ru_acceuil }}{% endif %}">Suivant
-                    &raquo;</a>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-        {% endif %}
-    </div>
+    </main>
 </div>
 {% endblock %}
 
@@ -206,11 +206,9 @@
         });
     }
 
-    // Met à jour un paramètre GET (status / ru_init / ru_acceuil) en conservant
-    // les autres paramètres déjà présents dans l'URL (tab compris).
     function updateFilter(paramName, value) {
         const params = new URLSearchParams(window.location.search);
-        if (value) {
+        if (value && value !== "all") {
             params.set(paramName, value);
         } else {
             params.delete(paramName);
@@ -236,18 +234,148 @@
 
         if (resetBtn) {
             resetBtn.addEventListener("click", function () {
-                if (searchInput) {
-                    searchInput.value = "";
-                }
+                if (searchInput) searchInput.value = "";
                 localStorage.removeItem("savedSearch");
-                filterTable();
 
-                // Réinitialise tous les filtres URL (status, ru_init, ru_acceuil) mais garde l'onglet actif
                 const urlParams = new URLSearchParams(window.location.search);
                 const currentTab = urlParams.get("tab") === "tab-toutes" ? "tab-toutes" : "tab-mes";
                 window.location.href = `?tab=${currentTab}`;
             });
         }
+    });
+
+    /* ---- Autocomplete pour RU initial et RU cible ---- */
+    document.addEventListener("DOMContentLoaded", function () {
+        const listeRuInitiaux = [{% for ru in ru_initiaux %}"{{ ru|escapejs }}", {% endfor %}];
+    const listeRuAcceuils = [{% for ru in ru_acceuils %}"{{ ru|escapejs }}", {% endfor %}];
+
+    function normaliser(texte) {
+        return String(texte).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function initAutocomplete(config) {
+        const wrapper = document.getElementById(config.wrapperId);
+        const input = document.getElementById(config.inputId);
+        const clearBtn = document.getElementById(config.clearId);
+        const suggestionsBox = document.getElementById(config.suggestionsId);
+
+        if (!wrapper || !input || !clearBtn || !suggestionsBox) return;
+
+        let indexActif = -1;
+        let resultatsCourants = [];
+
+        if (input.value.trim() !== "") {
+            wrapper.classList.add("has-value");
+        }
+
+        function fermerSuggestions() {
+            suggestionsBox.classList.remove("open");
+            suggestionsBox.innerHTML = "";
+            indexActif = -1;
+        }
+
+        function selectionner(valeur) {
+            input.value = valeur;
+            wrapper.classList.add("has-value");
+            fermerSuggestions();
+            updateFilter(config.paramName, valeur);
+        }
+
+        function effacer() {
+            input.value = "";
+            wrapper.classList.remove("has-value");
+            fermerSuggestions();
+            updateFilter(config.paramName, "");
+        }
+
+        function afficherSuggestions(requete) {
+            const requeteNorm = normaliser(requete.trim());
+
+            resultatsCourants = requeteNorm === ""
+                ? config.liste.slice(0, 20)
+                : config.liste.filter(v => normaliser(v).includes(requeteNorm)).slice(0, 20);
+
+            suggestionsBox.innerHTML = "";
+            indexActif = -1;
+
+            if (resultatsCourants.length === 0) {
+                const vide = document.createElement("div");
+                vide.className = "ru-search-empty";
+                vide.textContent = "Aucun résultat";
+                suggestionsBox.appendChild(vide);
+            } else {
+                resultatsCourants.forEach(valeur => {
+                    const ligne = document.createElement("div");
+                    ligne.className = "ru-search-suggestion";
+                    ligne.textContent = valeur;
+                    ligne.addEventListener("mousedown", e => {
+                        e.preventDefault();
+                        selectionner(valeur);
+                    });
+                    suggestionsBox.appendChild(ligne);
+                });
+            }
+
+            suggestionsBox.classList.add("open");
+        }
+
+        input.addEventListener("input", function () {
+            if (input.value.trim() === "") wrapper.classList.remove("has-value");
+            afficherSuggestions(input.value);
+        });
+
+        input.addEventListener("focus", function () {
+            afficherSuggestions(input.value);
+        });
+
+        input.addEventListener("keydown", function (e) {
+            const items = suggestionsBox.querySelectorAll(".ru-search-suggestion");
+            if (!items.length) return;
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                indexActif = Math.min(indexActif + 1, items.length - 1);
+                items.forEach((el, i) => el.classList.toggle("active", i === indexActif));
+                items[indexActif].scrollIntoView({ block: "nearest" });
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                indexActif = Math.max(indexActif - 1, 0);
+                items.forEach((el, i) => el.classList.toggle("active", i === indexActif));
+                items[indexActif].scrollIntoView({ block: "nearest" });
+            } else if (e.key === "Enter") {
+                if (indexActif >= 0 && resultatsCourants[indexActif]) {
+                    e.preventDefault();
+                    selectionner(resultatsCourants[indexActif]);
+                }
+            } else if (e.key === "Escape") {
+                fermerSuggestions();
+            }
+        });
+
+        clearBtn.addEventListener("click", effacer);
+
+        document.addEventListener("click", function (e) {
+            if (!wrapper.contains(e.target)) fermerSuggestions();
+        });
+    }
+
+    initAutocomplete({
+        wrapperId: "ru-init-wrapper",
+        inputId: "ru_init_search",
+        clearId: "ru_init_clear",
+        suggestionsId: "ru_init_suggestions",
+        liste: listeRuInitiaux,
+        paramName: "ru_init",
+    });
+
+    initAutocomplete({
+        wrapperId: "ru-acceuil-wrapper",
+        inputId: "ru_acceuil_search",
+        clearId: "ru_acceuil_clear",
+        suggestionsId: "ru_acceuil_suggestions",
+        liste: listeRuAcceuils,
+        paramName: "ru_acceuil",
+    });
     });
 </script>
 {% endblock %}

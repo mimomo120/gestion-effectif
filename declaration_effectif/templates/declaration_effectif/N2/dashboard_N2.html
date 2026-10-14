@@ -2,47 +2,66 @@
 {% load static %}
 
 {% block title %}Tableau de bord N2{% endblock %}
-
 {% block css %}
 <link rel="stylesheet" href="{% static 'utilisateur/css/N2/dashboard.css' %}">
 <style>
-    /* Ajustements CSS pour la grille des graphiques */
-    .charts-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    .ru-card {
-        background: #ffffff;
-        border-radius: 8px;
-        padding: 1.25rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    }
-
     .chart-container {
         position: relative;
-        height: 280px;
+        height: 320px;
         width: 100%;
+    }
+
+    /* Force l'affichage des 3 graphiques sur la même ligne */
+    .charts-grid-3-col {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+    }
+
+    @media (max-width: 1200px) {
+        .charts-grid-3-col {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-container">
-    <header class="dashboard-header d-flex justify-content-between align-items-center mb-4">
-        <h1 class="dashboard-title">Tableau de bord</h1>
-        <div class="date-picker-badge">
-            <span>{{ maint|date:"d M Y" }}</span>
-            <i class="far fa-calendar ms-2"></i>
+    <header class="dashboard-header">
+        <div>
+            <h1 class="dashboard-title">Tableau de bord</h1>
+            <p class="dashboard-subtitle">Aperçu des effectifs et des responsables d'unité</p>
+        </div>
+        <div class="actions-bar">
+            <div class="date-picker-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span>{{ maint|date:"d M Y" }}</span>
+            </div>
         </div>
     </header>
 
-    <!-- ===== STATISTIQUES GÉNÉRALES ===== -->
-    <div class="statistique-cards">
-        <div class="stat-card">
-            <h3>Effectif réel</h3>
+    <!-- ===== EFFECTIFS PRINCIPAUX (réel / système / maquette) ===== -->
+    <div class="kpi-primary-row">
+        <div class="stat-card card-reel">
+            <div class="stat-card-top">
+                <h3>Effectif réel</h3>
+                <span class="stat-icon icon-brand" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </span>
+            </div>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ effectif_reel|default:"0" }}</span>
                 <span class="unite">opérateurs</span>
@@ -53,8 +72,18 @@
                 {% endif %}
         </div>
 
-        <div class="stat-card">
-            <h3>Effectif système</h3>
+        <div class="stat-card card-systeme">
+            <div class="stat-card-top">
+                <h3>Effectif système</h3>
+                <span class="stat-icon icon-teal" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <ellipse cx="12" cy="5" rx="8" ry="3"></ellipse>
+                        <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"></path>
+                        <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"></path>
+                    </svg>
+                </span>
+            </div>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ effectif_syste|default:"0" }}</span>
                 <span class="unite">opérateurs</span>
@@ -65,153 +94,229 @@
                 {% endif %}
         </div>
 
-        <div class="stat-card">
-            <h3>Effectif maquette</h3>
+        <div class="stat-card card-maquette">
+            <div class="stat-card-top">
+                <h3>Effectif maquette</h3>
+                <span class="stat-icon icon-amber" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M3 21h18"></path>
+                        <path d="M5 21V7l7-4 7 4v14"></path>
+                        <path d="M9 21v-6h6v6"></path>
+                        <path d="M9 11h.01M15 11h.01M12 11h.01"></path>
+                    </svg>
+                </span>
+            </div>
             <div class="stat-valeur-group">
                 <span class="valeur">{{ maquette_total|default:"0" }}</span>
                 <span class="unite">opérateurs</span>
             </div>
         </div>
+    </div>
 
-        <div class="stat-card">
-            <h3>RU Total</h3>
-            <div class="stat-valeur-group">
-                <span class="valeur">{{ nbr_RU|default:"0" }}</span>
-                <span class="unite">responsables</span>
+    <!-- ===== SIGNAUX RH (à surveiller) ===== -->
+    <div class="alert-strip">
+        <div class="alert-pill">
+            <span class="stat-icon icon-red" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                    </path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ non_valides|default:"0" }} / {{ nbr_RU|default:"0" }}</span>
+                <span class="alert-pill-label">RU non validés</span>
             </div>
-            <small class="text-danger fw-bold">{{ non_valides|default:"0" }} non valide(s)</small>
         </div>
 
-        <div class="stat-card">
-            <h3>Collaborateurs directs</h3>
-            <div class="stat-valeur-group">
-                <span class="valeur">{{ nbr_op|default:"0" }}</span>
-                <span class="unite">collab.</span>
+        <div class="alert-pill">
+            <span class="stat-icon icon-violet" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_op|default:"0" }}</span>
+                <span class="alert-pill-label">Collaborateurs directs</span>
             </div>
-            <small class="text-muted">{{ nbr_cadre }} cadre(s), {{ op }} opérateur(s)</small>
+        </div>
+
+        <div class="alert-pill">
+            <span class="stat-icon icon-brand" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M12 2 2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_cadre|default:"0" }}</span>
+                <span class="alert-pill-label">Cadres</span>
+            </div>
+        </div>
+
+        <div class="alert-pill">
+            <span class="stat-icon icon-teal" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ op|default:"0" }}</span>
+                <span class="alert-pill-label">Opérateurs</span>
+            </div>
         </div>
     </div>
 
-    <!-- ===== CONTENU GRAPHIQUES ===== -->
-    <div class="contenue mt-4">
-        <div class="charts-grid">
-            <div class="ru-card">
-                <h4>Évolution Réel (7 derniers jours)</h4>
-                <div class="chart-container">
-                    <canvas id="chart-global"></canvas>
-                </div>
+    <!-- ===== GRAPHIQUES (3 sur la même ligne) ===== -->
+    <div class="charts-grid charts-grid-3-col">
+        <div class="ru-card">
+            <h4>Évolution Réel (7 derniers jours)</h4>
+            <div class="chart-container">
+                <canvas id="chart-global"></canvas>
             </div>
-            <div class="ru-card">
-                <h4>Réel vs Système vs Maquette par RU</h4>
-                <div class="chart-container">
+        </div>
+
+        <div class="ru-card">
+            <h4>Réel vs Système vs Maquette par RU</h4>
+            <div class="chart-container chart-container--wide">
+                <div class="chart-scroll-inner">
                     <canvas id="chart-comparatif"></canvas>
-                </div>
-            </div>
-            <div class="ru-card">
-                <h4>Réel vs Système vs Maquette par Lot</h4>
-                <div class="chart-container">
-                    <canvas id="chart-lot"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- Données JSON pour JS -->
-        {{ liste_ru_stats|json_script:"donnees-ru" }}
-
-        <!-- ===== STATISTIQUES PAR RU ===== -->
-        <div class="section mt-4">
-            <div class="section-header d-flex justify-content-between align-items-center mb-3">
-                <h2>Statistiques par responsable d'unité</h2>
-                <div class="recherche-ru">
-                    <input type="text" id="recherche-ru" class="form-control" placeholder="Rechercher par ID ou nom..."
-                        autocomplete="off">
-                </div>
+        <div class="ru-card">
+            <h4>Réel vs Système vs Maquette par Lot</h4>
+            <div class="chart-container">
+                <canvas id="chart-lot"></canvas>
             </div>
+        </div>
+    </div>
 
-            <div class="table-container">
-                <table class="table-ru table table-striped align-middle">
-                    <thead>
-                        <tr>
-                            <th>Utilisateur</th>
-                            <th>Responsable Unité</th>
-                            <th>Lot</th>
-                            <th>Unité</th>
-                            <th>DPT</th>
-                            <th>Effectif réel</th>
-                            <th>Effectif système</th>
-                            <th>Effectif maquette</th>
-                            <th>Derniers mouvements</th>
-                        </tr>
-                    </thead>
-                    <tbody id="corps-tableau-ru">
-                        {% for ru in liste_ru_stats %}
-                        <tr data-it="{{ ru.it }}" data-nom="{{ ru.nom_complete }}">
-                            <td class="it">{{ ru.it|default:"-" }}</td>
-                            <td>{{ ru.nom_complete|default:"-" }}</td>
-                            <td>{{ ru.lot|default:"-" }}</td>
-                            <td>{% if ru.unite and ru.unite != "None" %}{{ ru.unite }}{% else %}-{% endif %}</td>
-                            <td>{{ ru.dpt|default:"-" }}</td>
-                            <td>
-                                <div class="cell-stat-container">
-                                    <span class="valeur-chiffre">{{ ru.reel|default:"0" }}</span>
-                                    {% if ru.MR > 0 %} <span class="badge-vs positive">&#9650; +{{ ru.MR }}</span>
-                                    {% elif ru.MR < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MR }}</span>
-                                        {% endif %}
-                                </div>
-                            </td>
-                            <td>
-                                <div class="cell-stat-container">
-                                    <span class="valeur-chiffre">{{ ru.systeme|default:"0" }}</span>
-                                    {% if ru.MS > 0 %} <span class="badge-vs positive">&#9650; +{{ ru.MS }}</span>
-                                    {% elif ru.MS < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MS }}</span>
-                                        {% endif %}
-                                </div>
-                            </td>
-                            <td>
-                                <div class="cell-stat-container">
-                                    <span class="valeur-chiffre">{{ ru.maquette|default:"0" }}</span>
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                {% if ru.derniers_mouvements %}
-                                <button type="button" class="btn btn-sm btn-outline-primary btn-mouvements"
-                                    data-it="{{ ru.it }}" title="Voir les derniers mouvements">
-                                    <i class="fas fa-history"></i>
-                                    <span class="badge bg-secondary ms-1">{{ ru.derniers_mouvements|length }}</span>
-                                </button>
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="9" class="text-center py-4">Aucune donnée disponible</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <!-- Données JSON pour JS -->
+    {{ liste_ru_stats|json_script:"donnees-ru" }}
+
+    <!-- ===== STATISTIQUES PAR RU ===== -->
+    <div class="section">
+        <div class="section-header">
+            <h2>Statistiques par responsable d'unité</h2>
+            <div class="recherche-ru">
+                <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="recherche-ru" placeholder="Rechercher par utilisateur ou nom...">
             </div>
+        </div>
 
-            <div class="pagination-bar d-flex justify-content-between align-items-center mt-3" id="pagination-bar">
-                <span class="pagination-info" id="pagination-info"></span>
-                <div class="pagination-controls">
-                    <button type="button" id="page-prec" class="btn btn-sm btn-secondary">&laquo; Précédent</button>
-                    <span class="pagination-pages mx-2" id="pagination-pages"></span>
-                    <button type="button" id="page-suiv" class="btn btn-sm btn-secondary">Suivant &raquo;</button>
-                </div>
+        <div class="table-container">
+            <table class="table-ru">
+                <thead>
+                    <tr>
+                        <th>Utilisateur</th>
+                        <th>Responsable Unité</th>
+                        <th>Lot</th>
+                        <th>Unité</th>
+                        <th>DPT</th>
+                        <th>Effectif réel</th>
+                        <th>Effectif système</th>
+                        <th>Effectif maquette</th>
+                        <th>Derniers mouvements</th>
+                    </tr>
+                </thead>
+                <tbody id="corps-tableau-ru">
+                    {% for ru in liste_ru_stats %}
+                    <tr class="table-row-data" data-matricule="{{ ru.it|default:'' }}"
+                        data-nom="{{ ru.nom_complete|default:'' }}">
+                        <td class="matricule">{{ ru.it|default:"-" }}</td>
+                        <td>{{ ru.nom_complete|default:"-" }}</td>
+                        <td>{{ ru.lot|default:"-" }}</td>
+                        <td>{% if ru.unite and ru.unite != "None" %}{{ ru.unite }}{% else %}-{% endif %}</td>
+                        <td>{{ ru.dpt|default:"-" }}</td>
+
+                        <td>
+                            <div class="cell-stat-container">
+                                <span class="valeur-chiffre">{{ ru.reel|default:"0" }}</span>
+                                {% if ru.MR > 0 %}
+                                <span class="badge-vs positive">&#9650; +{{ ru.MR }}</span>
+                                {% elif ru.MR < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MR }}</span>
+                                    {% endif %}
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="cell-stat-container">
+                                <span class="valeur-chiffre">{{ ru.systeme|default:"0" }}</span>
+                                {% if ru.MS > 0 %}
+                                <span class="badge-vs positive">&#9650; +{{ ru.MS }}</span>
+                                {% elif ru.MS < 0 %} <span class="badge-vs negative">&#9660; {{ ru.MS }}</span>
+                                    {% endif %}
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="cell-stat-container">
+                                <span class="valeur-chiffre">{{ ru.maquette|default:"0" }}</span>
+                            </div>
+                        </td>
+
+                        <td class="text-center">
+                            {% if ru.derniers_mouvements %}
+                            <button type="button" class="btn-mouvements" data-it="{{ ru.it }}"
+                                title="Voir les derniers mouvements">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 3v5h5"></path>
+                                    <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
+                                    <path d="M12 7v5l4 2"></path>
+                                </svg>
+                                <span class="badge bg-secondary">{{ ru.derniers_mouvements|length }}</span>
+                            </button>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr class="empty-row-initial">
+                        <td colspan="9" class="empty-row">Aucune donnée disponible</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination-bar" id="pagination-bar">
+            <span class="pagination-info" id="pagination-info"></span>
+            <div class="pagination-controls">
+                <button type="button" id="page-prec" class="pagination-btn">&laquo; Précédent</button>
+                <span class="pagination-pages" id="pagination-pages"></span>
+                <button type="button" id="page-suiv" class="pagination-btn">Suivant &raquo;</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ===== MODAL MOUVEMENTS ===== -->
-<div class="modal fade" id="modal-mouvements-ru" tabindex="-1" aria-hidden="true">
+<!-- ===== POPUP : DERNIERS MOUVEMENTS ===== -->
+<div class="modal fade" id="modalMouvementsRu" tabindex="-1" aria-labelledby="modalMouvementsRuLabel"
+    aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-history me-2"></i>Derniers mouvements — <span id="mouvement-ru-nom"></span>
+                <h5 class="modal-title" id="modalMouvementsRuLabel">
+                    Derniers mouvements — <span id="mouvement-ru-nom"></span>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
@@ -219,7 +324,7 @@
                 <ul class="list-group" id="liste-mouvements-body"></ul>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fermer</button>
             </div>
         </div>
     </div>
@@ -227,43 +332,42 @@
 {% endblock %}
 
 {% block script %}
-{{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        /* =========================================================
-           1. GRAPHIQUE 1 : ÉVOLUTION RÉEL
-        ========================================================= */
-        const ctxGlobal = document.getElementById("chart-global");
-        if (ctxGlobal) {
-            new Chart(ctxGlobal, {
-                type: "line",
-                data: {
-                    labels: {{ chart_labels| safe }},
-        datasets: [{
-            label: "Évolution Réel",
-            data: {{ chart_data| safe }},
-        borderColor: "#2563eb",
-        backgroundColor: "rgba(37, 99, 235, 0.1)",
+    /* =========================================================
+       GRAPHIQUE 1 : ÉVOLUTION RÉEL (7 derniers jours)
+       ========================================================= */
+    const ctxGlobal = document.getElementById("chart-global");
+    if (ctxGlobal) {
+        new Chart(ctxGlobal, {
+            type: "line",
+            data: {
+                labels: {{ chart_labels| safe }},
+    datasets: [{
+        label: "Évolution Réel",
+        data: {{ chart_data| safe }},
+        borderColor: "#2C5F8A",
+        backgroundColor: "rgba(44, 95, 138, 0.1)",
         fill: true,
         tension: 0.3,
-        pointBackgroundColor: "#2563eb",
-        pointRadius: 4
-                    }]
-                },
-        options: {
+        pointBackgroundColor: "#2C5F8A",
+        pointRadius: 3
+                }]
+            },
+    options: {
         responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+            maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true } }
     }
-            });
-        }
+        });
+    }
+</script>
 
+<script>
     /* =========================================================
-       2. GRAPHIQUE 2 : COMPARATIF PAR RU
-    ========================================================= */
+       GRAPHIQUES 2 & 3 : COMPARATIF PAR RU / PAR LOT
+       ========================================================= */
     const donneesRuEl = document.getElementById("donnees-ru");
     let donneesRu = [];
     if (donneesRuEl) {
@@ -280,9 +384,9 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: "Réel", data: reel, backgroundColor: "#3b82f6" },
-                        { label: "Système", data: systeme, backgroundColor: "#16a34a" },
-                        { label: "Maquette", data: maquette, backgroundColor: "#f59e0b" }
+                        { label: "Réel", data: reel, backgroundColor: "#2C5F8A" },
+                        { label: "Système", data: systeme, backgroundColor: "#15805F" },
+                        { label: "Maquette", data: maquette, backgroundColor: "#B0741C" }
                     ]
                 },
                 options: {
@@ -290,7 +394,7 @@
                     maintainAspectRatio: false,
                     barThickness: 18,
                     plugins: {
-                        legend: { position: "top" },
+                        legend: { position: "top", labels: { usePointStyle: true, boxWidth: 8 } },
                         tooltip: { mode: "index", intersect: false }
                     },
                     scales: {
@@ -302,9 +406,6 @@
         }
     }
 
-    /* =========================================================
-       3. GRAPHIQUE 3 : COMPARATIF PAR LOT
-    ========================================================= */
     const ctxLot = document.getElementById("chart-lot");
     if (ctxLot) {
         new Chart(ctxLot, {
@@ -312,17 +413,17 @@
             data: {
                 labels: {{ lot_labels| safe }},
     datasets: [
-        { label: "Réel", data: {{ lot_reel_data| safe }}, backgroundColor: "#3b82f6" },
-        { label: "Système", data: {{ lot_systeme_data| safe }}, backgroundColor: "#16a34a" },
-        { label: "Maquette", data: {{ lot_maquette_data| safe }}, backgroundColor: "#f59e0b" }
+        { label: "Réel", data: {{ lot_reel_data| safe }}, backgroundColor: "#2C5F8A" },
+        { label: "Système", data: {{ lot_systeme_data| safe }}, backgroundColor: "#15805F" },
+        { label: "Maquette", data: {{ lot_maquette_data| safe }}, backgroundColor: "#B0741C" }
     ]
-                },
+            },
     options: {
         responsive: true,
             maintainAspectRatio: false,
                 barThickness: 22,
                     plugins: {
-            legend: { position: "top" },
+            legend: { position: "top", labels: { usePointStyle: true, boxWidth: 8 } },
             tooltip: { mode: "index", intersect: false }
         },
         scales: {
@@ -330,103 +431,147 @@
             y: { beginAtZero: true, ticks: { precision: 0 } }
         }
     }
+        });
+    }
+</script>
+
+<script>
+    /* =========================================================
+       POPUP DERNIERS MOUVEMENTS
+       ========================================================= */
+    document.addEventListener("DOMContentLoaded", function () {
+        const modalEl = document.getElementById("modalMouvementsRu");
+        const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+        const modalRuNom = document.getElementById("mouvement-ru-nom");
+        const listeMouvementsBody = document.getElementById("liste-mouvements-body");
+
+        document.querySelectorAll(".btn-mouvements").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                const it = btn.dataset.it;
+                const ru = donneesRu.find(r => String(r.it) === String(it));
+                if (!ru) return;
+
+                modalRuNom.textContent = ru.nom_complete || "-";
+                listeMouvementsBody.innerHTML = "";
+
+                if (!ru.derniers_mouvements || ru.derniers_mouvements.length === 0) {
+                    listeMouvementsBody.innerHTML = '<li class="list-group-item text-muted">Aucun mouvement récent</li>';
+                } else {
+                    ru.derniers_mouvements.forEach(function (mvt) {
+                        const li = document.createElement("li");
+                        li.className = "list-group-item d-flex justify-content-between align-items-center";
+
+                        let texte = `<strong>${mvt.nature_display || mvt.nature}</strong> — ${mvt.collaborateur || "-"}`;
+                        if (mvt.nouveau_responsable) {
+                            texte += ` → ${mvt.nouveau_responsable}`;
+                        }
+
+                        li.innerHTML = `<span>${texte}</span><small class="text-muted ms-2">${mvt.date}</small>`;
+                        listeMouvementsBody.appendChild(li);
+                    });
+                }
+
+                if (modal) modal.show();
+            });
+        });
+    });
+</script>
+
+<script>
+    /* =========================================================
+       RECHERCHE ET PAGINATION DYNAMIQUES
+       ========================================================= */
+    document.addEventListener("DOMContentLoaded", function () {
+        const rechercheInput = document.getElementById("recherche-ru");
+        const tbody = document.getElementById("corps-tableau-ru");
+        if (!rechercheInput || !tbody) return;
+
+        const LIGNES_PAR_PAGE = 10;
+        const toutesLesLignes = Array.from(tbody.querySelectorAll("tr.table-row-data"));
+        let pageActuelle = 1;
+
+        const btnPrec = document.getElementById("page-prec");
+        const btnSuiv = document.getElementById("page-suiv");
+        const infoEl = document.getElementById("pagination-info");
+        const pagesEl = document.getElementById("pagination-pages");
+        const barreEl = document.getElementById("pagination-bar");
+
+        function normaliser(texte) {
+            return String(texte)
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+        }
+
+        function lignesCorrespondantes() {
+            const requete = normaliser(rechercheInput.value.trim());
+            if (requete === "") return toutesLesLignes;
+            return toutesLesLignes.filter(function (ligne) {
+                const matricule = normaliser(ligne.dataset.matricule || "");
+                const nom = normaliser(ligne.dataset.nom || "");
+                return matricule.includes(requete) || nom.includes(requete);
             });
         }
 
-    /* =========================================================
-       4. MODAL DERNIERS MOUVEMENTS
-       (correction : le bouton n'avait aucun gestionnaire de clic)
-    ========================================================= */
-    const modalMouvementsEl = document.getElementById("modal-mouvements-ru");
-    const modalMouvements = modalMouvementsEl ? new bootstrap.Modal(modalMouvementsEl) : null;
-    const modalRuNom = document.getElementById("mouvement-ru-nom");
-    const listeMouvementsBody = document.getElementById("liste-mouvements-body");
+        function afficher() {
+            const ligneVideExistante = tbody.querySelector(".empty-row-recherche");
+            if (ligneVideExistante) ligneVideExistante.remove();
 
-    document.querySelectorAll(".btn-mouvements").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-            const it = btn.dataset.it;
-            const ru = donneesRu.find(r => String(r.it) === String(it));
-            if (!ru) return;
+            const correspondances = lignesCorrespondantes();
+            const total = correspondances.length;
 
-            modalRuNom.textContent = ru.nom_complete || "-";
-            listeMouvementsBody.innerHTML = "";
+            const ligneVideInitial = tbody.querySelector(".empty-row-initial");
+            if (ligneVideInitial) {
+                ligneVideInitial.style.display = (toutesLesLignes.length === 0) ? "" : "none";
+            }
 
-            if (!ru.derniers_mouvements || ru.derniers_mouvements.length === 0) {
-                listeMouvementsBody.innerHTML = '<li class="list-group-item text-muted">Aucun mouvement récent</li>';
+            const totalPages = Math.max(1, Math.ceil(total / LIGNES_PAR_PAGE));
+
+            if (pageActuelle > totalPages) pageActuelle = totalPages;
+            if (pageActuelle < 1) pageActuelle = 1;
+
+            const debut = (pageActuelle - 1) * LIGNES_PAR_PAGE;
+            const fin = debut + LIGNES_PAR_PAGE;
+            const aAfficher = new Set(correspondances.slice(debut, fin));
+
+            toutesLesLignes.forEach(function (ligne) {
+                ligne.style.display = aAfficher.has(ligne) ? "" : "none";
+            });
+
+            if (total === 0 && toutesLesLignes.length > 0) {
+                const ligneVide = document.createElement("tr");
+                ligneVide.className = "empty-row-recherche";
+                ligneVide.innerHTML = '<td colspan="9" class="empty-row">Aucun responsable trouvé pour cette recherche.</td>';
+                tbody.appendChild(ligneVide);
+            }
+
+            if (total > 0) {
+                infoEl.textContent = `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}`;
             } else {
-                ru.derniers_mouvements.forEach(function (mvt) {
-                    const li = document.createElement("li");
-                    li.className = "list-group-item d-flex justify-content-between align-items-center";
-
-                    let texte = `<strong>${mvt.nature_display || mvt.nature}</strong> — ${mvt.collaborateur || "-"}`;
-                    if (mvt.nouveau_responsable) {
-                        texte += ` → ${mvt.nouveau_responsable}`;
-                    }
-
-                    li.innerHTML = `<span>${texte}</span><small class="text-muted ms-2">${mvt.date}</small>`;
-                    listeMouvementsBody.appendChild(li);
-                });
+                infoEl.textContent = "";
             }
+            pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
+            btnPrec.disabled = pageActuelle <= 1;
+            btnSuiv.disabled = pageActuelle >= totalPages;
+            barreEl.style.display = (total <= LIGNES_PAR_PAGE) ? "none" : "flex";
+        }
 
-            if (modalMouvements) {
-                modalMouvements.show();
-            }
-        });
-    });
-
-    /* =========================================================
-       5. RECHERCHE ET PAGINATION
-    ========================================================= */
-    const rechercheInput = document.getElementById("recherche-ru");
-    const tbody = document.getElementById("corps-tableau-ru");
-    if (!rechercheInput || !tbody) return;
-
-    const LIGNES_PAR_PAGE = 10;
-    const toutesLesLignes = Array.from(tbody.querySelectorAll("tr[data-it]"));
-    let pageActuelle = 1;
-
-    const btnPrec = document.getElementById("page-prec");
-    const btnSuiv = document.getElementById("page-suiv");
-    const infoEl = document.getElementById("pagination-info");
-    const pagesEl = document.getElementById("pagination-pages");
-    const barreEl = document.getElementById("pagination-bar");
-
-    function normaliser(texte) {
-        return String(texte).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    }
-
-    function afficher() {
-        const requete = normaliser(rechercheInput.value.trim());
-        const correspondances = toutesLesLignes.filter(function (ligne) {
-            const it = normaliser(ligne.dataset.it || "");
-            const nom = normaliser(ligne.dataset.nom || "");
-            return it.includes(requete) || nom.includes(requete);
+        rechercheInput.addEventListener("input", function () {
+            pageActuelle = 1;
+            afficher();
         });
 
-        const total = correspondances.length;
-        const totalPages = Math.max(1, Math.ceil(total / LIGNES_PAR_PAGE));
+        btnPrec.addEventListener("click", function () {
+            pageActuelle -= 1;
+            afficher();
+        });
 
-        if (pageActuelle > totalPages) pageActuelle = totalPages;
-        if (pageActuelle < 1) pageActuelle = 1;
+        btnSuiv.addEventListener("click", function () {
+            pageActuelle += 1;
+            afficher();
+        });
 
-        const debut = (pageActuelle - 1) * LIGNES_PAR_PAGE;
-        const fin = debut + LIGNES_PAR_PAGE;
-        const aAfficher = new Set(correspondances.slice(debut, fin));
-
-        toutesLesLignes.forEach(l => l.style.display = aAfficher.has(l) ? "" : "none");
-
-        infoEl.textContent = total > 0 ? `Affichage ${debut + 1}-${Math.min(fin, total)} sur ${total}` : "Aucun résultat";
-        pagesEl.textContent = `Page ${pageActuelle} / ${totalPages}`;
-        btnPrec.disabled = pageActuelle <= 1;
-        btnSuiv.disabled = pageActuelle >= totalPages;
-        barreEl.style.display = total <= LIGNES_PAR_PAGE ? "none" : "flex";
-    }
-
-    rechercheInput.addEventListener("input", function () { pageActuelle = 1; afficher(); });
-    btnPrec.addEventListener("click", function () { pageActuelle--; afficher(); });
-    btnSuiv.addEventListener("click", function () { pageActuelle++; afficher(); });
-
-    afficher();
+        afficher();
     });
 </script>
 {% endblock %}

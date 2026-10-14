@@ -19,4 +19,8 @@ urlpatterns = [
             path("collaborateurs/", views.collaborateur, name="collaborateur"),
             path("collaborateurs/api/", views.collaborateur_api, name="collaborateur_api"),
             path("collaborateurs-ru/<str:ru_it>/", views.collaborateurs_par_ru, name="collaborateurs_par_ru"),
+            path("maquette",views.maquette_n1_view,name="maquette"),
+            path('maquette-n1/synchroniser/', views.synchroniser_maquettes_n1_view, name='synchroniser_maquettes_n1'),
+            
+            path('maquette_n1_update/', views.maquette_n1_update, name='maquette_n1_update'),
             ]

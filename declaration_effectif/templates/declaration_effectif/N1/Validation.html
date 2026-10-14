@@ -11,20 +11,38 @@
 {% block content %}
 {% csrf_token %}
 
-<header class="header">
-    <h1>Validation des Opérateurs</h1>
-    <div class="time">
-        <h5 id="time" aria-live="polite">{{ date }}</h5>
-    </div>
-</header>
-
 <div class="contenu">
+    <header class="header">
+        <div class="header-titles">
+            <h1><i class="fa-solid fa-list-check me-2" style="color: black;"></i>Validation des Opérateurs</h1>
+            <p>Validez, refusez ou modifiez les déclarations d'effectif du jour</p>
+        </div>
+        <div class="header-right">
+            {% if not status %}
+            <div class="stat-chip">
+                <span class="stat-chip-icon"><i class="fas fa-hourglass-half"></i></span>
+                <div class="stat-chip-text">
+                    <strong id="statCount">{{ nbr }}</strong>
+                    <span>En attente</span>
+                </div>
+            </div>
+            {% endif %}
+            <div class="date-chip">
+                <i class="far fa-calendar"></i>
+                <span id="time" aria-live="polite">{{ date }}</span>
+            </div>
+        </div>
+    </header>
+
     <div class="table-container">
-    
-    {% if not status %}
+
+        {% if not status %}
         <!-- Barre de Recherche & Filtrage -->
         <div class="chercher">
-            <input type="text" placeholder="IT - Nom" class="operateur" id="chercher">
+            <div class="search-wrap">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" placeholder="Rechercher par IT ou nom..." class="operateur" id="chercher">
+            </div>
             <select class="choix" id="choix">
                 <option value="">Tous les lots</option>
                 <option value="A">Lot A</option>
@@ -33,9 +51,10 @@
                 <option value="E">Lot E</option>
                 <option value="C">Lot C</option>
             </select>
-        <button id="ajouter" type="button" data-bs-toggle="modal" data-bs-target="#modal-ajouter" title="Ajouter un opérateur">
-            <i class="fas fa-plus"></i>
-        </button>
+            <button id="ajouter" type="button" data-bs-toggle="modal" data-bs-target="#modal-ajouter"
+                title="Ajouter un opérateur">
+                <i class="fas fa-plus"></i>
+            </button>
         </div>
 
         <!-- Modal: Ajouter un opérateur -->
@@ -43,15 +62,18 @@
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">Ajouter un Opérateur</h5>
+                        <div class="modal-header-info">
+                            <span class="modal-icon modal-icon-blue"><i class="fas fa-user-plus"></i></span>
+                            <h5 class="modal-title">Ajouter un Opérateur</h5>
+                        </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
                     </div>
                     <div class="modal-body">
                         <label for="nouveau-op-input">Identifiant</label>
                         <input type="text" id="nouveau-op-input" placeholder="Ex: M13-87424" class="nouveau-op-input"
                             required>
+                        <div class="alert2"></div>
                     </div>
-                    <div class="alert2"></div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
                         <button type="button" class="btn btn-primary btn-confirmer1">Confirmer</button>
@@ -59,7 +81,6 @@
                 </div>
             </div>
         </div>
-        <div class="alert mt-2"></div>
         <!-- TABLEAU EN ATTENTE DE VALIDATION -->
         <table class="table-operateurs">
             <thead>
@@ -82,29 +103,39 @@
                     </td>
                     <td class="matricule cell-mono">{{ operateur.matricule }}</td>
                     <td class="utilisateur cell-mono">{{ operateur.it }}</td>
-                    <td class="nom">{{ operateur.nom_complete }}</td>
-                    <td class="lot"><span class="chip chip-lot">{{ operateur.lot }}</span></td>
+                    <td class="nom">
+                        <div class="nom-cell">
+                            <span class="avatar">{{ operateur.nom_complete|slice:":1" }}</span>
+                            <span>{{ operateur.nom_complete }}</span>
+                        </div>
+                    </td>
+                    <td class="lot"><span class="chip chip-lot chip-lot-{{ operateur.lot|lower }}">{{ operateur.lot}}</span></td>
                     <td class="actions">
-                    <div class="action-buttons">
-                        <button type="button" class="btn-valider" data-matricule="{{ operateur.it }}" title="Valider">
-                            <i class="fas fa-check"></i>
-                        </button>
-                        <button type="button" class="btn btn-primary btn-refuser" data-bs-toggle="modal"
-                            data-bs-target="#modal-{{ operateur.it|slugify }}" title="Refuser">
-                            <i class="fas fa-times"></i>
-                        </button>
-                        <button type="button" class="btn-modifier" data-matricule="{{ operateur.it }}" title="Modifier">
-                        <i class="fas fa-pen"></i>
-                    </button>
-                        </button>
-                    </div>
+                        <div class="action-buttons">
+                            <button type="button" class="btn-valider" data-matricule="{{ operateur.it }}"
+                                title="Valider">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button type="button" class="btn btn-primary btn-refuser" data-bs-toggle="modal"
+                                data-bs-target="#modal-{{ operateur.it|slugify }}" title="Refuser">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <button type="button" class="btn-modifier" data-matricule="{{ operateur.it }}"
+                                title="Modifier">
+                                <i class="fas fa-pen"></i>
+                            </button>
+                        </div>
 
                         <!-- Modal Refus -->
                         <div class="modal fade" id="modal-{{ operateur.it|slugify }}" tabindex="-1">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Refuser {{ operateur.nom_complete }}</h5>
+                                        <div class="modal-header-info">
+                                            <span class="modal-icon modal-icon-red"><i
+                                                    class="fas fa-user-slash"></i></span>
+                                            <h5 class="modal-title">Refuser {{ operateur.nom_complete }}</h5>
+                                        </div>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
                                             aria-label="Fermer"></button>
                                     </div>
@@ -137,17 +168,23 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="empty-row">Aucun opérateur à valider.</td>
+                    <td colspan="6" class="empty-row">
+                        <i class="fas fa-check-circle"></i>
+                        <div>Aucun opérateur à valider.</div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
 
         <div class="pt-3">
-        <button type="button" id="btnValiderTout" data-nbr="{{ nbr }}" data-status="{{ status|lower }}" class="alert_btn">Valider la
-            sélection</button>
+            <button type="button" id="btnValiderTout" data-nbr="{{ nbr }}" data-status="{{ status|lower }}"
+                class="alert_btn">
+                <i class="fas fa-check-double"></i> Valider la sélection
+            </button>
+            <div class="alert"></div>
         </div>
-        
+
 
         {% else %}
         <!-- TABLEAU HISTORIQUE / VALIDE -->
@@ -166,20 +203,30 @@
                 <tr id="row-{{ operateur.collaborateur_it.it|slugify }}">
                     <td class="cell-mono">{{ operateur.collaborateur_it.matricule }}</td>
                     <td class="cell-mono">{{ operateur.collaborateur_it.it }}</td>
-                    <td>{{ operateur.collaborateur_it.nom_complete }}</td>
-                    <td><span class="chip chip-lot">{{ operateur.collaborateur_it.lot }}</span></td>
+                    <td>
+                        <div class="nom-cell">
+                            <span class="avatar">{{ operateur.collaborateur_it.nom_complete|slice:":1" }}</span>
+                            <span>{{ operateur.collaborateur_it.nom_complete }}</span>
+                        </div>
+                    </td>
+                    <td><span class="chip chip-lot chip-lot-{{ operateur.collaborateur_it.lot|lower }}">{{operateur.collaborateur_it.lot }}</span></td>
                     <td>{{ operateur.nature }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="5" class="empty-row">Aucune déclaration.</td>
+                    <td colspan="5" class="empty-row">
+                        <i class="fas fa-inbox"></i>
+                        <div>Aucune déclaration.</div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
 
         <div class="pt-3">
-            <button type="button" id="btnModifierTout" class="alert_btn">Supprimer cette déclaration</button>
+            <button type="button" id="btnModifierTout" class="alert_btn">
+                <i class="fas fa-trash-alt"></i> Supprimer cette déclaration
+            </button>
         </div>
         {% endif %}
     </div>

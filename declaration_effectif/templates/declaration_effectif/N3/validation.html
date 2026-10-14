@@ -5,51 +5,56 @@
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'declaration_effectif/css/validation.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 {% endblock %}
 
 {% block content %}
 <div class="page-container">
 
     <!-- En-tête de la page -->
-    <header class="header">
+    <header class="header-section">
         <h1>Validation des Déclarations</h1>
+        <p>Gestion et suivi des validations d'effectif journalières</p>
     </header>
 
-    <!-- Carte de Résumé KPI -->
-    <div class="stats-summary">
-        <div class="summary-card">
-            <div class="summary-info">
-                <span>Non Validés</span>
-                <h3 id="count-ru">{{ non_valides|length|default:"0" }}</h3>
-            </div>
-            <div class="summary-icon warning">
-                &#9888;
-            </div>
-        </div>
-    </div>
+    <!-- Carte principale -->
+    <div class="content-card">
 
-    <!-- Carte principale avec le tableau -->
-    <div class="card-table">
+        <!-- Barre de filtres et KPI -->
+        <div class="toolbar">
+            <div class="filters-left">
+                <!-- Filtre Date -->
+                <div class="filter-item">
+                    <label for="date" class="filter-label">Date de déclaration :</label>
+                    <input type="date" class="input-control" id="date">
+                </div>
 
-        <!-- Barre d'outils -->
-        <div class="table-toolbar">
-            <div class="date-filter-group">
-                <label for="date">Date de déclaration :</label>
-                <input type="date" class="date-input" id="date">
-            </div>
-            <div class="search-filter-group">
-                <label for="search">Recherche :</label>
-                <input type="text" class="search-input" id="search" placeholder="Matricule, utilisateur ou nom...">
-                <button type="button" class="btn btn-outline-secondary filter-btn-reset" id="reset-btn"
-                    onclick="resetFilters()">
+                <!-- Champ de Recherche -->
+                <div class="filter-item">
+                    <label for="search" class="filter-label">Recherche :</label>
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" class="input-control" id="search"
+                            placeholder="Matricule, utilisateur, nom...">
+                    </div>
+                </div>
+
+                <!-- Bouton Réinitialiser -->
+                <button type="button" class="btn-secondary" id="reset-btn">
                     <i class="fa-solid fa-rotate-left"></i> Effacer
                 </button>
+            </div>
+
+            <!-- Badge KPI -->
+            <div class="badge-status-warning">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Non Validés : <strong id="count-ru">{{ non_valides|length|default:"0" }}</strong></span>
             </div>
         </div>
 
         <!-- Tableau des données -->
-        <div class="table-wrapper">
-            <table class="custom-table">
+        <div class="table-responsive">
+            <table class="enterprise-table">
                 <thead id="titre">
                     <tr>
                         <th>Matricule</th>
@@ -63,20 +68,24 @@
                 <tbody id="result">
                     {% for operateur in non_valides %}
                     <tr>
-                        <td class="cell-mono">{{ operateur.matricule }}</td>
-                        <td class="cell-mono">{{ operateur.it }}</td>
-                        <td class="cell-name">{{ operateur.nom_complete }}</td>
+                        <td class="font-mono">{{ operateur.matricule }}</td>
+                        <td class="font-mono">{{ operateur.it }}</td>
+                        <td class="font-medium">{{ operateur.nom_complete }}</td>
                         <td class="text-center">
-                            <span class="badge-circle">{{ operateur.lot }}</span>
+                            <span class="lot-badge">{{ operateur.lot }}</span>
                         </td>
                         <td class="text-center">{{ date }}</td>
                         <td class="text-end">
-                            <button class="alert_btn" data-ru_it="{{ operateur.it }}">Alerter</button>
+                            <button type="button" class="btn-alert" data-ru_it="{{ operateur.it }}">
+                                <i class="fa-solid fa-bell"></i> Alerter
+                            </button>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="empty-row text-center">Aucun responsable d'unité sans validation trouvé.
+                        <td colspan="6" class="empty-state">
+                            <i class="fa-solid fa-inbox"></i>
+                            <p>Aucun responsable d'unité sans validation trouvé.</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -148,16 +157,15 @@
         const rows = resultContainer.querySelectorAll("tr");
 
         rows.forEach(function (row) {
-            // Ignore les lignes "vide"/"erreur" (colspan)
             if (row.querySelector("td[colspan]")) {
                 row.style.display = "";
                 return;
             }
 
-            const cellsMono = row.querySelectorAll(".cell-mono");
+            const cellsMono = row.querySelectorAll(".font-mono");
             const matricule = cellsMono[0]?.textContent.toLowerCase() || "";
             const utilisateur = cellsMono[1]?.textContent.toLowerCase() || "";
-            const nom = row.querySelector(".cell-name")?.textContent.toLowerCase() || "";
+            const nom = row.querySelector(".font-medium")?.textContent.toLowerCase() || "";
 
             const match = matricule.includes(term) || utilisateur.includes(term) || nom.includes(term);
             row.style.display = match ? "" : "none";
@@ -170,9 +178,12 @@
         if (!date) {
             resultContainer.innerHTML = `
             <tr>
-                <td colspan="6" class="empty-row text-center">Sélectionnez une date</td>
+                <td colspan="6" class="empty-state">
+                    <i class="fa-solid fa-calendar-xmark"></i>
+                    <p>Sélectionnez une date</p>
+                </td>
             </tr>
-        `;
+            `;
             if (countRu) countRu.textContent = "0";
             return;
         }
@@ -195,19 +206,19 @@
                         <th class="text-center">Lot</th>
                         <th class="text-center">Date</th>
                     </tr>
-                `;
+                    `;
 
                     resultContainer.innerHTML = data.resultats.map(op => `
                     <tr>
-                        <td class="cell-mono">${escapeHtml(op.matricule)}</td>
-                        <td class="cell-mono">${escapeHtml(op.it)}</td>
-                        <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                        <td class="font-mono">${escapeHtml(op.matricule)}</td>
+                        <td class="font-mono">${escapeHtml(op.it)}</td>
+                        <td class="font-medium">${escapeHtml(op.nom_complete)}</td>
                         <td class="text-center">
-                            <span class="badge-circle">${escapeHtml(op.lot || '-')}</span>
+                            <span class="lot-badge">${escapeHtml(op.lot || '-')}</span>
                         </td>
                         <td class="text-center">${escapeHtml(date)}</td>
                     </tr>
-                `).join("");
+                    `).join("");
 
                 } else {
                     head.innerHTML = `
@@ -219,22 +230,24 @@
                         <th class="text-center">Date</th>
                         <th class="text-end">Action</th>
                     </tr>
-                `;
+                    `;
 
                     resultContainer.innerHTML = data.resultats.map(op => `
                     <tr>
-                        <td class="cell-mono">${escapeHtml(op.matricule)}</td>
-                        <td class="cell-mono">${escapeHtml(op.it)}</td>
-                        <td class="cell-name">${escapeHtml(op.nom_complete)}</td>
+                        <td class="font-mono">${escapeHtml(op.matricule)}</td>
+                        <td class="font-mono">${escapeHtml(op.it)}</td>
+                        <td class="font-medium">${escapeHtml(op.nom_complete)}</td>
                         <td class="text-center">
-                            <span class="badge-circle">${escapeHtml(op.lot || '-')}</span>
+                            <span class="lot-badge">${escapeHtml(op.lot || '-')}</span>
                         </td>
                         <td class="text-center">${escapeHtml(date)}</td>
                         <td class="text-end">
-                            <button class="alert_btn" data-ru_it="${escapeHtml(op.it)}">Alerter</button>
+                            <button type="button" class="btn-alert" data-ru_it="${escapeHtml(op.it)}">
+                                <i class="fa-solid fa-bell"></i> Alerter
+                            </button>
                         </td>
                     </tr>
-                `).join("");
+                    `).join("");
 
                     attachAlertListeners();
                 }
@@ -243,26 +256,31 @@
                 if (countRu) countRu.textContent = "0";
                 resultContainer.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty-row text-center">Aucune donnée pour cette date.</td>
+                    <td colspan="6" class="empty-state">
+                        <i class="fa-solid fa-inbox"></i>
+                        <p>Aucune donnée pour cette date.</p>
+                    </td>
                 </tr>
-            `;
+                `;
             }
         } catch (error) {
             console.error("Erreur lors du filtrage:", error);
             if (countRu) countRu.textContent = "0";
             resultContainer.innerHTML = `
             <tr>
-                <td colspan="6" class="empty-row text-center" style="color: #ef4444;">Erreur lors du chargement des données.</td>
+                <td colspan="6" class="empty-state">
+                    <i class="fa-solid fa-circle-exclamation" style="color: #ef4444;"></i>
+                    <p style="color: #ef4444;">Erreur lors du chargement des données.</p>
+                </td>
             </tr>
-        `;
+            `;
         }
 
-        // Réapplique le filtre de recherche sur les nouvelles lignes chargées
         filterBySearch();
     }
 
     function attachAlertListeners() {
-        const alertButtons = resultContainer.querySelectorAll(".alert_btn");
+        const alertButtons = resultContainer.querySelectorAll(".btn-alert");
         alertButtons.forEach(function (btn) {
             btn.addEventListener("click", function () {
                 const ru_it = btn.dataset.ru_it;
@@ -285,7 +303,7 @@
                 return response.json();
             })
             .then(data => {
-                btn.textContent = "Envoyé";
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Envoyé';
                 btn.classList.add("sent");
                 btn.disabled = true;
             })
