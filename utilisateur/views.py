@@ -16,7 +16,7 @@ from Collaborateur.views import (
     _dates_fin_de_mois, _regrouper_par_annee, get_maquettes_a_date,
     get_managers_racines, calculer_maquette_totale_perimetre,
     get_tous_les_it_sous, get_tous_les_it_sous_reel,
-    get_tous_les_it_sous_reel_evolution,
+    get_tous_les_it_sous_reel_evolution,reelEff_evolution_multi
 )
 from django.db.models import Sum ,F , OuterRef, Subquery
 from .decorators import role_required
@@ -831,6 +831,7 @@ def calculer_evolution_effectif_reel(departements, jours=30):
     return {"labels": labels, "valeurs": valeurs}
 
 @role_required(["HRBP", "DRH", "ADMIN"])
+@role_required(["HRBP", "DRH", "ADMIN"])
 def dashboard_rh(request):
     it = request.session.get("it")
     role = request.session.get("role")
@@ -878,7 +879,7 @@ def dashboard_rh(request):
             it__in=(l1 | l2 | l3 | l4), departement_id__in=departements
         ).values_list("it", flat=True)
     )
-    maquette, maquette_map_racines, racines ,somme_ap ,somme_ce= calculer_maquette_totale_perimetre(
+    maquette, maquette_map_racines, racines, somme_ap, somme_ce = calculer_maquette_totale_perimetre(
         ids_managers_perimetre
     )
 
@@ -937,9 +938,16 @@ def dashboard_rh(request):
             "mr": reel_dept - maquette_dept,
         })
 
-    graphe = calculer_evolution_effectif_reel(departements)
-
     today = timezone.now().date()
+
+    # ===== FIX =====
+    # AVANT : calculer_evolution_effectif_reel(departements) -> une
+    # évolution JOUR PAR JOUR sur les 30 derniers jours seulement.
+    # APRÈS : _calculer_evolution_reel (déjà utilisée par
+    # pilot_dashboard) -> un point par MOIS sur toute l'année en
+    # cours (via get_effectif_reel_ids_multi, une seule requête pour
+    # toutes les dates au lieu d'une requête par jour).
+    ev = _calculer_evolution_reel(departements, today)
 
     collaborateurs_base = Collaborateur.objects.filter(departement_id__in=departements)
     responsables_directs = set(
@@ -1008,8 +1016,9 @@ def dashboard_rh(request):
         "maquette": maquette,
         "MS": colSyst - maquette,
         "MR": colReel - maquette,
-        "labels": graphe["labels"],
-        "valeurs": graphe["valeurs"],
+        # Évolution mensuelle (12 mois, année en cours)
+        "labels": ev["mois_labels_annee"],
+        "valeurs": ev["evolution_annee"],
         "detail_par_dept": detail_par_dept,
         "depart_TOT": depart_TOT,
         "liste_departs": liste_departs,
@@ -1021,11 +1030,11 @@ def dashboard_rh(request):
         "y_min": y_min,
         "y_max": y_max,
         "date_depart": date_depart or "",
-        "date_changement": date_changement or "","somme_ap":somme_ap,"somme_ce":somme_ce
+        "date_changement": date_changement or "",
+        "somme_ap": somme_ap, "somme_ce": somme_ce,
     }
 
     return render(request, "declaration_effectif/HRBP/dashboard.html", context)
-
 def derniers_mouvements_respo(it_respo, limite=10):
     if not it_respo:
         return []
@@ -1216,7 +1225,6 @@ def _evolution_maquette_par_lot(racines, dates_ref_annee, lots_suivis):
 
     return evolution
 
-
 def _stats_et_evolutions_par_ru(responsables, operateur, ids_total_r, maquette_map,
                                 dates_ref_ru, mois_labels_ru, dates_jour, jours_labels):
     liste_ru_stats = []
@@ -1225,17 +1233,12 @@ def _stats_et_evolutions_par_ru(responsables, operateur, ids_total_r, maquette_m
 
     ru_ids = [ru.it for ru in responsables]
 
-    # OPTIMISATION : maquette préchargée une seule fois par date, pour
-    # tous les RU, au lieu d'un appel par (RU, date).
     maquettes_par_date = {
         d: get_maquettes_a_date(ru_ids, d) for d in dates_ref_ru
     }
+    toutes_dates = sorted(set(dates_ref_ru) | set(dates_jour))
+    reel_evolution = reelEff_evolution_multi(ru_ids, toutes_dates)
 
-    # NOTE : reel_series / reel_series_jour appellent encore reelEff()
-    # une fois par (RU, date). C'est le principal point chaud restant de
-    # pilot_dashboard si le nombre de RU est important -- le batcher
-    # demanderait de reproduire la logique temporelle de reelEff() avec
-    # bisect, comme fait pour get_tous_les_it_sous_reel_evolution().
     for ru in responsables:
         equipe = operateur.filter(ru_it_id=ru.it)
         equipe_ids = set(equipe.values_list('it', flat=True))
@@ -1251,10 +1254,9 @@ def _stats_et_evolutions_par_ru(responsables, operateur, ids_total_r, maquette_m
             "maquette": maquette_ru,
         })
 
-        reel_series = [
-            reelEff(ru.it, date_reference=d).values('it').distinct().count()
-            for d in dates_ref_ru
-        ]
+        ev_ru = reel_evolution.get(ru.it, {})
+
+        reel_series = [len(ev_ru.get(d, set())) for d in dates_ref_ru]
         maquette_series = []
         for d in dates_ref_ru:
             snap = maquettes_par_date[d].get(ru.it)
@@ -1265,17 +1267,13 @@ def _stats_et_evolutions_par_ru(responsables, operateur, ids_total_r, maquette_m
             "reel": reel_series, "systeme": systeme, "maquette": maquette_series,
         }
 
-        reel_series_jour = [
-            reelEff(ru.it, date_reference=d).values('it').distinct().count()
-            for d in dates_jour
-        ]
+        reel_series_jour = [len(ev_ru.get(d, set())) for d in dates_jour]
         ru_evolution_jour[ru.it] = {
             "nom": ru.nom_complete, "labels": jours_labels,
             "reel": reel_series_jour, "systeme": systeme, "maquette": maquette_ru,
         }
 
     return liste_ru_stats, ru_evolution, ru_evolution_jour
-
 
 def pilot_dashboard(request):
     it = request.session.get("it")

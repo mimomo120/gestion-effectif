@@ -32,14 +32,6 @@
                 </svg>
                 Exporter le réel
             </a>
-            <button type="button" class="btn-departs-changements position-relative" data-bs-toggle="modal"
-                data-bs-target="#modalDepartsChangements">
-                <i class="fas fa-people-arrows"></i>
-                Départs &amp; changements
-                {% if nbr_departs_total or nbr_changements_total %}
-                <span class="badge-count">{{ nbr_departs_total|add:nbr_changements_total|default:0 }}</span>
-                {% endif %}
-            </button>
         </div>
     </div>
 
@@ -95,31 +87,52 @@
                 </div>
             </div>
         </div>
-
-        <div class="kpi-card">
-            <div class="kpi-icon-wrapper icon-red">
-                <i class="fas fa-user-minus"></i>
-            </div>
-            <div class="kpi-content">
-                <span class="kpi-title">Total Départs</span>
-                <div class="kpi-val-group">
-                    <span class="kpi-value">{{ depart_TOT|default:"0" }}</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="kpi-card">
-            <div class="kpi-icon-wrapper icon-amber">
-                <i class="fas fa-triangle-exclamation"></i>
-            </div>
-            <div class="kpi-content">
-                <span class="kpi-title">RU non validés</span>
-                <div class="kpi-val-group">
-                    <span class="kpi-value">{{ non_valides|default:"0" }} / {{ ru_total|default:"0" }}</span>
-                </div>
-            </div>
-        </div>
     </section>
+    <div class="alert-strip">
+        <div class="alert-pill">
+            <span class="stat-icon icon-red" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                    </path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ non_valides|default:"0" }} / {{ru_total|default:"0"}}</span>
+                <span class="alert-pill-label">RU non validés</span>
+            </div>
+        </div>
+        <div class="alert-pill" data-bs-toggle="modal" data-bs-target="#modalDepart" style="cursor: pointer;">
+            <span class="stat-icon icon-red" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M1 21v-2a4 4 0 0 1 4-4h4"></path>
+                    <line x1="17" y1="8" x2="22" y2="13"></line>
+                    <line x1="22" y1="8" x2="17" y2="13"></line>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ depart_TOT|default:"0" }}</span>
+                <span class="alert-pill-label">Départs déclarés</span>
+            </div>
+        </div>
+        
+        <div class="alert-pill" data-bs-toggle="modal" data-bs-target="#modalChangement" style="cursor: pointer;">
+            <span class="stat-icon icon-amber" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="17 1 21 5 17 9"></polyline>
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                    <polyline points="7 23 3 19 7 15"></polyline>
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                </svg>
+            </span>
+            <div class="alert-pill-text">
+                <span class="alert-pill-value">{{ nbr_changements_non_faits|default:"0" }}</span>
+                <span class="alert-pill-label">Changements en attente</span>
+            </div>
+        </div>
+    </div>
 
     <!-- 2. Zone Principale -->
     <div class="main-grid">
@@ -127,9 +140,6 @@
         <div class="card-panel chart-panel">
             <div class="panel-header d-flex justify-content-between align-items-center mb-3">
                 <h2 class="panel-title">Évolution de l'Effectif Réel</h2>
-                <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary active">30 jours</button>
-                </div>
             </div>
             <div class="chart-box">
                 <canvas id="effectifChart"></canvas>
@@ -197,137 +207,147 @@
 </div>
 
 <!-- ===== POPUP : DÉPARTS & CHANGEMENTS ===== -->
-<div class="modal fade" id="modalDepartsChangements" tabindex="-1" aria-labelledby="modalDepartsChangementsLabel"
+<div class="modal fade custom-modal" id="modalDepart" tabindex="-1" aria-labelledby="modalListeN2Label"
     aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalDepartsChangementsLabel">
-                    <i class="fas fa-people-arrows"></i>
-                    Départs et changements d'affectation
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-            </div>
-            <div class="modal-body">
-                <ul class="nav nav-tabs" id="dcTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="tab-departs-btn" data-bs-toggle="tab"
-                            data-bs-target="#tab-departs" type="button" role="tab" aria-controls="tab-departs"
-                            aria-selected="true">
-                            <i class="fas fa-user-minus"></i>
-                            Départs <span class="badge bg-secondary">{{ nbr_departs_total|default:"0" }}</span>
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="tab-changements-btn" data-bs-toggle="tab"
-                            data-bs-target="#tab-changements" type="button" role="tab" aria-controls="tab-changements"
-                            aria-selected="false">
-                            <i class="fas fa-right-left"></i>
-                            Changements <span class="badge bg-secondary">{{ nbr_changements_total|default:"0" }}</span>
-                        </button>
-                    </li>
-                </ul>
-
-                <div class="tab-content pt-3" id="dcTabsContent">
-                    <!-- Onglet Départs -->
-                    <div class="tab-pane fade show active" id="tab-departs" role="tabpanel"
-                        aria-labelledby="tab-departs-btn">
-
-                        <form method="GET" class="tab-filter-form">
-                            <input type="hidden" name="tab" value="departs">
-                            {% if date_changement %}
-                            <input type="hidden" name="date_changement" value="{{ date_changement }}">
-                            {% endif %}
-                            <label class="text-muted small mb-0"><i class="far fa-calendar-alt me-1"></i>Filtrer par
-                                date</label>
-                            <input type="date" name="date_depart" value="{{ date_depart }}"
-                                class="form-control form-control-sm" onchange="this.form.submit()">
-                            {% if date_depart %}
-                            <a href="?tab=departs{% if date_changement %}&date_changement={{ date_changement }}{% endif %}"
-                                class="btn btn-sm btn-outline-secondary" title="Réinitialiser"><i
-                                    class="fas fa-times"></i></a>
-                            {% endif %}
-                        </form>
-
-                        <div class="table-responsive">
-                            <table class="table-dept">
-                                <thead>
-                                    <tr>
-                                        <th>Collaborateur</th>
-                                        <th>Département</th>
-                                        <th>Date</th>
-                                        <th>Déclaré par</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for dep in liste_departs %}
-                                    <tr>
-                                        <td class="dept-name">{{ dep.collaborateur_it }}</td>
-                                        <td class="text-muted">{{ dep.collaborateur_it.departement.abreviation }}</td>
-                                        <td>{{ dep.date|date:"d/m/Y" }}</td>
-                                        <td class="text-muted">{{ dep.Ru }}</td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr>
-                                        <td colspan="4" class="text-muted text-center py-3">Aucun départ trouvé</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="modal-title-icon icon-violet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
                     </div>
-
-                    <!-- Onglet Changements -->
-                    <div class="tab-pane fade" id="tab-changements" role="tabpanel"
-                        aria-labelledby="tab-changements-btn">
-
-                        <form method="GET" class="tab-filter-form">
-                            <input type="hidden" name="tab" value="changements">
-                            {% if date_depart %}
-                            <input type="hidden" name="date_depart" value="{{ date_depart }}">
-                            {% endif %}
-                            <label class="text-muted small mb-0"><i class="far fa-calendar-alt me-1"></i>Filtrer par
-                                date</label>
-                            <input type="date" name="date_changement" value="{{ date_changement }}"
-                                class="form-control form-control-sm" onchange="this.form.submit()">
-                            {% if date_changement %}
-                            <a href="?tab=changements{% if date_depart %}&date_depart={{ date_depart }}{% endif %}"
-                                class="btn btn-sm btn-outline-secondary" title="Réinitialiser"><i
-                                    class="fas fa-times"></i></a>
-                            {% endif %}
-                        </form>
-
-                        <div class="table-responsive">
-                            <table class="table-dept">
-                                <thead>
-                                    <tr>
-                                        <th>Collaborateur</th>
-                                        <th>Ancien Ru</th>
-                                        <th>Nouveau Ru</th>
-                                        <th>Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for chg in liste_changements %}
-                                    <tr>
-                                        <td class="dept-name">{{ chg.collaborateur_it }}</td>
-                                        <td class="text-muted">{{ chg.Ru }}</td>
-                                        <td class="text-muted">{{ chg.nv_Ru }}</td>
-                                        <td>{{ chg.date|date:"d/m/Y" }}</td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr>
-                                        <td colspan="4" class="text-muted text-center py-3">Aucun changement trouvé</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                    <div>
+                        <h5 class="modal-title" id="modalListeN2Label">Départs non appliqués</h5>
                     </div>
                 </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {% if liste_departs %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom</th>
+                                <th>Lot</th>
+                                <th>Date déclaration</th>
+                                <th>Responsable</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in liste_departs %}
+                            <tr>
+                                <td>{{ d.collaborateur_it_id }}</td>
+                                <td>{{ d.collaborateur_it.nom_complete }}</td>
+                                <td>{{ d.collaborateur_it.lot }}</td>
+                                <td>{{ d.date|date:"d/m/Y" }}</td>
+                                <td>{{ d.Ru_id|default:"-" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Aucun départ déclaré</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <p class="empty-state-text">Aucun depart trouvé dans le système.</p>
+                </div>
+                {% endif %}
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-secondary-custom btn-sm" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade custom-modal" id="modalChangement" tabindex="-1" aria-labelledby="modalListeN2Label"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="modal-title-icon icon-violet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h5 class="modal-title" id="modalListeN2Label">Changements non appliqués</h5>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0">
+                {% if liste_changements %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom</th>
+                                <th>Date déclaration</th>
+                                <th>Changements détectés</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in liste_changements %}
+                            <tr>
+                                <td>{{ c.collaborateur_it_id }}</td>
+                                <td>{{ c.collaborateur_it.nom_complete }}</td>
+                                <td>{{ c.date|date:"d/m/Y" }}</td>
+                                <td>
+                                    <ul class="mb-0 ps-3">
+                                        <li>Ru: {{ c.Ru_id|default:"-" }} &rarr; {{c.nv_ru_id }}
+                                        </li>
+                                    </ul>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Aucun changement en attente</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32"
+                            height="32">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <p class="empty-state-text">Aucun changement en attente.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary-custom btn-sm" data-bs-dismiss="modal">Fermer</button>
             </div>
         </div>
     </div>

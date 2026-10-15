@@ -865,6 +865,70 @@ def get_tous_les_it_sous_reel(it):
     return _recurse(it, set())
 
 
+def reelEff_evolution_multi(ru_ids, dates):
+    ru_ids = list(ru_ids)
+    dates = sorted(set(dates))
+    if not ru_ids or not dates:
+        return {ru_id: {} for ru_id in ru_ids}
+
+    # Base "système" actuelle de chaque RU (non historisée, comme dans
+    # reelEff() : Collaborateur.objects.filter(ru_it_id=it)).
+    base_par_ru = defaultdict(set)
+    for c_it, c_ru_it in (
+        Collaborateur.objects.filter(ru_it_id__in=ru_ids)
+        .exclude(it=F('ru_it_id'))
+        .values_list('it', 'ru_it_id')
+    ):
+        base_par_ru[c_ru_it].add(c_it)
+
+    # Toutes les déclarations utiles (seules natures existantes : D, C, A, V).
+    rows = list(
+        declaration_effectif.objects
+        .filter(Ru_id__in=ru_ids, date__lte=dates[-1], nature__in=["D", "C", "A", "V"])
+        .order_by('Ru_id', 'date')
+        .values_list('Ru_id', 'date', 'nature', 'collaborateur_it_id')
+    )
+    par_ru_rows = defaultdict(list)
+    for ru_id, dt, nat, cid in rows:
+        par_ru_rows[ru_id].append((dt, nat, cid))
+
+    resultat = {ru_id: {} for ru_id in ru_ids}
+
+    for ru_id in ru_ids:
+        rows_ru = par_ru_rows.get(ru_id, [])
+        # "der" = dernière déclaration (toutes natures) au plus tard à d.
+        toutes_dates_decl = sorted({r[0] for r in rows_ru})
+
+        # Exclusions cumulées (C ou D), à n'importe quelle date <= d.
+        cd_events = sorted((r[0], r[2]) for r in rows_ru if r[1] in ("C", "D"))
+        cd_dates_sorted = [e[0] for e in cd_events]
+
+        # Ajouts/validations, regroupés par date exacte de déclaration.
+        av_par_date = defaultdict(lambda: {"A": set(), "V": set()})
+        for dt, nat, cid in rows_ru:
+            if nat in ("A", "V"):
+                av_par_date[dt][nat].add(cid)
+
+        base_ids = base_par_ru.get(ru_id, set())
+
+        for d in dates:
+            pos = bisect.bisect_right(toutes_dates_decl, d) - 1
+            if pos < 0:
+                # Aucune déclaration connue avant/à cette date -> base pure.
+                resultat[ru_id][d] = set(base_ids) - {ru_id}
+                continue
+
+            derniere_d = toutes_dates_decl[pos]
+            exclus_idx = bisect.bisect_right(cd_dates_sorted, d)
+            exclus = {cid for (dt, cid) in cd_events[:exclus_idx]}
+            av = av_par_date.get(derniere_d, {"A": set(), "V": set()})
+
+            operateurs = (base_ids - exclus) | av["A"] | av["V"]
+            operateurs.discard(ru_id)
+            resultat[ru_id][d] = operateurs
+
+    return resultat
+
 def respo_N4(request):
     it = request.session.get("it")
     if not it:
