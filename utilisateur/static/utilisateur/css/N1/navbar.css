@@ -16,12 +16,12 @@
     width: 100%;
 }
 
-/* En-tête bicolore flexible sans saut de couleur */
+/* En-tête bicolore flexible - overflow passé à visible pour ne pas couper le menu déroulant */
 .top-bar {
     background-color: var(--bg-header-left);
     min-height: 75px;
     position: relative;
-    overflow: hidden;
+    overflow: visible !important;
 }
 
 .brand-section {
@@ -32,6 +32,7 @@
 .user-section {
     background-color: var(--bg-header-right);
     min-height: 75px;
+    overflow: visible !important;
 }
 
 /* Brand Section */
@@ -49,6 +50,14 @@
 /* Carte Utilisateur */
 .user-card {
     border: 1px solid rgba(255, 255, 255, 0.15);
+    overflow: visible !important;
+}
+
+/* Correction pour le menu déroulant des rôles */
+.role-switcher .dropdown-menu {
+    z-index: 1050 !important;
+    position: absolute !important;
+    margin-top: 0.5rem;
 }
 
 .avatar-circle {

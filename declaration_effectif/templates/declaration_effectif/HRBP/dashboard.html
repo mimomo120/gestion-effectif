@@ -46,9 +46,8 @@
                 <div class="kpi-val-group">
                     <span class="kpi-value">{{ colReel|default:0 }}</span>
                     {% if MR > 0 %}
-                    <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MR }}</span>
-                    {% elif MR < 0 %} <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i> {{ MR
-                        }}</span>
+                    <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MR }} vs maquette</span>
+                    {% elif MR < 0 %} <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i> {{ MR}} vs maquette</span>
                         {% else %}
                         <span class="status-badge neutral">0</span>
                         {% endif %}
@@ -65,9 +64,8 @@
                 <div class="kpi-val-group">
                     <span class="kpi-value">{{ colSyst|default:"0" }}</span>
                     {% if MS > 0 %}
-                    <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MS }}</span>
-                    {% elif MS < 0 %} <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i> {{ MS
-                        }}</span>
+                    <span class="status-badge positive"><i class="fas fa-arrow-up me-1"></i> +{{ MS }} vs maquette</span>
+                    {% elif MS < 0 %} <span class="status-badge negative"><i class="fas fa-arrow-down me-1"></i> {{ MS}} vs maquette</span>
                         {% else %}
                         <span class="status-badge neutral">0</span>
                         {% endif %}
@@ -128,7 +126,7 @@
                 </svg>
             </span>
             <div class="alert-pill-text">
-                <span class="alert-pill-value">{{ nbr_changements_non_faits|default:"0" }}</span>
+                <span class="alert-pill-value">{{ nbr_changements_total|default:"0" }}</span>
                 <span class="alert-pill-label">Changements en attente</span>
             </div>
         </div>
@@ -236,6 +234,7 @@
                             <tr>
                                 <th>Matricule</th>
                                 <th>Nom</th>
+                                <th>DPT</th>
                                 <th>Lot</th>
                                 <th>Date déclaration</th>
                                 <th>Responsable</th>
@@ -246,6 +245,7 @@
                             <tr>
                                 <td>{{ d.collaborateur_it_id }}</td>
                                 <td>{{ d.collaborateur_it.nom_complete }}</td>
+                                <td>{{ d.collaborateur_it.departement_id }}</td>
                                 <td>{{ d.collaborateur_it.lot }}</td>
                                 <td>{{ d.date|date:"d/m/Y" }}</td>
                                 <td>{{ d.Ru_id|default:"-" }}</td>
@@ -307,8 +307,10 @@
                             <tr>
                                 <th>Matricule</th>
                                 <th>Nom</th>
+                                <th>DPT</th>
                                 <th>Date déclaration</th>
                                 <th>Changements détectés</th>
+                                <th>Dpt</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -316,17 +318,25 @@
                             <tr>
                                 <td>{{ c.collaborateur_it_id }}</td>
                                 <td>{{ c.collaborateur_it.nom_complete }}</td>
+                                <td>{{c.departement_id}}</td>
                                 <td>{{ c.date|date:"d/m/Y" }}</td>
                                 <td>
                                     <ul class="mb-0 ps-3">
-                                        <li>Ru: {{ c.Ru_id|default:"-" }} &rarr; {{c.nv_ru_id }}
+                                        <li>Ru: {{ c.Ru_id|default:"-" }} &rarr; {{c.nv_Ru_id }}
+                                        </li>
+                                    </ul>
+                                </td>
+                                <td>
+                                    <ul class="mb-0 ps-3">
+                                        <li>Ru: {{ c.Ru.departement_id|default:"-" }} &rarr; {{c.nv_Ru.departement_id}}
                                         </li>
                                     </ul>
                                 </td>
                             </tr>
+
                             {% empty %}
                             <tr>
-                                <td colspan="4" class="text-center text-muted">Aucun changement en attente</td>
+                                <td colspan="6" class="text-center text-muted">Aucun changement en attente</td>
                             </tr>
                             {% endfor %}
                         </tbody>

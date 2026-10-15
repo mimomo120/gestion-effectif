@@ -477,19 +477,8 @@ def envoyer_alert(request):
     )
     return JsonResponse({"status": "ok", "message": "Alerte envoyée."})
 
-
-# ------------------------------------------------------------------
-# OPTIMISATION : équivalents "batchés" de SystEff() et reelEff() pour
-# PLUSIEURS RU à la fois, AVEC la répartition par lot incluse.
-# ------------------------------------------------------------------
-
 def _systeme_effectif_batch(ru_ids, managers_its):
-    """
-    Équivalent batché de SystEff() pour plusieurs RU.
-    Retourne (total_par_ru, lot_par_ru) :
-      - total_par_ru = {ru_id: count}
-      - lot_par_ru   = {ru_id: {lot: count}}
-    """
+
     ru_ids = list(ru_ids)
     if not ru_ids:
         return {}, {}
@@ -513,12 +502,9 @@ def _systeme_effectif_batch(ru_ids, managers_its):
 
 
 def _reel_effectif_batch(ru_ids):
-    """
-    Équivalent batché de reelEff() (sans date_reference) pour plusieurs
-    RU. Reproduit fidèlement la logique de Collaborateur.views.reelEff().
-    Retourne {ru_id: set(collaborateur_it)}.
-    """
+
     ru_ids = list(ru_ids)
+    ru_ids_set = set(ru_ids)
     if not ru_ids:
         return {}
 
@@ -550,21 +536,42 @@ def _reel_effectif_batch(ru_ids):
         if dernieres_dates.get(ru_id) == dt:
             ajouts_valides_par_ru[ru_id].add(collab_id)
 
+    entrants_candidats = set(
+        declaration_effectif.objects.filter(nature="C", nv_Ru_id__in=ru_ids)
+        .values_list('collaborateur_it_id', flat=True)
+    )
+
+    entrants_valides_par_ru = defaultdict(set)
+    if entrants_candidats:
+        toutes_decls_candidats = (
+            declaration_effectif.objects
+            .filter(collaborateur_it_id__in=entrants_candidats)
+            .order_by("collaborateur_it_id", "-date", "-id")
+            .values_list("collaborateur_it_id", "nature", "nv_Ru_id")
+        )
+        derniere_par_collab = {}
+        for cid, nat, nv_ru_id in toutes_decls_candidats:
+            derniere_par_collab.setdefault(cid, (nat, nv_ru_id))
+
+        for cid, (nat, nv_ru_id) in derniere_par_collab.items():
+            if nat == "C" and nv_ru_id in ru_ids_set:
+                entrants_valides_par_ru[nv_ru_id].add(cid)
+
     resultat = {}
     for ru_id in ru_ids:
         if ru_id in dernieres_dates:
             base = membres_par_ru.get(ru_id, set()) - exclus_par_ru.get(ru_id, set())
-            resultat[ru_id] = (base | ajouts_valides_par_ru.get(ru_id, set())) - {ru_id}
+            operateurs = base | ajouts_valides_par_ru.get(ru_id, set())
         else:
-            resultat[ru_id] = membres_par_ru.get(ru_id, set())
+            operateurs = set(membres_par_ru.get(ru_id, set()))
+        operateurs |= entrants_valides_par_ru.get(ru_id, set())
+        operateurs.discard(ru_id)
+        resultat[ru_id] = operateurs
     return resultat
 
 
 def _reel_effectif_lot_batch(ru_ids):
-    """
-    Comme _reel_effectif_batch(), mais ramène aussi la répartition par
-    lot : (total_par_ru, lot_par_ru), avec lot_par_ru = {ru_id: {lot: count}}.
-    """
+
     reel_sets = _reel_effectif_batch(ru_ids)
 
     tous_collab_ids = set()
@@ -782,9 +789,6 @@ def dashboard_N3(request):
         lot_key = _cle_lot(lot_value)
         lot_details.setdefault(lot_key, []).append({"nom": nom, "reel": reel, "systeme": systeme, "maquette": maquette})
 
-    # ---- OPTIMISATION : on réutilise systeme_lot / reel_lot calculés
-    # plus haut, au lieu de rappeler SystEff()/reelEff() une seconde fois
-    # par N1 rien que pour la répartition par lot. ----
     for stat in liste_ru_stats:
         n1 = stat["n1"]
         n1_it = n1.it
@@ -819,10 +823,7 @@ def dashboard_N3(request):
         add_to_lot(getattr(n2, "lot", None), reel=1, systeme=1)
         add_detail(getattr(n2, "lot", None), getattr(n2, "nom_complete", n2.it), reel=1, systeme=1)
 
-    # ---- FIX : ce bloc était auparavant IMBRIQUÉ dans la boucle
-    # "for lot_key in (...)" ci-dessous (bug d'indentation), ce qui
-    # exécutait ces requêtes 4 FOIS pour rien. Il est maintenant sorti
-    # de la boucle et exécuté une seule fois. ----
+
     for lot_key in ("A/O", "P", "E", "C"):
         lot_stats.setdefault(lot_key, {"reel": 0, "systeme": 0, "maquette": 0})
 
@@ -847,7 +848,6 @@ def dashboard_N3(request):
         if d.collaborateur_it_id in collabs_departs_map
     ]
 
-    # ---- Changements déclarés mais pas encore appliqués dans la table Collaborateur ----
     declarations_changements = list(
         declaration_effectif.objects.filter(nature='C', Ru_id__in=tous_les_ru_ids).order_by('-date')
     )
@@ -888,8 +888,6 @@ def dashboard_N3(request):
 
     somme_ap = stats['somme_ap'] or 0
     somme_ce = stats['somme_ce'] or 0
-    # Répartition par lot cohérente avec maquette_totale : on utilise
-    # UNIQUEMENT la ligne propre du N+3, pas celles de ses N+1/N+2.
     maquette_map_pour_lot = {it_session_original: maquette_n3_obj} if maquette_n3_obj else {}
     repartir_maquette_par_lot(maquette_map_pour_lot, lot_stats)
 
@@ -1009,7 +1007,6 @@ def page_N4(request):
 
     vrais_n1_ids = {m for m in managers_ids if niveau_par_it.get(m) == 1}
 
-    # ---- Départs déclarés mais toujours présents dans la table Collaborateur ----
     declarations_departs = list(
         declaration_effectif.objects.filter(nature='D', Ru_id__in=vrais_n1_ids).order_by('-date')
     )
@@ -1029,8 +1026,6 @@ def page_N4(request):
         for d in declarations_departs
         if d.collaborateur_it_id in collabs_departs_map
     ]
-
-    # ---- Changements déclarés mais pas encore appliqués dans la table Collaborateur ----
     declarations_changements = list(
         declaration_effectif.objects.filter(nature='C', Ru_id__in=vrais_n1_ids).order_by('-date')
     )
@@ -1109,9 +1104,6 @@ def page_N4(request):
     liste_n1 = Collaborateur.objects.filter(it__in=vrais_n1_ids).select_related("departement")
     maquettes_n1_map = get_maquettes_n1_map(vrais_n1_ids)
 
-    # ---- OPTIMISATION : systeme/reel (total ET par lot) calculés EN BLOC
-    # pour tous les N1 d'un coup, réutilisés dans les DEUX boucles
-    # ci-dessous. ----
     vrais_n1_liste = [c.it for c in liste_n1]
     systeme_total, systeme_lot = _systeme_effectif_batch(vrais_n1_liste, tous_ru_it)
     reel_total, reel_lot = _reel_effectif_lot_batch(vrais_n1_liste)
@@ -1278,7 +1270,6 @@ def page_N4(request):
     n2_groups_directs_n4 = [construire_n2_group(n2) for n2 in n2_directs_n4]
     n1_stats_directs_n4 = [stats_by_it[c.it] for c in n1_directs_n4_collabs if c.it in stats_by_it]
 
-    # ---- CALCUL STATS PAR LOT ----
     lot_stats = {}
     lot_details = {}
 
@@ -1298,9 +1289,7 @@ def page_N4(request):
         lot_key = _cle_lot(lot_value)
         lot_details.setdefault(lot_key, []).append({"nom": nom, "reel": reel, "systeme": systeme, "maquette": maquette})
 
-    # ---- OPTIMISATION : on réutilise systeme_lot / reel_lot calculés
-    # plus haut, au lieu de rappeler SystEff()/reelEff() une seconde fois
-    # par N1 rien que pour la répartition par lot. ----
+
     for collab in liste_n1:
         it_n1 = collab.it
         systeme_par_lot_n1 = systeme_lot.get(it_n1, {})

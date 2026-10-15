@@ -91,8 +91,6 @@
                     <div class="avatar-circle">
                         NY
                     </div>
-
-                    <!-- Info Utilisateur + Role Dropdown -->
                     <div class="user-details text-start">
                         <div class="dropdown role-switcher">
                             {% if request.session.roles_disponibles|length > 1 %}
@@ -359,7 +357,7 @@
             <div class="container-fluid px-4">
                 <ul class="nav nav-tabs border-0">
                     <li class="nav-item">
-                        <a class="nav-link {% if 'pilot' in request.path|lower or 'dashboard' in request.path|lower %}active{% endif %}"
+                        <a class="nav-link {% if 'PILOT' in request.path|lower or 'dashboard' in request.path|lower %}active{% endif %}"
                             href="{% url 'pilot' %}">
                             <i class="fas fa-gauge-high"></i> Dashboard
                         </a>
@@ -371,13 +369,13 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if 'declaration' in request.path|lower %}active{% endif %}"
-                            href="{% url 'declaration' %}">
+                        <a class="nav-link {% if 'PILOT/valider' in request.path|lower %}active{% endif %}"
+                            href="{% url 'declaration_pilot' %}">
                             <i class="fa-solid fa-file-signature"></i> Declaration d'effectifs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if 'affectation' in request.path|lower %}active{% endif %}"
+                        <a class="nav-link {% if 'PILOT/affectation' in request.path|lower %}active{% endif %}"
                             href="{% url 'affectation_PILOT' %}">
                             <i class="fas fa-exchange-alt"></i> Changement d'affectation
                         </a>

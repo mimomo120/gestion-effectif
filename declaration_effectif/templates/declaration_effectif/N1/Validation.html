@@ -236,6 +236,9 @@
 {% block script %}
 {{ block.super }}
 <script>
+    const itN1 = "{{ request.session.it }}";
+</script>
+<script>
     const VALIDER_URL = "{% url 'valider_operateurs' %}";
     const STATUS = "{{ status|lower }}";
     const SUPPRIMER_URL = "{% url 'supprimer' %}";

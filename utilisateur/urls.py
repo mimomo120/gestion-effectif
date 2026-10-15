@@ -20,7 +20,7 @@ urlpatterns = [
     path("Dashboard/", views.dashboard_rh, name="dashboard"),
     path('utilisateurs/changer-mot-de-passe/', views.changer_mot_de_passe, name='changer_mot_de_passe'),
     path("PILOT/",views.pilot_dashboard,name="pilot"),
-    path("PILOT/valider", views.declaration, name="declaration"),
+    path("PILOT/valider", views.declaration, name="declaration_pilot"),
     path('filter_date_DPT', views.filter_date_DPT, name='filter_date_DPT'),
 ]
 

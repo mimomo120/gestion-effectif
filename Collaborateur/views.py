@@ -211,6 +211,7 @@ def rec(request):
     operateurs_finaux = operateurs_finaux.exclude(lot__in=["C", "E"])
     return operateurs_finaux
 
+
 #----------------------------------------------------------------------#
 #Cette fct return les operateurs reel d'un responsable N+1  ds un jour
 #----------------------------------------------------------------------#
@@ -220,16 +221,15 @@ def reelEff(it, date_reference=None, managers_its=None):
 
     if managers_its is None:
         managers_its = get_managers_its()
+    changements_sortants = declaration_effectif.objects.filter(nature__in=["C", "D"], Ru_id=it)
+    if date_reference:
+        changements_sortants = changements_sortants.filter(date__lte=date_reference)
+    liste_sortis = set(changements_sortants.values_list("collaborateur_it_id", flat=True))
 
     qs_declarations = declaration_effectif.objects.filter(Ru_id=it)
     if date_reference:
         qs_declarations = qs_declarations.filter(date__lte=date_reference)
     der = qs_declarations.order_by("-date").first()
-
-    changements_tous = declaration_effectif.objects.filter(nature__in=["C", "D"], Ru_id=it)
-    if date_reference:
-        changements_tous = changements_tous.filter(date__lte=date_reference)
-    liste_ch = set(changements_tous.values_list("collaborateur_it_id", flat=True))
 
     if der:
         derniere = der.date
@@ -239,18 +239,39 @@ def reelEff(it, date_reference=None, managers_its=None):
         liste_v = set(valider.values_list("collaborateur_it_id", flat=True))
 
         base_qs = Collaborateur.objects.filter(ru_it_id=it)
-
-        operateurs_qs = base_qs.filter(~Q(it__in=liste_ch)).exclude(it=it)
+        operateurs_qs = base_qs.filter(~Q(it__in=liste_sortis)).exclude(it=it)
         ajout_qs = Collaborateur.objects.filter(it__in=liste_a).exclude(it=it)
         valide_qs = Collaborateur.objects.filter(it__in=liste_v).exclude(it=it)
-
-        operateurs_qs = (operateurs_qs | ajout_qs | valide_qs).distinct()
+        operateurs_ids = set((operateurs_qs | ajout_qs | valide_qs).values_list("it", flat=True))
     else:
-        operateurs_qs = Collaborateur.objects.filter(ru_it_id=it).exclude(it=it)
+        operateurs_ids = set(
+            Collaborateur.objects.filter(ru_it_id=it).exclude(it=it).values_list("it", flat=True)
+        )
+    entrants_qs = declaration_effectif.objects.filter(nature="C", nv_Ru_id=it)
+    if date_reference:
+        entrants_qs = entrants_qs.filter(date__lte=date_reference)
+    entrants_candidats = set(entrants_qs.values_list("collaborateur_it_id", flat=True))
 
-    operateurs_finaux = operateurs_qs
-    return operateurs_finaux
+    if entrants_candidats:
+        toutes_decls_candidats = declaration_effectif.objects.filter(
+            collaborateur_it_id__in=entrants_candidats
+        )
+        if date_reference:
+            toutes_decls_candidats = toutes_decls_candidats.filter(date__lte=date_reference)
 
+        derniere_par_collab = {}
+        for cid, dt, nat, nv_ru_id in toutes_decls_candidats.order_by(
+            "collaborateur_it_id", "-date", "-id"
+        ).values_list("collaborateur_it_id", "date", "nature", "nv_Ru_id"):
+            derniere_par_collab.setdefault(cid, (nat, nv_ru_id))
+
+        entrants_valides = {
+            cid for cid, (nat, nv_ru_id) in derniere_par_collab.items()
+            if nat == "C" and nv_ru_id == it
+        }
+        operateurs_ids |= entrants_valides
+
+    return Collaborateur.objects.filter(it__in=operateurs_ids).exclude(it=it)
 #-------------------------------------------------------#
 #Cette fct return les operateurs  systeme d'un responsable N+1
 #-------------------------------------------------------#
@@ -586,11 +607,7 @@ def rechercher_N1_par_N2(request):
 #-------------------------------------------------------#
 
 def Rg_Dur(it):
-    """
-    Retourne les VRAIS N+2 directement sous 'it' (un N+3) : des
-    managers dont le sous-manager le plus profond est un vrai N+1
-    (au sens de niveau_hierarchique, règle A/O/P incluse).
-    """
+
     tous_ru_it = get_managers_its()
     mapping = get_hierarchie_map()
     managers_aop = get_managers_avec_operateurs_aop()
@@ -645,7 +662,6 @@ def liste_N2_par_N3(request):
         for c in tous
     ]
 
-    # RU distincts présents dans la liste, pour peupler le filtre "RU"
     ru_vus = {}
     for c in tous:
         if c.ru_it_id and c.ru_it_id not in ru_vus:
@@ -802,9 +818,7 @@ def get_n1_et_n2_sous(it, tous_ru_it=None, managers_aop=None):
     return n1_ids, n2_ids
 
 
-#-------------------------------------------------------#
-#Effectif RÉEL basé sur les déclarations (dernier état connu)
-#-------------------------------------------------------#
+
 def get_dernieres_declarations():
     derniers_ids = (
         declaration_effectif.objects
@@ -866,7 +880,9 @@ def get_tous_les_it_sous_reel(it):
 
 
 def reelEff_evolution_multi(ru_ids, dates):
+
     ru_ids = list(ru_ids)
+    ru_ids_set = set(ru_ids)
     dates = sorted(set(dates))
     if not ru_ids or not dates:
         return {ru_id: {} for ru_id in ru_ids}
@@ -881,7 +897,6 @@ def reelEff_evolution_multi(ru_ids, dates):
     ):
         base_par_ru[c_ru_it].add(c_it)
 
-    # Toutes les déclarations utiles (seules natures existantes : D, C, A, V).
     rows = list(
         declaration_effectif.objects
         .filter(Ru_id__in=ru_ids, date__lte=dates[-1], nature__in=["D", "C", "A", "V"])
@@ -892,18 +907,45 @@ def reelEff_evolution_multi(ru_ids, dates):
     for ru_id, dt, nat, cid in rows:
         par_ru_rows[ru_id].append((dt, nat, cid))
 
+    entrants_rows = list(
+        declaration_effectif.objects
+        .filter(nature="C", nv_Ru_id__in=ru_ids, date__lte=dates[-1])
+        .values_list('collaborateur_it_id', flat=True)
+    )
+    entrants_candidats = set(entrants_rows)
+
+
+    toutes_decls_par_candidat = defaultdict(list)
+    if entrants_candidats:
+        for cid, dt, nat, nv_ru_id in (
+            declaration_effectif.objects
+            .filter(collaborateur_it_id__in=entrants_candidats, date__lte=dates[-1])
+            .order_by('collaborateur_it_id', 'date')
+            .values_list('collaborateur_it_id', 'date', 'nature', 'nv_Ru_id')
+        ):
+            toutes_decls_par_candidat[cid].append((dt, nat, nv_ru_id))
+
+
+    entrants_actifs_par_date = {d: defaultdict(set) for d in dates}
+    for cid, decls in toutes_decls_par_candidat.items():
+        dts = [x[0] for x in decls]
+        for d in dates:
+            p = bisect.bisect_right(dts, d) - 1
+            if p < 0:
+                continue
+            _, nat, nv_ru_id = decls[p]
+            if nat == "C" and nv_ru_id in ru_ids_set:
+                entrants_actifs_par_date[d][nv_ru_id].add(cid)
+
     resultat = {ru_id: {} for ru_id in ru_ids}
 
     for ru_id in ru_ids:
         rows_ru = par_ru_rows.get(ru_id, [])
-        # "der" = dernière déclaration (toutes natures) au plus tard à d.
         toutes_dates_decl = sorted({r[0] for r in rows_ru})
 
-        # Exclusions cumulées (C ou D), à n'importe quelle date <= d.
         cd_events = sorted((r[0], r[2]) for r in rows_ru if r[1] in ("C", "D"))
         cd_dates_sorted = [e[0] for e in cd_events]
 
-        # Ajouts/validations, regroupés par date exacte de déclaration.
         av_par_date = defaultdict(lambda: {"A": set(), "V": set()})
         for dt, nat, cid in rows_ru:
             if nat in ("A", "V"):
@@ -914,16 +956,15 @@ def reelEff_evolution_multi(ru_ids, dates):
         for d in dates:
             pos = bisect.bisect_right(toutes_dates_decl, d) - 1
             if pos < 0:
-                # Aucune déclaration connue avant/à cette date -> base pure.
-                resultat[ru_id][d] = set(base_ids) - {ru_id}
-                continue
+                operateurs = set(base_ids)
+            else:
+                derniere_d = toutes_dates_decl[pos]
+                exclus_idx = bisect.bisect_right(cd_dates_sorted, d)
+                exclus = {cid for (dt, cid) in cd_events[:exclus_idx]}
+                av = av_par_date.get(derniere_d, {"A": set(), "V": set()})
+                operateurs = (base_ids - exclus) | av["A"] | av["V"]
 
-            derniere_d = toutes_dates_decl[pos]
-            exclus_idx = bisect.bisect_right(cd_dates_sorted, d)
-            exclus = {cid for (dt, cid) in cd_events[:exclus_idx]}
-            av = av_par_date.get(derniere_d, {"A": set(), "V": set()})
-
-            operateurs = (base_ids - exclus) | av["A"] | av["V"]
+            operateurs |= entrants_actifs_par_date[d].get(ru_id, set())
             operateurs.discard(ru_id)
             resultat[ru_id][d] = operateurs
 
@@ -1058,12 +1099,14 @@ def get_effectif_reel_ids(departement_ids, at_date):
         .filter(id=F('latest_id'))
     )
 
+    # Départ
     exclu1_ids = set(
         dernieres_declarations
         .filter(collaborateur_it__departement_id__in=departement_ids, nature="D")
         .values_list("collaborateur_it_id", flat=True)
     )
 
+    # Changement vers un dept hors périmètre
     exclu2_ids = set(
         dernieres_declarations
         .filter(collaborateur_it__departement_id__in=departement_ids, nature="C")
@@ -1071,83 +1114,60 @@ def get_effectif_reel_ids(departement_ids, at_date):
         .values_list("collaborateur_it_id", flat=True)
     )
 
-    inclu_ids = set(
+    # Ajout/validation faite par un RU HORS du périmètre -> sort du dept d'origine
+    exclu3_ids = set(
+        dernieres_declarations
+        .filter(collaborateur_it__departement_id__in=departement_ids, nature__in=["A", "V"])
+        .exclude(Ru__departement_id__in=departement_ids)
+        .values_list("collaborateur_it_id", flat=True)
+    )
+
+    # Changement entrant dans le périmètre
+    inclu_c_ids = set(
         dernieres_declarations
         .filter(nv_Ru__departement_id__in=departement_ids, nature="C")
+        .values_list("collaborateur_it_id", flat=True)
+    )
+
+    # Ajout/validation faite par un RU DU périmètre -> compté dedans
+    inclu_av_ids = set(
+        dernieres_declarations
+        .filter(Ru__departement_id__in=departement_ids, nature__in=["A", "V"])
         .values_list("collaborateur_it_id", flat=True)
     )
 
     ids_departement = set(
         Collaborateur.objects.filter(departement_id__in=departement_ids).values_list("it", flat=True)
     )
-    return (ids_departement - exclu1_ids - exclu2_ids) | inclu_ids
+    return (ids_departement - exclu1_ids - exclu2_ids - exclu3_ids) | inclu_c_ids | inclu_av_ids
 
 
-# ------------------------------------------------------------------
-# OPTIMISATION : équivalent "batché" de get_effectif_reel_ids() pour
-# PLUSIEURS dates à la fois.
-#
-# get_effectif_reel_ids() original, appelé une fois par date, refait
-# à chaque appel une sous-requête OuterRef/Subquery (coûteuse) pour
-# trouver la "dernière déclaration au plus tard à cette date" de
-# CHAQUE collaborateur. Pour un graphe sur ~12 mois + ~31 jours du
-# mois courant, ça fait jusqu'à ~42 requêtes lourdes.
-#
-# Ici : UNE seule requête ramène TOUTES les déclarations pertinentes
-# (triées par collaborateur/date/id), puis pour chaque date demandée
-# on retrouve en mémoire, via bisect, la dernière déclaration de
-# chaque collaborateur à cette date -- exactement la même logique
-# que get_ru_reel_et_departs_a_dates() plus bas dans ce fichier.
-#
-# NOTE IMPORTANTE (fidèle à l'original) : le département "propre" du
-# collaborateur (collaborateur_it__departement_id) et celui de son
-# nv_Ru (nv_Ru__departement_id) sont des champs NON historisés sur le
-# modèle Collaborateur -- ce sont donc les départements ACTUELS, pas
-# les départements "à la date d". Seule la NATURE de la dernière
-# déclaration varie selon la date. C'est exactement le comportement
-# de get_effectif_reel_ids() original.
-# ------------------------------------------------------------------
 def get_effectif_reel_ids_multi(departement_ids, dates):
-    """
-    Version multi-dates de get_effectif_reel_ids().
-    Retourne {date: set(collaborateur_it)}.
-    """
     dates = sorted(set(dates))
     if not dates:
         return {}
 
     departement_ids = list(departement_ids)
 
-    # Département ACTUEL de chaque collaborateur (champ non historisé,
-    # donc calculé une seule fois, indépendamment de la date).
     ids_departement = set(
         Collaborateur.objects.filter(departement_id__in=departement_ids)
         .values_list("it", flat=True)
     )
 
-    # Toutes les déclarations utiles jusqu'à la date la plus tardive
-    # demandée, triées par collaborateur/date/id -- UNE seule requête.
     rows = list(
         declaration_effectif.objects
         .filter(date__lte=dates[-1])
         .order_by("collaborateur_it_id", "date", "id")
-        .values_list("collaborateur_it_id", "date", "nature", "nv_Ru_id")
+        .values_list("collaborateur_it_id", "date", "nature", "Ru_id", "nv_Ru_id")
     )
 
     par_collab = defaultdict(list)
-    for cid, dt, nat, nv_ru_id in rows:
-        par_collab[cid].append((dt, nat, nv_ru_id))
+    for cid, dt, nat, ru_id, nv_ru_id in rows:
+        par_collab[cid].append((dt, nat, ru_id, nv_ru_id))
 
-    # Département ACTUEL des nv_Ru rencontrés (une seule requête,
-    # limitée aux nv_Ru effectivement présents dans les déclarations).
-    tous_nv_ru_ids = {nv_ru_id for _, _, _, nv_ru_id in rows if nv_ru_id}
-    nv_ru_dept_ok = (
-        set(
-            Collaborateur.objects.filter(
-                it__in=tous_nv_ru_ids, departement_id__in=departement_ids
-            ).values_list("it", flat=True)
-        )
-        if tous_nv_ru_ids else set()
+    tous_ru_ids = {ru_id for _, _, _, ru_id, _ in rows if ru_id} | {nv_ru_id for _, _, _, _, nv_ru_id in rows if nv_ru_id}
+    dept_par_ru = dict(
+        Collaborateur.objects.filter(it__in=tous_ru_ids).values_list("it", "departement_id")
     )
 
     resultat = {}
@@ -1160,16 +1180,22 @@ def get_effectif_reel_ids_multi(departement_ids, dates):
             pos = bisect.bisect_right(dts, d) - 1
             if pos < 0:
                 continue
-            _, nat, nv_ru_id = decls[pos]
+            _, nat, ru_id, nv_ru_id = decls[pos]
 
             if nat == "D":
                 if cid in ids_departement:
                     exclu_ids.add(cid)
             elif nat == "C":
-                nv_ru_ok = nv_ru_id in nv_ru_dept_ok
+                nv_ru_ok = dept_par_ru.get(nv_ru_id) in departement_ids
                 if cid in ids_departement and not nv_ru_ok:
                     exclu_ids.add(cid)
                 if nv_ru_ok:
+                    inclu_ids.add(cid)
+            elif nat in ("A", "V"):
+                ru_ok = dept_par_ru.get(ru_id) in departement_ids
+                if cid in ids_departement and not ru_ok:
+                    exclu_ids.add(cid)
+                if ru_ok:
                     inclu_ids.add(cid)
 
         resultat[d] = (ids_departement - exclu_ids) | inclu_ids
@@ -1206,7 +1232,6 @@ def get_departement_ids_for_role(role, it):
 def collaborateur(request):
     it = request.session.get("it")
     role = request.session.get("role")
-
     departement_ids = get_departement_ids_for_role(role, it)
     today = timezone.now().date()
     ids_total_r = get_effectif_reel_ids([dept.abreviation for dept in Departement.objects.filter(id__in=departement_ids)], today)
@@ -1313,16 +1338,7 @@ def get_n1_reels(departement):
     return ru_ids
 
 
-# ============================================================
-# synchroniser_maquettes_n1 : crée/désactive les lignes MaquetteN1
-# pour TOUS les managers reconnus (N+1 à N+4) d'un département.
-# Chaque niveau a sa propre ligne -- une page individuelle
-# (dashboard N+1/N+2/N+3/N+4) lit directement sa ligne, qui
-# contient déjà le cumul de toute sa branche en dessous d'elle.
-# Le calcul des "racines" (ci-dessous) sert uniquement à agréger
-# un PÉRIMÈTRE (département ou plusieurs) sans double compter une
-# branche déjà incluse dans celle de son manager au-dessus.
-# ============================================================
+
 @transaction.atomic
 def synchroniser_maquettes_n1(departement, modifie_par_it=None):
     from declaration_effectif.views import calculer_niveaux_hierarchie

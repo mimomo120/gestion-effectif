@@ -44,7 +44,6 @@ def login_view(request):
             utilis = utilisateur.objects.get(pk=it)
             collab = utilis.it
             if check_password(password, utilis.password):
-                # stocke l'identifiant collaborateur (chaîne it)
                 request.session["it"] = utilis.it.it
                 request.session["role"] = utilis.role
                 request.session["nom"] = collab.nom_complete
@@ -190,10 +189,6 @@ def tableau(request):
         if date_fin:
             mouvements_qs = mouvements_qs.filter(date__lte=date_fin)
 
-        # ---- OPTIMISATION : auparavant, chaque ligne du tableau faisait
-        # un Collaborateur.objects.filter(it=...).first() séparé (1 requête
-        # par mouvement affiché). On précharge maintenant tous les
-        # collaborateurs concernés en UNE requête. ----
         mouvements_list = list(mouvements_qs.order_by("-date"))
         collab_ids = {d.collaborateur_it_id for d in mouvements_list}
         collab_map = {
@@ -376,14 +371,10 @@ def deconnecter(request):
     )
     return redirect("login")
 
-
-# ------------------------------------------------------------------
-# OPTIMISATION : équivalent "batché" de reelEff() (sans date_reference)
-# pour PLUSIEURS responsables à la fois.
-# ------------------------------------------------------------------
 def _reel_effectif_batch(ru_ids):
-    """Retourne {ru_id: set(collaborateur_it)} pour tous les ru_ids donnés."""
+
     ru_ids = list(ru_ids)
+    ru_ids_set = set(ru_ids)
     if not ru_ids:
         return {}
 
@@ -415,13 +406,37 @@ def _reel_effectif_batch(ru_ids):
         if dernieres_dates.get(ru_id) == dt:
             ajouts_valides_par_ru[ru_id].add(collab_id)
 
+    entrants_candidats = set(
+        declaration_effectif.objects.filter(nature="C", nv_Ru_id__in=ru_ids)
+        .values_list('collaborateur_it_id', flat=True)
+    )
+
+    entrants_valides_par_ru = defaultdict(set)
+    if entrants_candidats:
+        toutes_decls_candidats = (
+            declaration_effectif.objects
+            .filter(collaborateur_it_id__in=entrants_candidats)
+            .order_by("collaborateur_it_id", "-date", "-id")
+            .values_list("collaborateur_it_id", "nature", "nv_Ru_id")
+        )
+        derniere_par_collab = {}
+        for cid, nat, nv_ru_id in toutes_decls_candidats:
+            derniere_par_collab.setdefault(cid, (nat, nv_ru_id))
+
+        for cid, (nat, nv_ru_id) in derniere_par_collab.items():
+            if nat == "C" and nv_ru_id in ru_ids_set:
+                entrants_valides_par_ru[nv_ru_id].add(cid)
+
     resultat = {}
     for ru_id in ru_ids:
         if ru_id in dernieres_dates:
             base = membres_par_ru.get(ru_id, set()) - exclus_par_ru.get(ru_id, set())
-            resultat[ru_id] = (base | ajouts_valides_par_ru.get(ru_id, set())) - {ru_id}
+            operateurs = base | ajouts_valides_par_ru.get(ru_id, set())
         else:
-            resultat[ru_id] = membres_par_ru.get(ru_id, set())
+            operateurs = set(membres_par_ru.get(ru_id, set()))
+        operateurs |= entrants_valides_par_ru.get(ru_id, set())
+        operateurs.discard(ru_id)
+        resultat[ru_id] = operateurs
     return resultat
 
 
@@ -452,8 +467,6 @@ def dashboard_N2(request):
     dates = [today - timedelta(days=i) for i in range(6, -1, -1)]
     labels_list = [d.strftime("%d %b") for d in dates]
 
-    # Graphique historisé, MÊME LOGIQUE que get_tous_les_it_sous_reel()
-    # (cohérent avec effectif_reel_total ci-dessous). 1 seule requête SQL.
     reel_par_date = get_tous_les_it_sous_reel_evolution(it, dates)
     data_list = [
         len(reel_par_date.get(d, set()))
@@ -831,7 +844,6 @@ def calculer_evolution_effectif_reel(departements, jours=30):
     return {"labels": labels, "valeurs": valeurs}
 
 @role_required(["HRBP", "DRH", "ADMIN"])
-@role_required(["HRBP", "DRH", "ADMIN"])
 def dashboard_rh(request):
     it = request.session.get("it")
     role = request.session.get("role")
@@ -869,7 +881,7 @@ def dashboard_rh(request):
             dernier_etat_activite[decl.collaborateur_it_id] = decl.nature
 
     liste_D = {c for c, nature in dernier_etat_activite.items() if nature == "D"}
-
+    
     colReel = Collaborateur.objects.filter(
         departement_id__in=departements
     ).exclude(it__in=liste_D).count()
@@ -939,14 +951,6 @@ def dashboard_rh(request):
         })
 
     today = timezone.now().date()
-
-    # ===== FIX =====
-    # AVANT : calculer_evolution_effectif_reel(departements) -> une
-    # évolution JOUR PAR JOUR sur les 30 derniers jours seulement.
-    # APRÈS : _calculer_evolution_reel (déjà utilisée par
-    # pilot_dashboard) -> un point par MOIS sur toute l'année en
-    # cours (via get_effectif_reel_ids_multi, une seule requête pour
-    # toutes les dates au lieu d'une requête par jour).
     ev = _calculer_evolution_reel(departements, today)
 
     collaborateurs_base = Collaborateur.objects.filter(departement_id__in=departements)
@@ -1016,7 +1020,6 @@ def dashboard_rh(request):
         "maquette": maquette,
         "MS": colSyst - maquette,
         "MR": colReel - maquette,
-        # Évolution mensuelle (12 mois, année en cours)
         "labels": ev["mois_labels_annee"],
         "valeurs": ev["evolution_annee"],
         "detail_par_dept": detail_par_dept,
@@ -1035,6 +1038,7 @@ def dashboard_rh(request):
     }
 
     return render(request, "declaration_effectif/HRBP/dashboard.html", context)
+
 def derniers_mouvements_respo(it_respo, limite=10):
     if not it_respo:
         return []
@@ -1108,6 +1112,7 @@ def _get_departs_et_changements(departement):
         liste_departs.append({
             "it": d.collaborateur_it_id,
             "nom": collab.nom_complete if collab else "-",
+            "dpt":collab.departement_id if collab else "-",
             "lot": collab.lot if collab else "-",
             "date_declaration": d.date,
             "ru": d.Ru_id,
@@ -1133,9 +1138,11 @@ def _get_departs_et_changements(departement):
             liste_changements_non_faits.append({
                 "it": c.collaborateur_it_id,
                 "nom": collab.nom_complete,
+                "dpt":c.collaborateur_it.departement_id if collab else "-",
                 "date_declaration": c.date,
                 "ru": c.Ru_id,
                 "diffs": diffs,
+                "dpt_init":c.Ru.departement_id,"dpt_acc":c.nv_Ru.departement_id,
             })
 
     return {
@@ -1157,13 +1164,8 @@ def pilot_departs_changements(request):
 
 
 def _calculer_evolution_reel(departement_ids, today):
-    """
-    OPTIMISATION : auparavant, get_effectif_reel_ids(departement_ids, d)
-    était appelé une fois par date (12 mois + jusqu'à 31 jours = ~42
-    requêtes lourdes avec sous-requête OuterRef/Subquery). Remplacé par
-    UNE seule requête via get_effectif_reel_ids_multi(), le résultat
-    étant ensuite simplement lu par date en mémoire.
-    """
+    
+
     premier_mois_annee = date(today.year, 1, 1)
     dates_ref_annee, mois_labels_annee = [], []
     curseur = premier_mois_annee
@@ -1239,11 +1241,14 @@ def _stats_et_evolutions_par_ru(responsables, operateur, ids_total_r, maquette_m
     toutes_dates = sorted(set(dates_ref_ru) | set(dates_jour))
     reel_evolution = reelEff_evolution_multi(ru_ids, toutes_dates)
 
+    reel_actuel_par_ru = {
+        ru_id: len(collabs) for ru_id, collabs in _reel_effectif_batch(ru_ids).items()
+    }
+
     for ru in responsables:
         equipe = operateur.filter(ru_it_id=ru.it)
-        equipe_ids = set(equipe.values_list('it', flat=True))
         systeme = equipe.count()
-        reel = len(equipe_ids & set(ids_total_r))
+        reel = reel_actuel_par_ru.get(ru.it, 0)
 
         maquette_obj = maquette_map.get(ru.it)
         maquette_ru = maquette_obj.total if maquette_obj else 0

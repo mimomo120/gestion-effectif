@@ -64,6 +64,13 @@ def iter_rows(df):
 # ------------------------------------------------------------------
 
 def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
+    """
+    Retourne (lignes_ok, lignes_total, lignes_erreur) :
+      - lignes_ok    : nb de lignes effectivement créées ou mises à jour
+      - lignes_total : nb de lignes présentes dans le fichier
+      - lignes_erreur: nb de lignes complètement ignorées (abréviation
+        manquante ou exception levée pendant le traitement de la ligne)
+    """
     if collaborateurs_map is None:
         collaborateurs_map = {c.it: c for c in Collaborateur.objects.all()}
 
@@ -71,12 +78,15 @@ def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
 
     a_creer = []
     a_maj = []
+    lignes_total = len(df_dpt)
+    lignes_erreur = 0
 
     for i, row in iter_rows(df_dpt):
         try:
             abbrev = clean_val(row.get("Abreviation") or row.get("abreviation"))
             if not abbrev:
                 erreurs.append(f"Départements Ligne {i+2}: Abréviation manquante.")
+                lignes_erreur += 1
                 continue
 
             nom_dpt = row.get("nom_departement") or abbrev
@@ -118,6 +128,7 @@ def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
 
         except Exception as e:
             erreurs.append(f"Départements Ligne {i+2}: {e}")
+            lignes_erreur += 1
 
     with transaction.atomic():
         if a_creer:
@@ -127,7 +138,8 @@ def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
                 a_maj, ["nom_departement", "HRBP", "ADMIN", "DRH", "PILOT"], batch_size=1000
             )
 
-    return len(a_creer) + len(a_maj)
+    lignes_ok = len(a_creer) + len(a_maj)
+    return lignes_ok, lignes_total, lignes_erreur
 
 
 CHAMPS_SUIVIS = ["matricule", "nom_complete", "lot", "departement", "eq", "shift", "sexe"]
@@ -152,6 +164,16 @@ def _normalize_for_match(s):
 
 
 def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_map=None):
+    """
+    Retourne :
+      (nb_lignes_traitees_total_incl_suppressions, collaborateurs_dans_fichier,
+       lignes_ok, lignes_total, lignes_erreur)
+
+    lignes_ok     : nb de lignes du fichier effectivement créées ou mises à jour
+    lignes_total  : nb de lignes présentes dans le fichier
+    lignes_erreur : nb de lignes du fichier jamais traitées (IT manquant ou
+                    exception levée pendant le traitement de la ligne)
+    """
     # maps existants (cache) : clé = abbreviation stripped
     departements_map = {d.abreviation.strip(): d for d in Departement.objects.all()}
     if collaborateurs_map is None:
@@ -166,12 +188,15 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
     ru_a_resoudre = []
     collaborateurs_dans_fichier = set()
     details_a_creer = []
+    lignes_total = len(df_collab)
+    lignes_erreur = 0
 
     for i, row in iter_rows(df_collab):
         try:
             utilisateur_it = clean_val(row.get("Utilisateur") or row.get("IT") or row.get("it"))
             if not utilisateur_it:
                 erreurs.append(f"Collaborateurs Ligne {i+2}: Identifiant Utilisateur manquant.")
+                lignes_erreur += 1
                 continue
 
             collaborateurs_dans_fichier.add(utilisateur_it)
@@ -246,6 +271,7 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
 
         except Exception as e:
             erreurs.append(f"Collaborateurs Ligne {i+2}: {e}")
+            lignes_erreur += 1
             if import_log is not None:
                 details_a_creer.append(histo_import_detail(
                     import_parent=import_log,
@@ -361,24 +387,37 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
         import_log.depar = len(a_creer)
         import_log.modif = len([d for d in details_a_creer if d.action == "MODIFICATION"])
         import_log.supprime = len(collaborateurs_a_supprimer)
-        import_log.erreur = len(erreurs)
+        import_log.erreur = lignes_erreur
         import_log.save(update_fields=["depar", "modif", "supprime", "erreur"])
 
-    return len(a_creer) + len(a_maj) + len(collaborateurs_a_supprimer), collaborateurs_dans_fichier
+    lignes_ok = len(a_creer) + len(a_maj)
+    return (
+        len(a_creer) + len(a_maj) + len(collaborateurs_a_supprimer),
+        collaborateurs_dans_fichier,
+        lignes_ok,
+        lignes_total,
+        lignes_erreur,
+    )
 
 # ------------------------------------------------------------------
 # IMPORT CHANGEMENTS D'AFFECTATION (inchangé sauf noms DPT)
 # ------------------------------------------------------------------
 
 def importer_changements(df_chg, erreurs):
+    """
+    Retourne (lignes_ok, lignes_total, lignes_erreur).
+    """
     departements_map = {d.abreviation: d for d in Departement.objects.all()}
     a_creer = []
+    lignes_total = len(df_chg)
+    lignes_erreur = 0
 
     for i, row in iter_rows(df_chg):
         try:
             collaborateur = clean_val(row.get("Nom & prénom"))
             if not collaborateur:
                 erreurs.append(f"Changements Ligne {i+2}: Nom du collaborateur manquant.")
+                lignes_erreur += 1
                 continue
 
             initial = clean_val(row.get("Ru (Initial)")) or ""
@@ -407,12 +446,14 @@ def importer_changements(df_chg, erreurs):
             a_creer.append(obj)
         except Exception as e:
             erreurs.append(f"Changements Ligne {i+2}: {e}")
+            lignes_erreur += 1
 
     with transaction.atomic():
         if a_creer:
             historique.objects.bulk_create(a_creer, batch_size=1000)
 
-    return len(a_creer)
+    lignes_ok = len(a_creer)
+    return lignes_ok, lignes_total, lignes_erreur
 
 # ------------------------------------------------------------------
 # SUIVI DES DÉCLARATIONS VS FICHIER IMPORTÉ
@@ -583,6 +624,12 @@ def importer_fichiers_combines(request):
 
     erreurs = []
     crees_dpts = crees_collabs = crees_chgs = 0
+
+    # ===== Compteurs précis lignes OK / total / erreur, par fichier =====
+    dpt_ok = dpt_total = dpt_err = 0
+    collab_ok = collab_total = collab_err = 0
+    chg_ok = chg_total = chg_err = 0
+
     import_log = None
     debut = timezone.now()
     synthese_declarations = None
@@ -602,7 +649,8 @@ def importer_fichiers_combines(request):
     if f_dpt:
         try:
             df_dpt = read_uploaded_file(f_dpt)
-            crees_dpts = importer_departements(df_dpt, erreurs, collaborateurs_map=collaborateurs_map)
+            dpt_ok, dpt_total, dpt_err = importer_departements(df_dpt, erreurs, collaborateurs_map=collaborateurs_map)
+            crees_dpts = dpt_ok
         except Exception as e:
             messages.error(request, f"Erreur de lecture du fichier Départements : {e}", extra_tags="import")
 
@@ -614,7 +662,13 @@ def importer_fichiers_combines(request):
                 nom_fichier=f_collab.name,
                 statut="EN_COURS",
             )
-            crees_collabs, collaborateurs_dans_fichier = importer_collaborateurs(
+            (
+                crees_collabs,
+                collaborateurs_dans_fichier,
+                collab_ok,
+                collab_total,
+                collab_err,
+            ) = importer_collaborateurs(
                 df_collab, erreurs, import_log=import_log, collaborateurs_map=collaborateurs_map
             )
             import_log.statut = "SUCCES" if not erreurs else "PARTIEL"
@@ -636,20 +690,30 @@ def importer_fichiers_combines(request):
     if f_chg:
         try:
             df_chg = read_uploaded_file(f_chg)
-            crees_chgs = importer_changements(df_chg, erreurs)
+            chg_ok, chg_total, chg_err = importer_changements(df_chg, erreurs)
+            crees_chgs = chg_ok
         except Exception as e:
             messages.error(request, f"Erreur de lecture du fichier Changements : {e}", extra_tags="import")
 
+    # ===== Résumé : X/Y lignes importées avec succès, Z en erreur =====
     resume = []
     if f_dpt:
-        resume.append(f"Départements: {crees_dpts} ligne(s) importée(s) avec succès")
+        resume.append(
+            f"Départements : {dpt_ok}/{dpt_total} ligne(s) importée(s) avec succès"
+            + (f", {dpt_err} en erreur" if dpt_err else "")
+        )
     if f_collab:
-        detail_msg = f"Collaborateurs: {crees_collabs} ligne(s) traitée(s)"
+        detail_msg = f"Collaborateurs : {collab_ok}/{collab_total} ligne(s) importée(s) avec succès"
+        if collab_err:
+            detail_msg += f", {collab_err} en erreur"
         if import_log:
             detail_msg += f" ({import_log.depar} créé(s), {import_log.modif} modifié(s), {import_log.supprime} supprimé(s))"
         resume.append(detail_msg)
     if f_chg:
-        resume.append(f"Changements d'affectation: {crees_chgs} ligne(s) importée(s) avec succès")
+        resume.append(
+            f"Changements d'affectation : {chg_ok}/{chg_total} ligne(s) importée(s) avec succès"
+            + (f", {chg_err} en erreur" if chg_err else "")
+        )
 
     messages.success(request, "Importation terminée : " + " | ".join(resume), extra_tags="import")
 

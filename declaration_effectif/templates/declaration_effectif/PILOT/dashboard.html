@@ -124,7 +124,7 @@
             </div>
             {% if MS > 0 %}
             <span class="badge-vs positive">&#9650; +{{ MS }} vs maquette</span>
-            {% elif MS < 0 %} <span class="badge-vs negative">&#9660; {{ MS }}</span>
+            {% elif MS < 0 %} <span class="badge-vs negative">&#9660; {{ MS }} vs maquette</span>
                 {% endif %}
         </div>
 
@@ -396,6 +396,7 @@
                             <tr>
                                 <th>Matricule</th>
                                 <th>Nom</th>
+                                <th>DPT</th>
                                 <th>Lot</th>
                                 <th>Date déclaration</th>
                                 <th>Responsable</th>
@@ -406,6 +407,7 @@
                             <tr>
                                 <td>{{ d.it }}</td>
                                 <td>{{ d.nom }}</td>
+                                <td>{{d.dpt}}</td>
                                 <td>{{ d.lot }}</td>
                                 <td>{{ d.date_declaration|date:"d/m/Y" }}</td>
                                 <td>{{ d.ru|default:"-" }}</td>
@@ -467,8 +469,10 @@
                             <tr>
                                 <th>Matricule</th>
                                 <th>Nom</th>
+                                <th>Dpt</th>
                                 <th>Date déclaration</th>
                                 <th>Changements détectés</th>
+                                <th>Dpt</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -476,12 +480,19 @@
                             <tr>
                                 <td>{{ c.it }}</td>
                                 <td>{{ c.nom }}</td>
+                                <td>{{c.dpt}}</td>
                                 <td>{{ c.date_declaration|date:"d/m/Y" }}</td>
                                 <td>
                                     <ul class="mb-0 ps-3">
                                         {% for champ, valeurs in c.diffs.items %}
                                         <li>{{ champ }} : {{ valeurs.ancien|default:"-" }} &rarr; {{valeurs.nouveau }}</li>
                                         {% endfor %}
+                                    </ul>
+                                </td>
+                                <td>
+                                    <ul class="mb-0 ps-3">
+                                        <li>DPT: {{ c.dpt_init|default:"-" }} &rarr; {{c.dpt_acc}}
+                                        </li>
                                     </ul>
                                 </td>
                             </tr>

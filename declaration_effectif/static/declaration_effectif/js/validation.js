@@ -337,10 +337,16 @@ document.addEventListener("click", async function (e) {
             const data = await response.json();
 
             if (data.valide) {
+                if (nvRu === itN1) {
+                    if (erreur) {
+                        erreur.textContent = "Vous ne pouvez pas utiliser votre propre identifiant comme nouveau RU.";
+                        erreur.style.display = "block";
+                    }
+                    return;
+                }
                 if (erreur) erreur.style.display = "none";
                 retirerDesListes(it);
                 liste_C.push({ it: it, nvRu: nvRu });
-
                 setRefuseBadge(btn_inv, "changement");
                 if (btn_v) btn_v.style.display = "none";
 
