@@ -13,11 +13,17 @@ from django.db import transaction, IntegrityError
 from django.views.decorators.csrf import ensure_csrf_cookie
 from collections import defaultdict
 from Collaborateur.views import (
-    rec, Ru_Rg, liste_N1_par_N2, Rg_Dur, liste_N1_pr_N3, liste_N3_N4,
-    SystEff, reelEff, get_tous_les_it_sous, get_tous_les_n1,
-    get_n1_et_n2_sous, get_managers_its, invalider_cache_hierarchie,
-    get_maquettes_n1_map, get_managers_avec_operateurs_aop, niveau_hierarchique,
-    get_hierarchie_map, repartir_maquette_par_lot,
+    rec, Ru_Rg, liste_N1_pr_N3, Rg_Dur, reelEff, SystEff,niveau_hierarchique,
+    get_effectif_reel_ids, get_effectif_reel_ids_multi, get_managers_its,
+    get_maquettes_n1_map,get_hierarchie_map,
+    repartir_maquette_par_lot, LOT_VERS_CHAMP_MAQUETTE,
+    _dates_fin_de_mois, _regrouper_par_annee, get_maquettes_a_date,
+    get_maquettes_a_date_multi,get_managers_avec_operateurs_aop,
+    get_managers_racines, calculer_maquette_totale_perimetre,get_n1_et_n2_sous,
+    get_tous_les_it_sous, get_tous_les_it_sous_reel,get_tous_les_n1,
+    get_tous_les_it_sous_reel_evolution, reelEff_evolution_multi, get_hierarchie_complete,
+            get_maquettes_multi, get_sous_managers_groupes,invalider_cache_hierarchie,
+                    get_sous_operateurs_groupes,liste_N3_N4
 )
 from django.views.decorators.http import require_POST
 from utilisateur.decorators import role_required
@@ -26,6 +32,7 @@ from django.core.paginator import PageNotAnInteger, Paginator, EmptyPage
 import bisect
 from django.views.decorators.cache import never_cache
 from django.contrib.auth.decorators import login_required
+
 
 
 @ensure_csrf_cookie
@@ -78,7 +85,14 @@ def valider(request):
     return JsonResponse({"status": "valider"})
 
 
+from django.core.cache import cache
+
 def calculer_niveaux_hierarchie():
+    cache_key = "niveaux_hierarchie_v1"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     tous_ru_it = get_managers_its()
     mapping = get_hierarchie_map()
     managers_aop = get_managers_avec_operateurs_aop()
@@ -90,16 +104,15 @@ def calculer_niveaux_hierarchie():
             managers_aop=managers_aop,
         )
 
-    niveau_par_it = {
-        it: min(n, 4) for it, n in cache_niveau.items() if n and n >= 1
-    }
-
+    niveau_par_it = {it: min(n, 4) for it, n in cache_niveau.items() if n and n >= 1}
     l1 = {it for it, n in niveau_par_it.items() if n == 1}
     l2 = {it for it, n in niveau_par_it.items() if n == 2}
     l3 = {it for it, n in niveau_par_it.items() if n == 3}
     l4 = {it for it, n in niveau_par_it.items() if n == 4}
 
-    return niveau_par_it, l1, l2, l3, l4
+    result = (niveau_par_it, l1, l2, l3, l4)
+    cache.set(cache_key, result, 120)
+    return result
 
 
 def determiner_hierarchie(it_val):
@@ -189,19 +202,60 @@ def validation_view(request):
     aujourdhui = timezone.localdate()
     der = declaration_effectif.objects.filter(Ru_id=it).order_by("-date").first()
 
+    membres_du_ru = set(
+        Collaborateur.objects.filter(ru_it_id=it)
+        .exclude(it=it)
+        .values_list("it", flat=True)
+    )
+    exclus_a_autre_ru = set()
+    if membres_du_ru:
+        toutes_decls = (
+            declaration_effectif.objects
+            .filter(collaborateur_it_id__in=membres_du_ru)
+            .order_by("collaborateur_it_id", "-date", "-id")
+            .values_list("collaborateur_it_id", "nature", "Ru_id")
+        )
+        derniere_decl_par_collab = {}
+        for cid, nat, ru_id_decl in toutes_decls:
+            if cid not in derniere_decl_par_collab:
+                derniere_decl_par_collab[cid] = (nat, ru_id_decl)
+        exclus_a_autre_ru = {
+            cid
+            for cid, (nat, ru_id_decl) in derniere_decl_par_collab.items()
+            if nat == "A" and ru_id_decl != it
+        }
+
     if der and der.date == aujourdhui:
-        operateurs_finaux_qs = declaration_effectif.objects.filter(Ru_id=it, date=aujourdhui)
-        operateurs_finaux_qs = operateurs_finaux_qs.exclude(collaborateur_it_id__in=manager_direct_its)
+        # -------- BRANCHE 1 : déjà validé aujourd'hui --------
+        operateurs_finaux_qs = declaration_effectif.objects.filter(
+            Ru_id=it, date=aujourdhui
+        )
+        operateurs_finaux_qs = operateurs_finaux_qs.exclude(
+            collaborateur_it_id__in=manager_direct_its
+        )
+        operateurs_finaux_qs = operateurs_finaux_qs.exclude(
+            collaborateur_it_id__in=exclus_a_autre_ru  # <-- AJOUT
+        )
+        operateurs_finaux_qs = operateurs_finaux_qs.exclude(
+            collaborateur_it__lot__in=["C", "E"]
+        )
         status = True
-        operateurs_finaux = operateurs_finaux_qs.exclude(collaborateur_it__lot__in=["C", "E"])
+        operateurs_finaux = operateurs_finaux_qs
     else:
+        # -------- BRANCHE 2 : pas encore validé --------
         candidats = rec(request)
         if hasattr(candidats, 'exclude'):
-            operateurs_finaux = candidats.exclude(it__in=manager_direct_its).exclude(lot__in=["C", "E"])
+            operateurs_finaux = (
+                candidats
+                .exclude(it__in=manager_direct_its)
+                .exclude(it__in=exclus_a_autre_ru)  # <-- AJOUT
+                .exclude(lot__in=["C", "E"])
+            )
         else:
             operateurs_finaux = [
                 c for c in candidats
                 if getattr(c, 'it', None) not in manager_direct_its
+                and getattr(c, 'it', None) not in exclus_a_autre_ru
                 and getattr(c, 'lot', None) not in ["C", "E"]
             ]
         status = False
@@ -212,7 +266,6 @@ def validation_view(request):
         request, 'declaration_effectif/N1/Validation.html',
         {"operateurs_finaux": operateurs_finaux, "nbr": nbr, "status": status, "date": aujourdhui}
     )
-
 
 def difference(request):
     it = request.session.get("it")
@@ -596,25 +649,19 @@ def _reel_effectif_lot_batch(ru_ids):
 
 @role_required('N+3')
 def dashboard_N3(request):
+    from collections import defaultdict
+
     it_session_original = request.session.get("it")
     if not it_session_original:
         return redirect("login")
 
-    tous_ru_it = get_managers_its()
-    mapping = get_hierarchie_map()
-    niveau_par_it_local = {}
-    for manager_it in tous_ru_it:
-        niveau_hierarchique(
-            manager_it, tous_ru_it, mapping, niveau_par_it_local,
-            managers_aop=tous_ru_it,
-        )
-    niveau_par_it = {it: min(n, 4) for it, n in niveau_par_it_local.items() if n and n >= 1}
-
-    l1 = {it for it, n in niveau_par_it.items() if n == 1}
-    l2 = {it for it, n in niveau_par_it.items() if n == 2}
-    l3 = {it for it, n in niveau_par_it.items() if n == 3}
-    l4 = {it for it, n in niveau_par_it.items() if n == 4}
-    tous_managers_classes = l1 | l2 | l3 | l4
+    # ⚡ UN SEUL APPEL pour toute la hiérarchie
+    H = get_hierarchie_complete()
+    tous_ru_it = H["managers_its"]
+    mapping = H["mapping"]
+    niveau_par_it = H["niveau_par_it"]
+    l1, l2, l3, l4 = H["l1"], H["l2"], H["l3"], H["l4"]
+    tous_managers_classes = H["tous_managers_classes"]
 
     directs_n3 = Collaborateur.objects.filter(ru_it_id=it_session_original)
     managers_directs_n3 = [c for c in directs_n3 if c.it in tous_managers_classes]
@@ -623,19 +670,22 @@ def dashboard_N3(request):
     n1_directs = [c for c in managers_directs_n3 if niveau_par_it.get(c.it) == 1]
     n2_list = [c for c in managers_directs_n3 if niveau_par_it.get(c.it) == 2]
 
-    def collab_niveau(m_it, niveau_cible):
-        return [c for c in Collaborateur.objects.filter(ru_it_id=m_it) if niveau_par_it.get(c.it) == niveau_cible]
+    # ⚡ 1 REQUÊTE GROUPÉE au lieu de 2*N
+    n2_ids = [n2.it for n2 in n2_list]
+    tous_sous_n2 = Collaborateur.objects.filter(ru_it_id__in=n2_ids)
 
-    def operateurs_directs_de(m_it):
-        return [c for c in Collaborateur.objects.filter(ru_it_id=m_it) if c.it not in tous_managers_classes]
-    
-    n2_to_n1 = {n2.it: collab_niveau(n2.it, 1) for n2 in n2_list}
-    n2_to_operateurs = {n2.it: operateurs_directs_de(n2.it) for n2 in n2_list}
+    n2_to_n1 = defaultdict(list)
+    n2_to_operateurs = defaultdict(list)
+    for c in tous_sous_n2:
+        if c.it in tous_managers_classes and niveau_par_it.get(c.it) == 1:
+            n2_to_n1[c.ru_it_id].append(c)
+        elif c.it not in tous_managers_classes:
+            n2_to_operateurs[c.ru_it_id].append(c)
+
     it_n2 = {c.it for c in n2_list}
-
     it_n1_set = {c.it for c in n1_directs}
-    for sous_managers in n2_to_n1.values():
-        it_n1_set.update(c.it for c in sous_managers)
+    for sous in n2_to_n1.values():
+        it_n1_set.update(c.it for c in sous)
     it_n1 = list(it_n1_set)
 
     nbr_n1_total = len(it_n1)
@@ -664,9 +714,7 @@ def dashboard_N3(request):
     collaborateurs_n1 = Collaborateur.objects.filter(it__in=it_n1).exclude(it__in=it_n2)
     maquettes_n1_map = get_maquettes_n1_map(it_n1)
 
-    # ---- OPTIMISATION : systeme/reel (total ET par lot) calculés EN BLOC
-    # pour tous les N1 d'un coup -- réutilisés plus bas dans la boucle
-    # "répartition par lot". ----
+    # ⚡ BATCH : 1 requête pour systeme, 1 pour reel
     it_n1_liste = [c.it for c in collaborateurs_n1]
     systeme_total, systeme_lot = _systeme_effectif_batch(it_n1_liste, tous_ru_it)
     reel_total, reel_lot = _reel_effectif_lot_batch(it_n1_liste)
@@ -770,6 +818,9 @@ def dashboard_N3(request):
             "nbr_collabs_total": sum(s["reel"] for s in n1_stats_n2) + len(sous_operateurs),
         })
 
+    # ============================================================
+    # Répartition par lot
+    # ============================================================
     lot_stats = {}
     lot_details = {}
 
@@ -787,7 +838,9 @@ def dashboard_N3(request):
 
     def add_detail(lot_value, nom, reel=0, systeme=0, maquette=0):
         lot_key = _cle_lot(lot_value)
-        lot_details.setdefault(lot_key, []).append({"nom": nom, "reel": reel, "systeme": systeme, "maquette": maquette})
+        lot_details.setdefault(lot_key, []).append({
+            "nom": nom, "reel": reel, "systeme": systeme, "maquette": maquette
+        })
 
     for stat in liste_ru_stats:
         n1 = stat["n1"]
@@ -800,7 +853,8 @@ def dashboard_N3(request):
         for lot_val, s_count in systeme_par_lot_n1.items():
             r_count = reel_map_n1.get(lot_val, 0)
             add_to_lot(lot_val, reel=r_count, systeme=s_count)
-            add_detail(lot_val, f"{n1.nom_complete} (équipe)", reel=r_count, systeme=s_count)
+            add_detail(lot_val, f"{n1.nom_complete} (équipe)",
+                       reel=r_count, systeme=s_count)
 
         for lot_val, r_count in reel_map_n1.items():
             if lot_val not in lots_vus_systeme:
@@ -808,28 +862,35 @@ def dashboard_N3(request):
                 add_detail(lot_val, f"{n1.nom_complete} (équipe)", reel=r_count)
 
         add_to_lot(getattr(n1, "lot", None), reel=1, systeme=1)
-        add_detail(getattr(n1, "lot", None), getattr(n1, "nom_complete", n1_it), reel=1, systeme=1)
+        add_detail(getattr(n1, "lot", None),
+                   getattr(n1, "nom_complete", n1_it), reel=1, systeme=1)
 
     for op in operateurs_directs_n3:
         add_to_lot(getattr(op, "lot", None), reel=1, systeme=1)
-        add_detail(getattr(op, "lot", None), getattr(op, "nom_complete", op.it), reel=1, systeme=1)
+        add_detail(getattr(op, "lot", None),
+                   getattr(op, "nom_complete", op.it), reel=1, systeme=1)
 
     for sous_operateurs in n2_to_operateurs.values():
         for op in sous_operateurs:
             add_to_lot(getattr(op, "lot", None), reel=1, systeme=1)
-            add_detail(getattr(op, "lot", None), getattr(op, "nom_complete", op.it), reel=1, systeme=1)
+            add_detail(getattr(op, "lot", None),
+                       getattr(op, "nom_complete", op.it), reel=1, systeme=1)
 
     for n2 in n2_list:
         add_to_lot(getattr(n2, "lot", None), reel=1, systeme=1)
-        add_detail(getattr(n2, "lot", None), getattr(n2, "nom_complete", n2.it), reel=1, systeme=1)
-
+        add_detail(getattr(n2, "lot", None),
+                   getattr(n2, "nom_complete", n2.it), reel=1, systeme=1)
 
     for lot_key in ("A/O", "P", "E", "C"):
         lot_stats.setdefault(lot_key, {"reel": 0, "systeme": 0, "maquette": 0})
 
-    # ---- Départs déclarés mais toujours présents dans la table Collaborateur ----
+    # ============================================================
+    # Départs déclarés
+    # ============================================================
     declarations_departs = list(
-        declaration_effectif.objects.filter(nature='D', Ru_id__in=tous_les_ru_ids).order_by('-date')
+        declaration_effectif.objects
+        .filter(nature='D', Ru_id__in=tous_les_ru_ids)
+        .order_by('-date')
     )
     ids_collabs_departs = {d.collaborateur_it_id for d in declarations_departs}
     collabs_departs_map = {
@@ -848,8 +909,13 @@ def dashboard_N3(request):
         if d.collaborateur_it_id in collabs_departs_map
     ]
 
+    # ============================================================
+    # Changements déclarés non effectués
+    # ============================================================
     declarations_changements = list(
-        declaration_effectif.objects.filter(nature='C', Ru_id__in=tous_les_ru_ids).order_by('-date')
+        declaration_effectif.objects
+        .filter(nature='C', Ru_id__in=tous_les_ru_ids)
+        .order_by('-date')
     )
     ids_collabs_changements = {c.collaborateur_it_id for c in declarations_changements}
     collabs_changements_map = {
@@ -876,18 +942,23 @@ def dashboard_N3(request):
                 "diffs": diffs,
             })
 
-    maquette_n3_obj = MaquetteN1.objects.filter(n1_id=it_session_original, actif=True).first()
+    # ============================================================
+    # Maquette N+3
+    # ============================================================
+    maquette_n3_obj = MaquetteN1.objects.filter(
+        n1_id=it_session_original, actif=True
+    ).first()
     maquette_totale = maquette_n3_obj.total if maquette_n3_obj else 0
+
     stats = MaquetteN1.objects.filter(
-        n1_id=it_session_original,
-        actif=True
+        n1_id=it_session_original, actif=True
     ).aggregate(
         somme_ap=Sum(F('A') + F('P')),
         somme_ce=Sum(F('C') + F('T'))
     )
-
     somme_ap = stats['somme_ap'] or 0
     somme_ce = stats['somme_ce'] or 0
+
     maquette_map_pour_lot = {it_session_original: maquette_n3_obj} if maquette_n3_obj else {}
     repartir_maquette_par_lot(maquette_map_pour_lot, lot_stats)
 
@@ -919,8 +990,12 @@ def dashboard_N3(request):
         "data_systeme": data_systeme_liste, "data_maquette": data_maquette_liste,
         "lot_labels": lot_labels, "lot_reel": lot_reel_data,
         "lot_systeme": lot_systeme_data, "lot_maquette": lot_maquette_data,
-        "lot_details": lot_details,"liste_departs":liste_departs,"liste_changements_non_faits":liste_changements_non_faits,
-        "nbr_departs": len(liste_departs),"nbr_changements_non_faits": len(liste_changements_non_faits),"somme_ap":somme_ap,"somme_ce":somme_ce
+        "lot_details": lot_details,
+        "liste_departs": liste_departs,
+        "liste_changements_non_faits": liste_changements_non_faits,
+        "nbr_departs": len(liste_departs),
+        "nbr_changements_non_faits": len(liste_changements_non_faits),
+        "somme_ap": somme_ap, "somme_ce": somme_ce,
     }
     return render(request, "declaration_effectif/N3/dashboard.html", context)
 
@@ -993,22 +1068,33 @@ def calculer_evolution_reel_mensuelle(ru_ids, systeme_par_ru, part_fixe, nb_anne
 
 @role_required('N+4')
 def page_N4(request):
+    from collections import defaultdict
+    from Collaborateur.views import reelEff_batch_multi
+
     it_session_original = request.session.get("it")
     if not it_session_original:
         return redirect("login")
 
-    tous_les_it = get_tous_les_it_sous(it_session_original)
-    niveau_par_it, l1, l2, l3, l4 = calculer_niveaux_hierarchie()
-    tous_managers_classes = l1 | l2 | l3 | l4
-    tous_ru_it = get_managers_its()
+    # ⚡ UN SEUL APPEL pour toute la hiérarchie
+    H = get_hierarchie_complete()
+    niveau_par_it = H["niveau_par_it"]
+    l1, l2, l3, l4 = H["l1"], H["l2"], H["l3"], H["l4"]
+    tous_managers_classes = H["tous_managers_classes"]
+    tous_ru_it = H["managers_its"]
 
+    tous_les_it = get_tous_les_it_sous(it_session_original)
     managers_ids = tous_les_it & tous_managers_classes
     operateurs_ids = tous_les_it - tous_managers_classes
 
     vrais_n1_ids = {m for m in managers_ids if niveau_par_it.get(m) == 1}
 
+    # ============================================================
+    # Départs déclarés (par vrais N+1)
+    # ============================================================
     declarations_departs = list(
-        declaration_effectif.objects.filter(nature='D', Ru_id__in=vrais_n1_ids).order_by('-date')
+        declaration_effectif.objects
+        .filter(nature='D', Ru_id__in=vrais_n1_ids)
+        .order_by('-date')
     )
     ids_collabs_departs = {d.collaborateur_it_id for d in declarations_departs}
     collabs_departs_map = {
@@ -1026,8 +1112,14 @@ def page_N4(request):
         for d in declarations_departs
         if d.collaborateur_it_id in collabs_departs_map
     ]
+
+    # ============================================================
+    # Changements déclarés non effectués
+    # ============================================================
     declarations_changements = list(
-        declaration_effectif.objects.filter(nature='C', Ru_id__in=vrais_n1_ids).order_by('-date')
+        declaration_effectif.objects
+        .filter(nature='C', Ru_id__in=vrais_n1_ids)
+        .order_by('-date')
     )
     ids_collabs_changements = {c.collaborateur_it_id for c in declarations_changements}
     collabs_changements_map = {
@@ -1054,6 +1146,9 @@ def page_N4(request):
                 "diffs": diffs,
             })
 
+    # ============================================================
+    # Comptages de niveaux
+    # ============================================================
     nbr_n1_total = len(vrais_n1_ids)
     nbr_n2_total = sum(1 for m in managers_ids if niveau_par_it.get(m) == 2)
     nbr_n3_total = sum(1 for m in managers_ids if niveau_par_it.get(m, 0) >= 3)
@@ -1062,22 +1157,31 @@ def page_N4(request):
 
     liste_n2_totale = Collaborateur.objects.filter(it__in=n2_ids)
     liste_n3_totale = Collaborateur.objects.filter(it__in=n3_ids)
+
+    # ============================================================
+    # Directs N+4 (1 requête)
+    # ============================================================
     directs_n4 = list(
         Collaborateur.objects.filter(ru_it_id=it_session_original)
         .exclude(it=it_session_original)
         .select_related("departement")
     )
     operateurs_directs_n4 = [
-        c for c in directs_n4 if c.it not in tous_managers_classes and c.lot in ("A", "P")
+        c for c in directs_n4
+        if c.it not in tous_managers_classes and c.lot in ("A", "P")
     ]
     n1_directs_n4_collabs = [c for c in directs_n4 if niveau_par_it.get(c.it) == 1]
     n2_directs_n4 = [c for c in directs_n4 if niveau_par_it.get(c.it) == 2]
     n3_directs_n4 = [c for c in directs_n4 if niveau_par_it.get(c.it, 0) >= 3]
 
+    # ============================================================
+    # Cas vide
+    # ============================================================
     if not vrais_n1_ids and not operateurs_ids:
         annee_courante = str(timezone.now().year)
         return render(request, "declaration_effectif/N4/dashboard.html", {
-            "liste_ru_stats": [], "reel": 0, "systeme": 0, "maquette": 0, "MR": 0, "MS": 0,
+            "liste_ru_stats": [], "reel": 0, "systeme": 0, "maquette": 0,
+            "MR": 0, "MS": 0,
             "maint": timezone.localdate(), "non_valides": 0,
             "chart_labels_json": json.dumps([]), "chart_data_json": json.dumps([]),
             "operateurs_directs_n4": {"liste": [], "reel": 0},
@@ -1095,6 +1199,9 @@ def page_N4(request):
             "somme_ap": 0, "somme_ce": 0,
         })
 
+    # ============================================================
+    # Période (mois courant)
+    # ============================================================
     today = timezone.now().date()
     start = today.replace(day=1)
     nb_jours = (today - start).days + 1
@@ -1105,10 +1212,32 @@ def page_N4(request):
     maquettes_n1_map = get_maquettes_n1_map(vrais_n1_ids)
 
     vrais_n1_liste = [c.it for c in liste_n1]
+
     systeme_total, systeme_lot = _systeme_effectif_batch(vrais_n1_liste, tous_ru_it)
-    reel_total, reel_lot = _reel_effectif_lot_batch(vrais_n1_liste)
+
+    reel_sets = reelEff_batch_multi(vrais_n1_liste, managers_its=tous_ru_it)
+    reel_total = {ru_id: len(ids) for ru_id, ids in reel_sets.items()}
+
+    tous_collab_ids_reel = set()
+    for s in reel_sets.values():
+        tous_collab_ids_reel |= s
+
+    lot_map_reel = dict(
+        Collaborateur.objects.filter(it__in=tous_collab_ids_reel)
+        .values_list("it", "lot")
+    )
+
+    reel_lot = {}
+    for ru_id, ids in reel_sets.items():
+        compte_lot = defaultdict(int)
+        for c_it in ids:
+            compte_lot[lot_map_reel.get(c_it)] += 1
+        reel_lot[ru_id] = dict(compte_lot)
+
+    # Dernières dates A/V
     dernieres_dates_av = dict(
-        declaration_effectif.objects.filter(Ru_id__in=vrais_n1_liste, nature__in=["A", "V"])
+        declaration_effectif.objects
+        .filter(Ru_id__in=vrais_n1_liste, nature__in=["A", "V"])
         .values('Ru_id').annotate(d=Max('date')).values_list('Ru_id', 'd')
     )
 
@@ -1142,45 +1271,68 @@ def page_N4(request):
         maint_global = timezone.localdate()
 
     liste_ru_stats = list(stats_by_it.values())
-    
+
+    # ============================================================
+    # Opérateurs intermédiaires
+    # ============================================================
     operateurs_sous_vrais_n1 = set(
-        Collaborateur.objects.filter(ru_it_id__in=vrais_n1_ids).values_list("it", flat=True)
+        Collaborateur.objects
+        .filter(ru_it_id__in=vrais_n1_ids)
+        .values_list("it", flat=True)
     )
     operateurs_intermediaires_ids = operateurs_ids - operateurs_sous_vrais_n1
 
-    maquette_n4_obj = MaquetteN1.objects.filter(n1_id=it_session_original, actif=True).first()
+    # ============================================================
+    # Maquette N+4
+    # ============================================================
+    maquette_n4_obj = MaquetteN1.objects.filter(
+        n1_id=it_session_original, actif=True
+    ).first()
     maquette = maquette_n4_obj.total if maquette_n4_obj else 0
 
+    # ============================================================
+    # Totaux réel / système
+    # ============================================================
     reel = (
         sum(s["reel1"] for s in liste_ru_stats)
-        + len(operateurs_intermediaires_ids) + nbr_n1_total + nbr_n2_total + len(n3_directs_n4)
+        + len(operateurs_intermediaires_ids)
+        + nbr_n1_total + nbr_n2_total + len(n3_directs_n4)
     )
     systeme = (
         sum(s["systeme1"] for s in liste_ru_stats)
-        +len(operateurs_intermediaires_ids) + nbr_n1_total + nbr_n2_total + len(n3_directs_n4)
+        + len(operateurs_intermediaires_ids)
+        + nbr_n1_total + nbr_n2_total + len(n3_directs_n4)
     )
 
-    stats = MaquetteN1.objects.filter(
-        n1_id=it_session_original,
-        actif=True
+    stats_maq = MaquetteN1.objects.filter(
+        n1_id=it_session_original, actif=True
     ).aggregate(
         somme_ap=Sum(F('A') + F('P')),
         somme_ce=Sum(F('C') + F('T'))
     )
+    somme_ap = stats_maq['somme_ap'] or 0
+    somme_ce = stats_maq['somme_ce'] or 0
 
-    somme_ap = stats['somme_ap'] or 0
-    somme_ce = stats['somme_ce'] or 0
-
+    # ============================================================
+    # Non validés aujourd'hui
+    # ============================================================
     liste_declares_today = set(
-        declaration_effectif.objects.filter(date=today, Ru_id__in=vrais_n1_ids).values_list("Ru_id", flat=True)
+        declaration_effectif.objects
+        .filter(date=today, Ru_id__in=vrais_n1_ids)
+        .values_list("Ru_id", flat=True)
     )
     non_valides = sum(
-        1 for s in liste_ru_stats if s["systeme1"] > 0 and s["n1"].it not in liste_declares_today
+        1 for s in liste_ru_stats
+        if s["systeme1"] > 0 and s["n1"].it not in liste_declares_today
     )
 
+    # ============================================================
+    # Chart "par jour"
+    # ============================================================
     decl_window_qs = (
         declaration_effectif.objects
-        .filter(Ru_id__in=vrais_n1_ids, nature__in=["A", "V"], date__gte=start, date__lte=today)
+        .filter(Ru_id__in=vrais_n1_ids, nature__in=["A", "V"],
+                date__gte=start, date__lte=today)
         .values("Ru_id", "date")
         .annotate(total=Count("collaborateur_it_id", distinct=True))
     )
@@ -1207,10 +1359,15 @@ def page_N4(request):
                     continue
             data_totale_par_jour[idx] += ru_system
 
+    # ============================================================
+    # Évolution mensuelle
+    # ============================================================
     annee_actuelle = str(today.year)
     evolution_mensuelle_raw = calculer_evolution_reel_mensuelle(
-        ru_ids=vrais_n1_ids, systeme_par_ru=systeme_par_n1_pour_bisect,
-        part_fixe=part_fixe_par_jour, nb_annees=1,
+        ru_ids=vrais_n1_ids,
+        systeme_par_ru=systeme_par_n1_pour_bisect,
+        part_fixe=part_fixe_par_jour,
+        nb_annees=1,
     )
     labels_annee = evolution_mensuelle_raw.get("labels_par_annee", {}).get(
         annee_actuelle, evolution_mensuelle_raw.get("labels", [])
@@ -1222,36 +1379,67 @@ def page_N4(request):
     data_par_annee_json = json.dumps({annee_actuelle: data_annee})
     annees_liste = [annee_actuelle]
 
+    sous_managers_map = get_sous_managers_groupes(
+        list(managers_ids), tous_managers_classes
+    )
+    sous_operateurs_map = get_sous_operateurs_groupes(
+        list(managers_ids), tous_managers_classes
+    )
+
+    tous_les_its_concernes = set()
+    for ids in sous_managers_map.values():
+        tous_les_its_concernes.update(ids)
+    for ids in sous_operateurs_map.values():
+        tous_les_its_concernes.update(ids)
+
+    collabs_cache = {
+        c.it: c for c in Collaborateur.objects.filter(it__in=tous_les_its_concernes)
+    }
+
     def operateurs_directs_de(m_it):
-        return list(Collaborateur.objects.filter(ru_it_id=m_it, it__in=operateurs_intermediaires_ids))
+        return [
+            collabs_cache[it]
+            for it in sous_operateurs_map.get(m_it, [])
+            if it in collabs_cache
+        ]
 
     def sous_managers_de(m_it, niveau_cible):
         return [
-            c for c in Collaborateur.objects.filter(ru_it_id=m_it, it__in=managers_ids)
-            if niveau_par_it.get(c.it) == niveau_cible
+            collabs_cache[it]
+            for it in sous_managers_map.get(m_it, [])
+            if it in collabs_cache and niveau_par_it.get(it) == niveau_cible
         ]
 
     def sous_managers_niveau_min(m_it, niveau_min):
         return [
-            c for c in Collaborateur.objects.filter(ru_it_id=m_it, it__in=managers_ids)
-            if niveau_par_it.get(c.it, 0) >= niveau_min
+            collabs_cache[it]
+            for it in sous_managers_map.get(m_it, [])
+            if it in collabs_cache and niveau_par_it.get(it, 0) >= niveau_min
         ]
 
+    # ============================================================
+    # Construction des groupes
+    # ============================================================
     def construire_n2_group(n2):
         sous_n1 = sous_managers_de(n2.it, 1)
         n1_stats = [stats_by_it[c.it] for c in sous_n1 if c.it in stats_by_it]
         directs_ops = operateurs_directs_de(n2.it)
         nbr_total = sum(s["reel1"] for s in n1_stats) + len(n1_stats) + len(directs_ops)
-        return {"n2": n2, "n1_stats": n1_stats,
-                "directs": {"liste": directs_ops, "reel": len(directs_ops)},
-                "nbr_collabs_total": nbr_total}
+        return {
+            "n2": n2,
+            "n1_stats": n1_stats,
+            "directs": {"liste": directs_ops, "reel": len(directs_ops)},
+            "nbr_collabs_total": nbr_total,
+        }
 
     def construire_n3_group(n3):
         sous_n3_imbriques = sous_managers_niveau_min(n3.it, 3)
         sous_n2 = sous_managers_de(n3.it, 2)
         sous_n1_directs = sous_managers_de(n3.it, 1)
 
-        n1_stats_directs = [stats_by_it[c.it] for c in sous_n1_directs if c.it in stats_by_it]
+        n1_stats_directs = [
+            stats_by_it[c.it] for c in sous_n1_directs if c.it in stats_by_it
+        ]
         n2_groups = [construire_n2_group(n2) for n2 in sous_n2]
         n3_groups_imbriques = [construire_n3_group(n3b) for n3b in sous_n3_imbriques]
         directs_ops = operateurs_directs_de(n3.it)
@@ -1259,17 +1447,27 @@ def page_N4(request):
         nbr_total = (
             sum(g["nbr_collabs_total"] for g in n2_groups) + len(n2_groups)
             + sum(g["nbr_collabs_total"] for g in n3_groups_imbriques) + len(n3_groups_imbriques)
-            + sum(s["reel1"] for s in n1_stats_directs) + len(n1_stats_directs) + len(directs_ops)
+            + sum(s["reel1"] for s in n1_stats_directs) + len(n1_stats_directs)
+            + len(directs_ops)
         )
-        return {"n3": n3, "n1_stats_directs": n1_stats_directs, "n2_groups": n2_groups,
-                "n3_groups_imbriques": n3_groups_imbriques,
-                "directs": {"liste": directs_ops, "reel": len(directs_ops)},
-                "nbr_collabs_total": nbr_total}
+        return {
+            "n3": n3,
+            "n1_stats_directs": n1_stats_directs,
+            "n2_groups": n2_groups,
+            "n3_groups_imbriques": n3_groups_imbriques,
+            "directs": {"liste": directs_ops, "reel": len(directs_ops)},
+            "nbr_collabs_total": nbr_total,
+        }
 
     n3_groups = [construire_n3_group(n3) for n3 in n3_directs_n4]
     n2_groups_directs_n4 = [construire_n2_group(n2) for n2 in n2_directs_n4]
-    n1_stats_directs_n4 = [stats_by_it[c.it] for c in n1_directs_n4_collabs if c.it in stats_by_it]
+    n1_stats_directs_n4 = [
+        stats_by_it[c.it] for c in n1_directs_n4_collabs if c.it in stats_by_it
+    ]
 
+    # ============================================================
+    # Répartition par lot
+    # ============================================================
     lot_stats = {}
     lot_details = {}
 
@@ -1287,8 +1485,9 @@ def page_N4(request):
 
     def add_detail(lot_value, nom, reel=0, systeme=0, maquette=0):
         lot_key = _cle_lot(lot_value)
-        lot_details.setdefault(lot_key, []).append({"nom": nom, "reel": reel, "systeme": systeme, "maquette": maquette})
-
+        lot_details.setdefault(lot_key, []).append({
+            "nom": nom, "reel": reel, "systeme": systeme, "maquette": maquette
+        })
 
     for collab in liste_n1:
         it_n1 = collab.it
@@ -1299,19 +1498,23 @@ def page_N4(request):
         for lot_val, s_count in systeme_par_lot_n1.items():
             r_count = reel_map_n1.get(lot_val, 0)
             add_to_lot(lot_val, reel=r_count, systeme=s_count)
-            add_detail(lot_val, f"{getattr(collab, 'nom_complete', it_n1)} (équipe)", reel=r_count, systeme=s_count)
+            add_detail(lot_val, f"{getattr(collab, 'nom_complete', it_n1)} (équipe)",
+                       reel=r_count, systeme=s_count)
 
         for lot_val, r_count in reel_map_n1.items():
             if lot_val not in lots_vus_systeme:
                 add_to_lot(lot_val, reel=r_count)
-                add_detail(lot_val, f"{getattr(collab, 'nom_complete', it_n1)} (équipe)", reel=r_count)
+                add_detail(lot_val, f"{getattr(collab, 'nom_complete', it_n1)} (équipe)",
+                           reel=r_count)
 
         add_to_lot(getattr(collab, "lot", None), reel=1, systeme=1)
-        add_detail(getattr(collab, "lot", None), getattr(collab, "nom_complete", it_n1), reel=1, systeme=1)
+        add_detail(getattr(collab, "lot", None),
+                   getattr(collab, "nom_complete", it_n1), reel=1, systeme=1)
 
     for op in operateurs_directs_n4:
         add_to_lot(getattr(op, "lot", None), reel=1, systeme=1)
-        add_detail(getattr(op, "lot", None), getattr(op, "nom_complete", op.it), reel=1, systeme=1)
+        add_detail(getattr(op, "lot", None),
+                   getattr(op, "nom_complete", op.it), reel=1, systeme=1)
 
     ids_deja_comptes = {o.it for o in operateurs_directs_n4}
     operateurs_intermediaires_hors_n4 = Collaborateur.objects.filter(
@@ -1320,12 +1523,14 @@ def page_N4(request):
 
     for op in operateurs_intermediaires_hors_n4:
         add_to_lot(getattr(op, "lot", None), reel=1, systeme=1)
-        add_detail(getattr(op, "lot", None), getattr(op, "nom_complete", op.it), reel=1, systeme=1)
+        add_detail(getattr(op, "lot", None),
+                   getattr(op, "nom_complete", op.it), reel=1, systeme=1)
 
     managers_n2_n3 = Collaborateur.objects.filter(it__in=(managers_ids - vrais_n1_ids))
     for m in managers_n2_n3:
         add_to_lot(getattr(m, "lot", None), reel=1, systeme=1)
-        add_detail(getattr(m, "lot", None), getattr(m, "nom_complete", m.it), reel=1, systeme=1)
+        add_detail(getattr(m, "lot", None),
+                   getattr(m, "nom_complete", m.it), reel=1, systeme=1)
 
     for lot_key in ("A/O", "P", "E", "C"):
         lot_stats.setdefault(lot_key, {"reel": 0, "systeme": 0, "maquette": 0})
@@ -1338,11 +1543,15 @@ def page_N4(request):
             lot_stats["A/O"]["maquette"] += lot_stats[k].get("maquette", 0)
             del lot_stats[k]
 
-    lot_labels = [l for l in ["A/O", "P", "E", "C"] if l in lot_stats] + [l for l in lot_stats if l not in ("A/O", "P", "E", "C")]
+    lot_labels = [l for l in ["A/O", "P", "E", "C"] if l in lot_stats] + \
+                 [l for l in lot_stats if l not in ("A/O", "P", "E", "C")]
     lot_reel_data = [lot_stats[l]["reel"] for l in lot_labels]
     lot_systeme_data = [lot_stats[l]["systeme"] for l in lot_labels]
     lot_maquette_data = [lot_stats[l]["maquette"] for l in lot_labels]
 
+    # ============================================================
+    # Rendu
+    # ============================================================
     return render(request, "declaration_effectif/N4/dashboard.html", {
         "liste_ru_stats": liste_ru_stats,
         "reel": reel, "systeme": systeme, "maquette": maquette,
@@ -1350,10 +1559,17 @@ def page_N4(request):
         "maint": maint_global, "non_valides": non_valides,
         "chart_labels_json": json.dumps(labels_list),
         "chart_data_json": json.dumps(data_totale_par_jour),
-        "operateurs_directs_n4": {"liste": operateurs_directs_n4, "reel": len(operateurs_directs_n4)},
-        "nbr_n1_total": nbr_n1_total, "nbr_n2_total": nbr_n2_total, "nbr_n3_total": nbr_n3_total,
-        "lot_labels": lot_labels, "lot_reel": lot_reel_data,
-        "lot_systeme": lot_systeme_data, "lot_maquette": lot_maquette_data,
+        "operateurs_directs_n4": {
+            "liste": operateurs_directs_n4,
+            "reel": len(operateurs_directs_n4),
+        },
+        "nbr_n1_total": nbr_n1_total,
+        "nbr_n2_total": nbr_n2_total,
+        "nbr_n3_total": nbr_n3_total,
+        "lot_labels": lot_labels,
+        "lot_reel": lot_reel_data,
+        "lot_systeme": lot_systeme_data,
+        "lot_maquette": lot_maquette_data,
         "lot_details": lot_details,
         "n1_directs_n4": n1_stats_directs_n4,
         "n2_groups": n2_groups_directs_n4,
@@ -1370,7 +1586,7 @@ def page_N4(request):
         "liste_n2_totale": liste_n2_totale,
         "liste_n3_totale": liste_n3_totale,
         "somme_ap": somme_ap,
-        "somme_ce": somme_ce
+        "somme_ce": somme_ce,
     })
 
 @role_required('N+4')
@@ -1566,7 +1782,7 @@ def affectation_HRBP(request):
         a.badge_class = get_badge_class(a.etat)
 
     return render(request, "declaration_effectif/HRBP/affectation.html", {
-        "info": page_obj, "page_obj": page_obj, "status": status,
+        "info": page_obj, "page_obj": page_obj, "status": status,"total":affectation.count(),
         "dpt_filtre": dpt_filtre, "departements": departements,
     })
 
@@ -1578,32 +1794,60 @@ def responsables_ru_sans_declaration_du_jour(request):
     it = request.session.get("it")
 
     departements_qs = Departement.objects.filter(HRBP_id=it)
-    departements = departements_qs.values_list("abreviation", flat=True)
-    collaborateurs_base = Collaborateur.objects.filter(departement_id__in=departements)
-    responsable = list(
-        collaborateurs_base.exclude(ru_it_id__isnull=True)
-        .values_list("ru_it_id", flat=True).distinct()
+    departements = list(departements_qs.values_list("abreviation", flat=True))
+
+    dept_filtre = request.GET.get("dept", "").strip()
+
+    if dept_filtre and dept_filtre in departements:
+        departements_filtres = [dept_filtre]
+    else:
+        departements_filtres = departements
+
+    # ⚡ Récupérer la hiérarchie canonique
+    niveau_par_it, l1, l2, l3, l4 = calculer_niveaux_hierarchie()
+    managers_aop = get_managers_avec_operateurs_aop()
+
+    vrais_n1_ids = set()
+    for it_candidat in (l1 & managers_aop):
+        if it_candidat in (l2 | l3 | l4):
+            continue
+        vrais_n1_ids.add(it_candidat)
+
+    # ⚡ Restreindre aux départements du HRBP
+    n1_ids_departement = set(
+        Collaborateur.objects.filter(
+            it__in=vrais_n1_ids,
+            departement_id__in=departements_filtres,
+        )
+        .values_list("it", flat=True)
     )
 
-    operateur = Collaborateur.objects.filter(
-        departement_id__in=departements, lot__in=["A", "O", "P"]
-    ).exclude(it__in=responsable)
-
-    ru_ids = list(
-        operateur.exclude(ru_it_id__isnull=True).values_list("ru_it_id", flat=True).distinct()
-    )
     ru_avec_declaration = set(
-        declaration_effectif.objects.filter(date=today).values_list("Ru_id", flat=True).distinct()
+        declaration_effectif.objects
+        .filter(date=today, Ru_id__in=n1_ids_departement)
+        .values_list("Ru_id", flat=True)
     )
-    ru_ids_sans_declaration = [ru_id for ru_id in ru_ids if ru_id not in ru_avec_declaration]
-    ru = Collaborateur.objects.filter(it__in=ru_ids_sans_declaration)
+
+    ru_ids_sans_declaration = n1_ids_departement - ru_avec_declaration
+
+    ru = (
+        Collaborateur.objects
+        .filter(it__in=ru_ids_sans_declaration)
+        .select_related("departement")
+        .order_by("nom_complete")
+    )
 
     paginator = Paginator(ru, 20)
     page_obj = paginator.get_page(request.GET.get("page"))
 
     return render(request, "declaration_effectif/HRBP/declaration.html", {
-        "ru": page_obj, "non_valides": ru, "page_obj": page_obj,
-        "departements": departements_qs, "date": today,
+        "ru": page_obj,
+        "non_valides": ru,
+        "page_obj": page_obj,
+        "departements": departements_qs,
+        "departements_liste": departements,
+        "dept_filtre": dept_filtre,
+        "date": today,
     })
 
 
@@ -1625,30 +1869,48 @@ def filter_date2(request):
 
     departements_qs = Departement.objects.filter(HRBP_id=it)
     departements = list(departements_qs.values_list("abreviation", flat=True))
-    if dept:
-        departements = [d for d in departements if d == dept]
 
-    collaborateurs_base = Collaborateur.objects.filter(departement_id__in=departements)
-    responsable = list(
-        collaborateurs_base.exclude(ru_it_id__isnull=True).values_list("ru_it_id", flat=True).distinct()
+    if dept and dept in departements:
+        departements = [dept]
+
+    # ⚡ MÊME LOGIQUE : vrais N+1 purs uniquement
+    niveau_par_it, l1, l2, l3, l4 = calculer_niveaux_hierarchie()
+    managers_aop = get_managers_avec_operateurs_aop()
+
+    vrais_n1_ids = set()
+    for it_candidat in (l1 & managers_aop):
+        if it_candidat in (l2 | l3 | l4):
+            continue
+        vrais_n1_ids.add(it_candidat)
+
+    n1_ids_departement = set(
+        Collaborateur.objects.filter(
+            it__in=vrais_n1_ids,
+            departement_id__in=departements,
+        )
+        .values_list("it", flat=True)
     )
 
-    operateur = Collaborateur.objects.filter(
-        departement_id__in=departements, lot__in=["A", "O", "P"]
-    ).exclude(it__in=responsable)
-
-    ru_ids = list(
-        operateur.exclude(ru_it_id__isnull=True).values_list("ru_it_id", flat=True).distinct()
-    )
     ru_avec_declaration = set(
-        declaration_effectif.objects.filter(date=date_selectionnee).values_list("Ru_id", flat=True).distinct()
+        declaration_effectif.objects
+        .filter(date=date_selectionnee, Ru_id__in=n1_ids_departement)
+        .values_list("Ru_id", flat=True)
     )
-    ru_ids_sans_declaration = [ru_id for ru_id in ru_ids if ru_id not in ru_avec_declaration]
 
-    ru_qs = Collaborateur.objects.filter(it__in=ru_ids_sans_declaration).select_related("departement")
+    ru_ids_sans_declaration = n1_ids_departement - ru_avec_declaration
+
+    ru_qs = (
+        Collaborateur.objects
+        .filter(it__in=ru_ids_sans_declaration)
+        .select_related("departement")
+    )
+
     resultats = [
         {
-            "matricule": r.matricule, "it": r.it, "nom_complete": r.nom_complete, "lot": r.lot,
+            "matricule": r.matricule,
+            "it": r.it,
+            "nom_complete": r.nom_complete,
+            "lot": r.lot,
             "departement": {"abreviation": r.departement.abreviation if r.departement else ""},
         }
         for r in ru_qs
@@ -1740,7 +2002,77 @@ def changement_dpt(request):
         page_obj = paginator.page(paginator.num_pages if paginator.num_pages else 1)
 
     return render(request, "declaration_effectif/PILOT/affectation.html", {
-        "info": page_obj, "page_obj": page_obj, "nbr": nbr, "status": status,
+        "info": page_obj, "page_obj": page_obj, "nbr": nbr, "status": status,"total":len(changement_list),
         "ru_init_selected": ru_init, "ru_acceuil_selected": ru_acceuil,
         "ru_init_list": ru_init_list, "ru_acceuil_list": ru_acceuil_list,
+    })
+
+
+@role_required('SUPER')
+def rechercher_utilisateurs(request):
+    """
+    Endpoint AJAX pour rechercher/filtrer/paginer les utilisateurs.
+    """
+    search = request.GET.get("q", "").strip()
+    lot = request.GET.get("lot", "").strip()
+    dpt = request.GET.get("dpt", "").strip()
+    role = request.GET.get("role", "").strip()
+    page_number = request.GET.get("page", 1)
+    per_page = 20
+
+    # Queryset de base
+    utilisateurs_qs = utilisateur.objects.all().order_by('it__nom_complete')
+
+    # Filtre recherche (matricule, it, nom)
+    if search:
+        utilisateurs_qs = utilisateurs_qs.filter(
+            Q(it__matricule__icontains=search) |
+            Q(it__it__icontains=search) |
+            Q(it__nom_complete__icontains=search)
+        )
+
+    # Filtre lot
+    if lot:
+        utilisateurs_qs = utilisateurs_qs.filter(it__lot=lot)
+
+    # Filtre département
+    if dpt:
+        utilisateurs_qs = utilisateurs_qs.filter(it__departement__abreviation=dpt)
+
+    # Filtre rôle
+    if role:
+        utilisateurs_qs = utilisateurs_qs.filter(role=role)
+
+    # Pagination
+    paginator = Paginator(utilisateurs_qs, per_page)
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages if paginator.num_pages else 1)
+
+    # Construire les résultats
+    results = []
+    for u in page_obj:
+        results.append({
+            "id": u.pk,
+            "matricule": u.it.matricule if u.it else "",
+            "it": u.it.it if u.it else "",
+            "nom_complete": u.it.nom_complete if u.it else "",
+            "lot": u.it.lot if u.it else "",
+            "dpt": u.it.departement.abreviation if (u.it and u.it.departement) else "-",
+            "role": u.role or "",
+            "role_slug": (u.role or "").lower().replace("+", ""),
+        })
+
+    return JsonResponse({
+        "results": results,
+        "count": paginator.count,
+        "page": page_obj.number,
+        "num_pages": paginator.num_pages,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+        "previous_page": page_obj.previous_page_number() if page_obj.has_previous() else None,
+        "next_page": page_obj.next_page_number() if page_obj.has_next() else None,
     })

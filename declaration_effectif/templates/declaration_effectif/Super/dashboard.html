@@ -10,152 +10,498 @@
 
 {% block content %}
 <div class="operateurs-container">
-    <!-- Header -->
-    <header class="header d-flex justify-content-between align-items-center mb-4">
+
+    <!-- ============================================================ -->
+    <!-- HEADER (style PILOT)                                         -->
+    <!-- ============================================================ -->
+    <header class="header d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
         <div>
             <h1>Gestion des Utilisateurs</h1>
-            <div class="time mt-2">
-                <span id="counter" aria-live="polite">Total : {{ total }}</span>
-            </div>
+            <p class="header-subtitle">Aperçu des comptes, des connexions et des rôles</p>
         </div>
-        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-ajouter"
-            title="Ajouter un utilisateur">
-            <i class="fas fa-user-plus"></i>
-        </button>
+
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <div class="date-badge">
+                <i class="fas fa-calendar-alt me-2"></i>
+                {{ today|date:"d M Y" }}
+            </div>
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-ajouter">
+                <i class="fas fa-user-plus me-1"></i> Ajouter un utilisateur
+            </button>
+        </div>
     </header>
 
-    <!-- Filters Section -->
-    <div class="filters-section mb-4">
-        <div class="row g-3">
-            <div class="col-md-3">
-                <input type="text" placeholder="Rechercher par matricule, IT ou nom..." class="form-control"
-                    id="search">
+    <!-- ============================================================ -->
+    <!-- NAVBAR INTERNE — Système d'onglets                          -->
+    <!-- ============================================================ -->
+    <nav class="super-navbar mb-4">
+        <ul class="super-nav-list">
+            <li>
+                <a href="#section-stats" class="super-nav-link active" data-section="section-stats">
+                    <i class="fas fa-chart-pie"></i> Statistiques
+                </a>
+            </li>
+            <li>
+                <a href="#section-connexions" class="super-nav-link" data-section="section-connexions">
+                    <i class="fas fa-history"></i> Connexions
+                </a>
+            </li>
+            <li>
+                <a href="#section-utilisateurs" class="super-nav-link" data-section="section-utilisateurs">
+                    <i class="fas fa-users-cog"></i> Utilisateurs
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 1 : STATISTIQUES                                     -->
+    <!-- ============================================================ -->
+    <div id="section-stats" class="super-section active">
+
+        <!-- Cartes KPI principales -->
+        <div class="kpi-row-cards mb-3">
+
+            <div class="kpi-card">
+                <div class="kpi-card-header">
+                    <span class="kpi-card-title">Connexions aujourd'hui</span>
+                    <div class="kpi-card-icon kpi-icon-blue">
+                        <i class="fas fa-sign-in-alt"></i>
+                    </div>
+                </div>
+                <div class="kpi-card-value">{{ logins_aujourdhui }}</div>
+                <div class="kpi-card-sub">Utilisateurs connectés</div>
             </div>
-            <div class="col-md-2">
-                <select class="form-select" id="choix">
-                    <option value="">Tous les lots</option>
-                    <option value="A">Lot A</option>
-                    <option value="O">Lot O</option>
-                    <option value="P">Lot P</option>
-                    <option value="E">Lot E</option>
-                    <option value="C">Lot C</option>
-                </select>
+
+            <div class="kpi-card">
+                <div class="kpi-card-header">
+                    <span class="kpi-card-title">Connexions (7 jours)</span>
+                    <div class="kpi-card-icon kpi-icon-cyan">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                </div>
+                <div class="kpi-card-value">{{ logins_7j }}</div>
+                <div class="kpi-card-sub">Activité récente</div>
             </div>
-            <div class="col-md-2">
-                <select class="form-select" id="dpt">
-                    <option value="">Tous les départements</option>
-                    {% for dep in departements %}
-                    <option value="{{ dep.abreviation }}">{{ dep.abreviation }}</option>
-                    {% endfor %}
-                </select>
+
+            <div class="kpi-card">
+                <div class="kpi-card-header">
+                    <span class="kpi-card-title">Échecs (7 jours)</span>
+                    <div class="kpi-card-icon kpi-icon-amber">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+                <div class="kpi-card-value">{{ echecs_7j }}</div>
+                <div class="kpi-card-sub">Tentatives échouées</div>
             </div>
-            <div class="col-md-3">
-                <select class="form-select" id="role">
-                    <option value="">Tous les rôles</option>
-                    <option value="ADMIN">ADMIN</option>
-                    <option value="HRBP">HRBP</option>
-                    <option value="PILOT">PILOT</option>
-                    <option value="N+1">N+1</option>
-                    <option value="N+2">N+2</option>
-                    <option value="N+3">N+3</option>
-                    <option value="N+4">N+4</option>
-                </select>
+
+            <div class="kpi-card">
+                <div class="kpi-card-header">
+                    <span class="kpi-card-title">Total utilisateurs</span>
+                    <div class="kpi-card-icon kpi-icon-green">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+                <div class="kpi-card-value">{{ total }}</div>
+                <div class="kpi-card-sub">Comptes enregistrés</div>
             </div>
-            <div class="col-md-2 d-flex">
-                <button type="button" class="btn btn-outline-secondary w-100" id="resetBtn">
-                    <i class="fas fa-undo me-1"></i> Effacer
-                </button>
+
+        </div>
+
+        <!-- Répartition rôles + Activité connexion -->
+        <div class="row g-3 mb-3">
+
+            <div class="col-12 col-lg-6">
+                <div class="panel-card h-100">
+                    <div class="panel-card-header">
+                        <h5 class="panel-card-title">
+                            <i class="fas fa-user-shield text-primary me-2"></i>
+                            Répartition par rôle
+                        </h5>
+                    </div>
+                    <div class="panel-card-body">
+                        <div class="role-grid">
+                            <div class="role-item"><span class="role-badge role-super">SUPER</span><span
+                                    class="role-count">{{ stats_roles.SUPER }}</span></div>
+                            <div class="role-item"><span class="role-badge role-admin">ADMIN</span><span
+                                    class="role-count">{{ stats_roles.ADMIN }}</span></div>
+                            <div class="role-item"><span class="role-badge role-hrbp">HRBP</span><span
+                                    class="role-count">{{ stats_roles.HRBP }}</span></div>
+                            <div class="role-item"><span class="role-badge role-drh">DRH</span><span
+                                    class="role-count">{{ stats_roles.DRH }}</span></div>
+                            <div class="role-item"><span class="role-badge role-pilot">PILOT</span><span
+                                    class="role-count">{{ stats_roles.PILOT }}</span></div>
+                            <div class="role-item"><span class="role-badge role-n1">N+1</span><span
+                                    class="role-count">{{ stats_roles.N1 }}</span></div>
+                            <div class="role-item"><span class="role-badge role-n2">N+2</span><span
+                                    class="role-count">{{ stats_roles.N2 }}</span></div>
+                            <div class="role-item"><span class="role-badge role-n3">N+3</span><span
+                                    class="role-count">{{ stats_roles.N3 }}</span></div>
+                            <div class="role-item"><span class="role-badge role-n4">N+4</span><span
+                                    class="role-count">{{ stats_roles.N4 }}</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="panel-card h-100">
+                    <div class="panel-card-header">
+                        <h5 class="panel-card-title">
+                            <i class="fas fa-chart-bar text-success me-2"></i>
+                            Activité de connexion
+                        </h5>
+                    </div>
+                    <div class="panel-card-body">
+                        <div class="kpi-list">
+                            <div class="kpi-line">
+                                <span class="kpi-line-label">Total connexions (historique)</span>
+                                <span class="kpi-line-value text-success">{{ total_logins }}</span>
+                            </div>
+                            <div class="kpi-line">
+                                <span class="kpi-line-label">Connexions 7 derniers jours</span>
+                                <span class="kpi-line-value text-success">{{ logins_7j }}</span>
+                            </div>
+                            <div class="kpi-line">
+                                <span class="kpi-line-label">Connexions 30 derniers jours</span>
+                                <span class="kpi-line-value text-success">{{ logins_30j }}</span>
+                            </div>
+                            <div class="kpi-line">
+                                <span class="kpi-line-label">Déconnexions</span>
+                                <span class="kpi-line-value text-secondary">{{ total_logouts }}</span>
+                            </div>
+                            <div class="kpi-line">
+                                <span class="kpi-line-label">Échecs (total)</span>
+                                <span class="kpi-line-value text-danger">{{ total_echecs }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Top utilisateurs -->
+        {% if top_users %}
+        <div class="panel-card mb-3">
+            <div class="panel-card-header">
+                <h5 class="panel-card-title">
+                    <i class="fas fa-trophy text-warning me-2"></i>
+                    Top 10 utilisateurs les plus connectés (7 derniers jours)
+                </h5>
+            </div>
+            <div class="panel-card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;">#</th>
+                            <th>Nom complet</th>
+                            <th>IT</th>
+                            <th>Rôle</th>
+                            <th class="text-end">Connexions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in top_users %}
+                        <tr>
+                            <td class="text-muted">{{ forloop.counter }}</td>
+                            <td class="fw-semibold">{{ u.nom_complet }}</td>
+                            <td><code>{{ u.it|default:"—" }}</code></td>
+                            <td>
+                                {% if u.role != "—" %}
+                                <span class="role-badge role-{{ u.role_slug }}">{{ u.role }}</span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <span class="badge bg-success-subtle text-success fw-bold">{{ u.nb_connexions }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
+        {% endif %}
+
     </div>
 
-    <!-- Table Section -->
-    <div class="table-container">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>Matricule</th>
-                        <th>Utilisateur (IT)</th>
-                        <th>Nom & Prénom</th>
-                        <th>Lot</th>
-                        <th>DPT</th>
-                        <th>Rôle</th>
-                        <th class="text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="result">
-                    {% for u in utilisateurs %}
-                    <tr data-id="{{ u.pk }}" data-matricule="{{ u.it.matricule|lower }}" data-it="{{ u.it.it|lower }}"
-                        data-nom="{{ u.it.nom_complete|lower }}" data-lot="{{ u.it.lot|default:'' }}"
-                        data-dpt="{{ u.it.departement.abreviation|default:'' }}" data-role="{{ u.role }}">
-                        <td class="cell-matricule">{{ u.it.matricule }}</td>
-                        <td class="cell-utilisateur">{{ u.it.it }}</td>
-                        <td class="cell-nom">{{ u.it.nom_complete }}</td>
-                        <td class="cell-lot"><span>{{ u.it.lot }}</span></td>
-                        <td class="cell-dpt">{{ u.it.departement.abreviation|default:"-" }}</td>
-                        <td class="cell-role"><span>{{ u.role }}</span></td>
-                        <td class="text-center">
-                            <button type="button" class="btn btn-sm btn-outline-primary btn-modifier" title="Modifier"
-                                data-id="{{ u.pk }}" data-role="{{ u.role }}" data-nom="{{ u.it.nom_complete }}"
-                                data-it="{{ u.it.it }}">
-                                <i class="fas fa-pen"></i>
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-supprimer" title="Supprimer"
-                                data-id="{{ u.pk }}" data-nom="{{ u.it.nom_complete }}">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">
-                            <i class="fas fa-inbox fa-2x mb-2 d-block"></i> Aucun utilisateur trouvé
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- ============================================================ -->
+    <!-- SECTION 2 : CONNEXIONS                                       -->
+    <!-- ============================================================ -->
+    <div id="section-connexions" class="super-section">
+
+        <!-- Dernières connexions -->
+        <div class="panel-card mb-3">
+            <div class="panel-card-header d-flex justify-content-between align-items-center">
+                <h5 class="panel-card-title">
+                    <i class="fas fa-history text-primary me-2"></i>
+                    Dernières connexions
+                </h5>
+                <span class="badge bg-primary-subtle text-primary">{{ derniers_logins|length }} affichées</span>
+            </div>
+            <div class="panel-card-body p-0">
+                <div class="table-responsive" style="max-height: 500px;">
+                    <table class="table table-hover mb-0">
+                        <thead class="sticky-top">
+                            <tr>
+                                <th>Date & Heure</th>
+                                <th>Utilisateur</th>
+                                <th>IT</th>
+                                <th>Rôle</th>
+                                <th>IP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in derniers_logins %}
+                            <tr>
+                                <td class="text-nowrap">
+                                    <i class="far fa-clock me-1 text-muted"></i>
+                                    <span class="text-muted">{{ log.date_heure|date:"d/m/Y H:i" }}</span>
+                                </td>
+                                <td class="fw-semibold">
+                                    {% if log.nom_complet != "—" %}
+                                    {{ log.nom_complet }}
+                                    {% else %}
+                                    <span class="text-muted fst-italic">Utilisateur inconnu</span>
+                                    {% endif %}
+                                </td>
+                                <td><code>{{ log.utilisateur_id|default:"—" }}</code></td>
+                                <td>
+                                    {% if log.role %}
+                                    <span class="role-badge role-{{ log.role_slug }}">{{ log.role }}</span>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">{{ log.ip_address }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                    Aucune connexion enregistrée.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
+
+        <!-- Échecs -->
+        {% if derniers_echecs %}
+        <div class="panel-card mb-3">
+            <div class="panel-card-header d-flex justify-content-between align-items-center">
+                <h5 class="panel-card-title">
+                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                    Tentatives de connexion échouées
+                </h5>
+                <span class="badge bg-danger-subtle text-danger">{{ derniers_echecs|length }} récentes</span>
+            </div>
+            <div class="panel-card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date & Heure</th>
+                            <th>Utilisateur</th>
+                            <th>IT</th>
+                            <th>IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in derniers_echecs %}
+                        <tr>
+                            <td class="text-nowrap">
+                                <i class="far fa-clock me-1 text-muted"></i>
+                                <span class="text-muted">{{ log.date_heure|date:"d/m/Y H:i" }}</span>
+                            </td>
+                            <td>
+                                {% if log.nom_complet != "—" %}
+                                <span class="fw-semibold">{{ log.nom_complet }}</span>
+                                {% else %}
+                                <span class="text-muted fst-italic">— inconnu —</span>
+                                {% endif %}
+                            </td>
+                            <td><code>{{ log.utilisateur_id|default:"—" }}</code></td>
+                            <td class="text-muted small">{{ log.ip_address }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
     </div>
 
-    <!-- Pagination -->
-    <div class="pagination-container" id="pagination"></div>
+    <!-- ============================================================ -->
+    <!-- SECTION 3 : UTILISATEURS                                     -->
+    <!-- ============================================================ -->
+    <div id="section-utilisateurs" class="super-section">
+
+        <div class="panel-card">
+
+            <div class="panel-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="panel-card-title">
+                    <i class="fas fa-users-cog text-primary me-2"></i>
+                    Liste des utilisateurs
+                </h5>
+                <span class="badge bg-primary-subtle text-primary" id="counter">
+                    Total : {{ total }}
+                </span>
+            </div>
+
+            <!-- Filtres -->
+            <div class="panel-card-body border-bottom">
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <input type="text" placeholder="Rechercher..." class="form-control form-control-sm" id="search">
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select form-select-sm" id="choix">
+                            <option value="">Tous les lots</option>
+                            <option value="A">Lot A</option>
+                            <option value="O">Lot O</option>
+                            <option value="P">Lot P</option>
+                            <option value="E">Lot E</option>
+                            <option value="C">Lot C</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select form-select-sm" id="dpt">
+                            <option value="">Tous les départements</option>
+                            {% for dep in departements %}
+                            <option value="{{ dep.abreviation }}">{{ dep.abreviation }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" id="role">
+                            <option value="">Tous les rôles</option>
+                            <option value="SUPER">SUPER</option>
+                            <option value="ADMIN">ADMIN</option>
+                            <option value="HRBP">HRBP</option>
+                            <option value="DRH">DRH</option>
+                            <option value="PILOT">PILOT</option>
+                            <option value="N+1">N+1</option>
+                            <option value="N+2">N+2</option>
+                            <option value="N+3">N+3</option>
+                            <option value="N+4">N+4</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" id="resetBtn">
+                            <i class="fas fa-undo me-1"></i> Effacer
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Matricule</th>
+                            <th>IT</th>
+                            <th>Nom & Prénom</th>
+                            <th>Lot</th>
+                            <th>DPT</th>
+                            <th>Rôle</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="result">
+                        {% for u in utilisateurs %}
+                        <tr data-id="{{ u.pk }}" data-matricule="{{ u.it.matricule|lower }}"
+                            data-it="{{ u.it.it|lower }}" data-nom="{{ u.it.nom_complete|lower }}"
+                            data-lot="{{ u.it.lot|default:'' }}"
+                            data-dpt="{{ u.it.departement.abreviation|default:'' }}" data-role="{{ u.role }}">
+                            <td class="cell-matricule">{{ u.it.matricule }}</td>
+                            <td class="cell-utilisateur">{{ u.it.it }}</td>
+                            <td class="cell-nom">{{ u.it.nom_complete }}</td>
+                            <td class="cell-lot"><span>{{ u.it.lot }}</span></td>
+                            <td class="cell-dpt">{{ u.it.departement.abreviation|default:"-" }}</td>
+                            <td class="cell-role">
+                                <span class="role-badge role-{{ u.role|lower|cut:'+' }}">{{ u.role }}</span>
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-primary btn-modifier"
+                                    data-id="{{ u.pk }}" data-role="{{ u.role }}" data-nom="{{ u.it.nom_complete }}"
+                                    data-it="{{ u.it.it }}">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-supprimer"
+                                    data-id="{{ u.pk }}" data-nom="{{ u.it.nom_complete }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">
+                                <i class="fas fa-inbox fa-2x mb-2 d-block"></i> Aucun utilisateur trouvé
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination (gérée dynamiquement par JS) -->
+            <div class="table-pagination" id="pagination-container">
+                {% if is_paginated %}
+                <div class="pagination-info">
+                    Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                    <span class="text-muted ms-2">({{ total }} utilisateur{{ total|pluralize }})</span>
+                </div>
+                <ul class="pagination" id="pagination-list">
+                    <!-- Rempli par JS -->
+                </ul>
+                {% endif %}
+            </div>
+
+        </div>
+
+    </div>
+
 </div>
 
-<!-- Modal Ajouter Utilisateur (sans départements) -->
-<div class="modal fade" id="modal-ajouter" tabindex="-1" aria-labelledby="modalAjouterLabel" aria-hidden="true">
+<!-- ============================================================ -->
+<!-- MODALES                                                      -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modal-ajouter" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalAjouterLabel">Ajouter un utilisateur</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Ajouter un utilisateur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="nouveau-op-input" class="form-label font-weight-bold">Identifiant (IT)</label>
+                    <label for="nouveau-op-input" class="form-label fw-semibold">Identifiant (IT)</label>
                     <input type="text" id="nouveau-op-input" placeholder="Ex: M13-87424" class="form-control" required>
                 </div>
                 <div class="mb-3">
-                    <label for="nouveau-op-role" class="form-label">Rôle <span class="text-muted">(optionnel — calculé
-                            automatiquement si non renseigné)</span></label>
+                    <label for="nouveau-op-role" class="form-label fw-semibold">Rôle <span
+                            class="text-muted fw-normal">(optionnel)</span></label>
                     <select class="form-select" id="nouveau-op-role">
                         <option value="">Déterminer automatiquement</option>
                         <option value="ADMIN">ADMIN</option>
                         <option value="HRBP">HRBP</option>
                         <option value="DRH">DRH</option>
                         <option value="PILOT">PILOT</option>
-
                     </select>
                 </div>
-
                 <div class="alert2"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
                 <button type="button" class="btn btn-success" id="btn-submit-user">
-                    <span id="btn-spinner" class="spinner-border spinner-border-sm d-none" role="status"
-                        aria-hidden="true"></span>
+                    <span id="btn-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
                     Confirmer
                 </button>
             </div>
@@ -163,13 +509,12 @@
     </div>
 </div>
 
-<!-- Modal Confirmation Suppression -->
-<div class="modal fade" id="modal-supprimer" tabindex="-1" aria-labelledby="modalSupprimerLabel" aria-hidden="true">
+<div class="modal fade" id="modal-supprimer" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalSupprimerLabel">Confirmer la suppression</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                <h5 class="modal-title"><i class="fas fa-trash me-2 text-danger"></i>Confirmer la suppression</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <p class="mb-0">Voulez-vous vraiment supprimer l'utilisateur
@@ -180,8 +525,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
                 <button type="button" class="btn btn-danger" id="btn-confirmer-suppression">
-                    <span id="btn-spinner-suppr" class="spinner-border spinner-border-sm d-none" role="status"
-                        aria-hidden="true"></span>
+                    <span id="btn-spinner-suppr" class="spinner-border spinner-border-sm d-none"></span>
                     Supprimer
                 </button>
             </div>
@@ -189,13 +533,12 @@
     </div>
 </div>
 
-<!-- Modal Modifier Utilisateur -->
-<div class="modal fade" id="modal-modifier" tabindex="-1" aria-labelledby="modalModifierLabel" aria-hidden="true">
+<div class="modal fade" id="modal-modifier" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalModifierLabel">Modifier un utilisateur</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                <h5 class="modal-title"><i class="fas fa-pen me-2 text-primary"></i>Modifier un utilisateur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
@@ -207,7 +550,7 @@
                     <input type="text" class="form-control" id="modifier-nom-affiche" disabled>
                 </div>
                 <div class="mb-3">
-                    <label for="modifier-role" class="form-label">Rôle</label>
+                    <label for="modifier-role" class="form-label fw-semibold">Rôle</label>
                     <select class="form-select" id="modifier-role">
                         <option value="">Déterminer automatiquement</option>
                         <option value="ADMIN">ADMIN</option>
@@ -216,14 +559,12 @@
                         <option value="PILOT">PILOT</option>
                     </select>
                 </div>
-
                 <div class="alert4"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
                 <button type="button" class="btn btn-success" id="btn-confirmer-modification">
-                    <span id="btn-spinner-modif" class="spinner-border spinner-border-sm d-none" role="status"
-                        aria-hidden="true"></span>
+                    <span id="btn-spinner-modif" class="spinner-border spinner-border-sm d-none"></span>
                     Enregistrer
                 </button>
             </div>
@@ -250,61 +591,188 @@
         return cookieValue;
     }
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
-        /* ============================================================
-           FILTRAGE
-           ============================================================ */
+
+        // ===== NAVBAR ONGLETS =====
+        const navLinks = document.querySelectorAll('.super-nav-link');
+        const sections = document.querySelectorAll('.super-section');
+
+        const hashActif = window.location.hash;
+        if (hashActif) {
+            const linkActif = document.querySelector(`.super-nav-link[data-section="${hashActif.replace('#', '')}"]`);
+            if (linkActif) {
+                navLinks.forEach(l => l.classList.remove('active'));
+                sections.forEach(s => s.classList.remove('active'));
+                linkActif.classList.add('active');
+                const cible = document.getElementById(hashActif.replace('#', ''));
+                if (cible) cible.classList.add('active');
+            }
+        }
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                navLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                sections.forEach(s => s.classList.remove('active'));
+                const targetId = link.getAttribute('data-section');
+                const target = document.getElementById(targetId);
+                if (target) {
+                    target.classList.add('active');
+                    history.replaceState(null, '', '#' + targetId);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
+        });
+
+        // ===== FILTRES (recherche CÔTÉ SERVEUR) =====
         const searchInput = document.getElementById("search");
         const lotSelect = document.getElementById("choix");
         const dptSelect = document.getElementById("dpt");
         const roleSelect = document.getElementById("role");
         const resetBtn = document.getElementById("resetBtn");
         const resultBody = document.getElementById("result");
+        const counterEl = document.getElementById("counter");
+        const paginationList = document.getElementById("pagination-list");
+        const paginationInfo = document.querySelector(".pagination-info");
 
-        function applyFilters() {
-            const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : "";
-            const lotVal = lotSelect ? lotSelect.value : "";
-            const dptVal = dptSelect ? dptSelect.value : "";
-            const roleVal = roleSelect ? roleSelect.value : "";
+        let currentPage = 1;
+        let debounceTimer = null;
 
-            const rows = Array.from(resultBody.querySelectorAll("tr[data-id]"));
-            let visibleCount = 0;
+        function renderUsers(results) {
+            if (!results || results.length === 0) {
+                resultBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="fas fa-filter fa-2x mb-2 d-block"></i> Aucun utilisateur ne correspond aux filtres
+                        </td>
+                    </tr>`;
+                return;
+            }
 
-            rows.forEach(row => {
-                const matchesSearch = !searchVal ||
-                    row.dataset.matricule.includes(searchVal) ||
-                    row.dataset.it.includes(searchVal) ||
-                    row.dataset.nom.includes(searchVal);
-                const matchesLot = !lotVal || row.dataset.lot === lotVal;
-                const matchesDpt = !dptVal || row.dataset.dpt === dptVal;
-                const matchesRole = !roleVal || row.dataset.role === roleVal;
+            resultBody.innerHTML = results.map(u => `
+                <tr data-id="${u.id}" data-matricule="${escapeHtml((u.matricule || '').toLowerCase())}"
+                    data-it="${escapeHtml((u.it || '').toLowerCase())}"
+                    data-nom="${escapeHtml((u.nom_complete || '').toLowerCase())}"
+                    data-lot="${escapeHtml(u.lot || '')}"
+                    data-dpt="${escapeHtml(u.dpt || '')}"
+                    data-role="${escapeHtml(u.role || '')}">
+                    <td class="cell-matricule">${escapeHtml(u.matricule)}</td>
+                    <td class="cell-utilisateur">${escapeHtml(u.it)}</td>
+                    <td class="cell-nom">${escapeHtml(u.nom_complete)}</td>
+                    <td class="cell-lot"><span>${escapeHtml(u.lot || '')}</span></td>
+                    <td class="cell-dpt">${escapeHtml(u.dpt || '-')}</td>
+                    <td class="cell-role">
+                        <span class="role-badge role-${escapeHtml(u.role_slug || '')}">${escapeHtml(u.role || '')}</span>
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-primary btn-modifier"
+                            data-id="${u.id}" data-role="${escapeHtml(u.role || '')}"
+                            data-nom="${escapeHtml(u.nom_complete || '')}"
+                            data-it="${escapeHtml(u.it || '')}">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger btn-supprimer"
+                            data-id="${u.id}" data-nom="${escapeHtml(u.nom_complete || '')}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join("");
+        }
 
-                const visible = matchesSearch && matchesLot && matchesDpt && matchesRole;
-                row.style.display = visible ? "" : "none";
-                if (visible) visibleCount++;
-            });
+        function renderPagination(data) {
+            if (!paginationList) return;
 
-            // Message "aucun résultat" dynamique lié au filtrage
-            let noResultRow = document.getElementById("no-filter-result-row");
-            if (visibleCount === 0 && rows.length > 0) {
-                if (!noResultRow) {
-                    noResultRow = document.createElement("tr");
-                    noResultRow.id = "no-filter-result-row";
-                    noResultRow.innerHTML = `<td colspan="7" class="text-center py-4 text-muted">
-                        <i class="fas fa-filter fa-2x mb-2 d-block"></i> Aucun utilisateur ne correspond aux filtres
-                    </td>`;
-                    resultBody.appendChild(noResultRow);
+            const { page, num_pages, has_previous, has_next, previous_page, next_page } = data;
+
+            if (num_pages <= 1) {
+                paginationList.innerHTML = "";
+                if (paginationInfo) {
+                    paginationInfo.innerHTML = `Page 1 sur 1 <span class="text-muted ms-2">(${data.count} utilisateur(s))</span>`;
                 }
-                noResultRow.style.display = "";
-            } else if (noResultRow) {
-                noResultRow.style.display = "none";
+                return;
+            }
+
+            let html = "";
+
+            // Précédent
+            if (has_previous) {
+                html += `<li class="page-item"><a class="page-link" href="#" data-page="${previous_page}"><i class="fas fa-chevron-left"></i></a></li>`;
+            } else {
+                html += `<li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left"></i></span></li>`;
+            }
+
+            // Numéros
+            for (let num = 1; num <= num_pages; num++) {
+                if (num === page) {
+                    html += `<li class="page-item active"><span class="page-link">${num}</span></li>`;
+                } else if (num === 1 || num === num_pages || (num >= page - 2 && num <= page + 2)) {
+                    html += `<li class="page-item"><a class="page-link" href="#" data-page="${num}">${num}</a></li>`;
+                } else if (num === page - 3 || num === page + 3) {
+                    html += `<li class="page-item disabled"><span class="page-link">…</span></li>`;
+                }
+            }
+
+            // Suivant
+            if (has_next) {
+                html += `<li class="page-item"><a class="page-link" href="#" data-page="${next_page}"><i class="fas fa-chevron-right"></i></a></li>`;
+            } else {
+                html += `<li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-right"></i></span></li>`;
+            }
+
+            paginationList.innerHTML = html;
+
+            if (paginationInfo) {
+                paginationInfo.innerHTML = `Page ${page} sur ${num_pages} <span class="text-muted ms-2">(${data.count} utilisateur(s))</span>`;
             }
         }
 
+        async function fetchUsers(page = 1) {
+            const params = new URLSearchParams({
+                q: searchInput ? searchInput.value.trim() : "",
+                lot: lotSelect ? lotSelect.value : "",
+                dpt: dptSelect ? dptSelect.value : "",
+                role: roleSelect ? roleSelect.value : "",
+                page: page,
+            });
+
+            try {
+                const response = await fetch(`/utilisateurs/rechercher/?${params.toString()}`);
+                if (!response.ok) throw new Error("Erreur réseau");
+                const data = await response.json();
+
+                renderUsers(data.results);
+                renderPagination(data);
+
+                if (counterEl) counterEl.textContent = `Total : ${data.count}`;
+                currentPage = data.page;
+
+            } catch (err) {
+                console.error("Erreur de recherche:", err);
+            }
+        }
+
+        function debouncedFetch() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => fetchUsers(1), 300);
+        }
+
+        // Écouteurs filtres
         [searchInput, lotSelect, dptSelect, roleSelect].forEach(el => {
             if (!el) return;
-            el.addEventListener("input", applyFilters);
-            el.addEventListener("change", applyFilters);
+            el.addEventListener("input", debouncedFetch);
+            el.addEventListener("change", () => fetchUsers(1));
         });
 
         if (resetBtn) {
@@ -313,13 +781,22 @@
                 if (lotSelect) lotSelect.value = "";
                 if (dptSelect) dptSelect.value = "";
                 if (roleSelect) roleSelect.value = "";
-                applyFilters();
+                fetchUsers(1);
             });
         }
 
-        /* ============================================================
-           AJOUT UTILISATEUR
-           ============================================================ */
+        // Clic sur la pagination
+        if (paginationList) {
+            paginationList.addEventListener("click", (e) => {
+                const link = e.target.closest("a[data-page]");
+                if (!link) return;
+                e.preventDefault();
+                const page = parseInt(link.dataset.page, 10);
+                if (page) fetchUsers(page);
+            });
+        }
+
+        // ===== AJOUT =====
         const roleAjoutSelect = document.getElementById("nouveau-op-role");
         const btnConfirmer = document.getElementById("btn-submit-user");
         const alertBox = document.querySelector(".alert2");
@@ -329,53 +806,38 @@
             btnConfirmer.addEventListener("click", async () => {
                 const inputIt = document.getElementById("nouveau-op-input").value.trim();
                 const roleVal = roleAjoutSelect ? roleAjoutSelect.value : "";
-
                 if (!inputIt) {
-                    alertBox.innerHTML = `<div class="alert alert-warning py-2 mb-0 mt-2">Veuillez renseigner l'identifiant (IT).</div>`;
+                    alertBox.innerHTML = `<div class="alert alert-warning py-2 mb-0 mt-2">Veuillez renseigner l'IT.</div>`;
                     return;
                 }
-
                 btnConfirmer.disabled = true;
                 if (spinner) spinner.classList.remove("d-none");
                 alertBox.innerHTML = "";
-
                 try {
                     const response = await fetch('/utilisateurs/ajouter/', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCookie('csrftoken')
-                        },
-                        body: JSON.stringify({
-                            it: inputIt,
-                            role: roleVal
-                        })
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                        body: JSON.stringify({ it: inputIt, role: roleVal })
                     });
-
                     const result = await response.json();
-
                     if (response.ok) {
                         alertBox.innerHTML = `
                             <div class="alert alert-success mt-3 mb-0">
-                                <i class="fas fa-check-circle me-1"></i> <strong>Compte créé avec succès !</strong><br>
-                                Mot de passe temporaire : 
+                                <i class="fas fa-check-circle me-1"></i> <strong>Compte créé !</strong><br>
+                                Mot de passe temporaire :
                                 <div class="input-group mt-2">
-                                    <input type="text" class="form-control fw-bold text-center" value="${result.mdp_temporaire}" readonly id="temp-password-input">
-                                    <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('${result.mdp_temporaire}')" title="Copier">
-                                        <i class="fas fa-copy"></i>
-                                    </button>
+                                    <input type="text" class="form-control fw-bold text-center" value="${result.mdp_temporaire}" readonly>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('${result.mdp_temporaire}')"><i class="fas fa-copy"></i></button>
                                 </div>
-                            </div>
-                        `;
-
+                            </div>`;
                         document.getElementById("nouveau-op-input").value = "";
                         if (roleAjoutSelect) roleAjoutSelect.value = "";
+                        fetchUsers(currentPage);
                     } else {
-                        alertBox.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur lors de la création.'}</div>`;
+                        alertBox.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur.'}</div>`;
                     }
                 } catch (err) {
-                    console.error(err);
-                    alertBox.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau ou serveur.</div>`;
+                    alertBox.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau.</div>`;
                 } finally {
                     btnConfirmer.disabled = false;
                     if (spinner) spinner.classList.add("d-none");
@@ -383,23 +845,10 @@
             });
         }
 
-        const modalAjouterEl = document.getElementById("modal-ajouter");
-        if (modalAjouterEl) {
-            modalAjouterEl.addEventListener("hidden.bs.modal", () => {
-                if (alertBox) alertBox.innerHTML = "";
-                document.getElementById("nouveau-op-input").value = "";
-                if (roleAjoutSelect) roleAjoutSelect.value = "";
-                if (spinner) spinner.classList.add("d-none");
-            });
-        }
-
-        /* ============================================================
-        SUPPRESSION UTILISATEUR
-           ============================================================ */
+        // ===== SUPPRESSION =====
         let idASupprimer = null;
         const modalSupprimerEl = document.getElementById("modal-supprimer");
-        const modalSupprimer = (typeof bootstrap !== "undefined" && modalSupprimerEl)
-            ? new bootstrap.Modal(modalSupprimerEl) : null;
+        const modalSupprimer = (typeof bootstrap !== "undefined" && modalSupprimerEl) ? new bootstrap.Modal(modalSupprimerEl) : null;
         const nomCibleSpan = document.getElementById("supprimer-nom-cible");
         const alertSuppr = document.querySelector(".alert3");
         const btnConfirmerSuppression = document.getElementById("btn-confirmer-suppression");
@@ -417,38 +866,23 @@
         if (btnConfirmerSuppression) {
             btnConfirmerSuppression.addEventListener("click", async () => {
                 if (!idASupprimer) return;
-
                 btnConfirmerSuppression.disabled = true;
                 if (spinnerSuppr) spinnerSuppr.classList.remove("d-none");
                 if (alertSuppr) alertSuppr.innerHTML = "";
-
                 try {
                     const response = await fetch(`/utilisateurs/supprimer/${encodeURIComponent(idASupprimer)}/`, {
-                        method: "POST",
-                        headers: { "X-CSRFToken": getCookie("csrftoken") }
+                        method: "POST", headers: { "X-CSRFToken": getCookie("csrftoken") }
                     });
                     const result = await response.json();
-
                     if (response.ok) {
-                        const row = resultBody.querySelector(`tr[data-id="${CSS.escape(idASupprimer)}"]`);
-                        if (row) row.remove();
-
-                        const counterEl = document.getElementById("counter");
-                        if (counterEl) {
-                            const match = counterEl.textContent.match(/\d+/);
-                            if (match) {
-                                counterEl.textContent = `Total : ${Math.max(0, parseInt(match[0], 10) - 1)}`;
-                            }
-                        }
-
-                        applyFilters();
                         if (modalSupprimer) modalSupprimer.hide();
+                        // ⚡ Recharge via AJAX
+                        fetchUsers(currentPage);
                     } else {
-                        alertSuppr.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur lors de la suppression.'}</div>`;
+                        alertSuppr.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur.'}</div>`;
                     }
                 } catch (err) {
-                    console.error(err);
-                    alertSuppr.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau ou serveur.</div>`;
+                    alertSuppr.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau.</div>`;
                 } finally {
                     btnConfirmerSuppression.disabled = false;
                     if (spinnerSuppr) spinnerSuppr.classList.add("d-none");
@@ -456,20 +890,10 @@
             });
         }
 
-        if (modalSupprimerEl) {
-            modalSupprimerEl.addEventListener("hidden.bs.modal", () => {
-                idASupprimer = null;
-                if (alertSuppr) alertSuppr.innerHTML = "";
-            });
-        }
-
-        /* ============================================================
-           MODIFICATION UTILISATEUR
-           ============================================================ */
+        // ===== MODIFICATION =====
         let idAModifier = null;
         const modalModifierEl = document.getElementById("modal-modifier");
-        const modalModifier = (typeof bootstrap !== "undefined" && modalModifierEl)
-            ? new bootstrap.Modal(modalModifierEl) : null;
+        const modalModifier = (typeof bootstrap !== "undefined" && modalModifierEl) ? new bootstrap.Modal(modalModifierEl) : null;
         const itAfficheInput = document.getElementById("modifier-it-affiche");
         const nomAfficheInput = document.getElementById("modifier-nom-affiche");
         const roleModifierSelect = document.getElementById("modifier-role");
@@ -485,8 +909,8 @@
             if (nomAfficheInput) nomAfficheInput.value = btn.dataset.nom || "";
             if (roleModifierSelect) {
                 const currentRole = btn.dataset.role || "";
-                // Présélectionne ADMIN/HRBP si applicable, sinon "automatique" (cas N+1..N+4)
-                roleModifierSelect.value = (currentRole === "ADMIN" || currentRole === "HRBP") ? currentRole : "";
+                const rolesPossibles = ["ADMIN", "HRBP", "DRH", "PILOT"];
+                roleModifierSelect.value = rolesPossibles.includes(currentRole) ? currentRole : "";
             }
             if (alertModif) alertModif.innerHTML = "";
             if (modalModifier) modalModifier.show();
@@ -495,50 +919,29 @@
         if (btnConfirmerModification) {
             btnConfirmerModification.addEventListener("click", async () => {
                 if (!idAModifier) return;
-
                 btnConfirmerModification.disabled = true;
                 if (spinnerModif) spinnerModif.classList.remove("d-none");
                 if (alertModif) alertModif.innerHTML = "";
-
                 try {
                     const response = await fetch(`/utilisateurs/modifier/${encodeURIComponent(idAModifier)}/`, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "X-CSRFToken": getCookie("csrftoken")
-                        },
-                        body: JSON.stringify({
-                            role: roleModifierSelect ? roleModifierSelect.value : ""
-                        })
+                        headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
+                        body: JSON.stringify({ role: roleModifierSelect ? roleModifierSelect.value : "" })
                     });
                     const result = await response.json();
-
                     if (response.ok) {
-                        const row = resultBody.querySelector(`tr[data-id="${CSS.escape(idAModifier)}"]`);
-                        if (row) {
-                            row.dataset.role = result.role;
-                            const roleSpan = row.querySelector(".cell-role span");
-                            if (roleSpan) roleSpan.textContent = result.role;
-                        }
-                        applyFilters();
                         if (modalModifier) modalModifier.hide();
+                        // ⚡ Recharge via AJAX
+                        fetchUsers(currentPage);
                     } else {
-                        alertModif.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur lors de la modification.'}</div>`;
+                        alertModif.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur.'}</div>`;
                     }
                 } catch (err) {
-                    console.error(err);
-                    alertModif.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau ou serveur.</div>`;
+                    alertModif.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">Erreur réseau.</div>`;
                 } finally {
                     btnConfirmerModification.disabled = false;
                     if (spinnerModif) spinnerModif.classList.add("d-none");
                 }
-            });
-        }
-
-        if (modalModifierEl) {
-            modalModifierEl.addEventListener("hidden.bs.modal", () => {
-                idAModifier = null;
-                if (alertModif) alertModif.innerHTML = "";
             });
         }
     });

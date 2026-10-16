@@ -6,6 +6,23 @@
 {% block css %}
 <link rel="stylesheet" href="{% static 'declaration_effectif/css/validation.css' %}">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    #filtre-dept {
+        min-width: 180px;
+        padding: 6px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #fff;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    #filtre-dept:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -26,6 +43,19 @@
                 <div class="filter-item">
                     <span class="filter-label">Date de déclaration :</span>
                     <input type="date" class="input-control" id="date">
+                </div>
+
+                <!-- ⚡ NOUVEAU : filtre département -->
+                <div class="filter-item">
+                    <span class="filter-label">Département :</span>
+                    <select class="input-control" id="filtre-dept">
+                        <option value="">Tous les départements</option>
+                        {% for d in departements_liste %}
+                        <option value="{{ d }}" {% if d == dept_filtre %}selected{% endif %}>
+                            {{ d }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
 
                 <div class="filter-item search-box">
@@ -98,7 +128,7 @@
                 {% if page_obj.has_previous %}
                 <li>
                     <a class="page-link"
-                        href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
+                        href="?page={{ page_obj.previous_page_number }}{% if dept_filtre %}&dept={{ dept_filtre }}{% endif %}">
                         &laquo; Précédent
                     </a>
                 </li>
@@ -110,8 +140,7 @@
                 {% if num == page_obj.number %}
                 <li><span class="page-link active">{{ num }}</span></li>
                 {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <li>
-                    <a class="page-link"
-                        href="?page={{ num }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
+                    <a class="page-link" href="?page={{ num }}{% if dept_filtre %}&dept={{ dept_filtre }}{% endif %}">
                         {{ num }}
                     </a>
                     </li>
@@ -121,7 +150,7 @@
                     {% if page_obj.has_next %}
                     <li>
                         <a class="page-link"
-                            href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if dpt_filtre %}&dpt={{ dpt_filtre }}{% endif %}">
+                            href="?page={{ page_obj.next_page_number }}{% if dept_filtre %}&dept={{ dept_filtre }}{% endif %}">
                             Suivant &raquo;
                         </a>
                     </li>
@@ -146,6 +175,7 @@
 
     const csrftoken = getCookie('csrftoken');
     const dateInput = document.getElementById("date");
+    const deptInput = document.getElementById("filtre-dept");
     const nameInput = document.getElementById("filtre-nom");
     const resultContainer = document.getElementById("result");
     const head = document.getElementById("titre");
@@ -184,12 +214,17 @@
         dateInput.addEventListener("change", filterByDate);
     }
 
+    if (deptInput) {
+        deptInput.addEventListener("change", filterByDate);
+    }
+
     if (nameInput) {
         nameInput.addEventListener("input", filterByName);
     }
 
     function resetFilters() {
         if (nameInput) nameInput.value = "";
+        if (deptInput) deptInput.value = "";
 
         const today = new Date();
         const year = today.getFullYear();
@@ -242,6 +277,7 @@
 
     async function filterByDate() {
         const date = dateInput.value;
+        const dept = deptInput ? deptInput.value : "";
 
         if (!date) {
             resultContainer.innerHTML = `
@@ -254,7 +290,8 @@
         }
 
         try {
-            const response = await fetch(`/filter_date2/?time=${encodeURIComponent(date)}`);
+            const url = `/filter_date2/?time=${encodeURIComponent(date)}&dept=${encodeURIComponent(dept)}`;
+            const response = await fetch(url);
             if (!response.ok) throw new Error("Erreur réseau");
 
             const data = await response.json();
@@ -268,6 +305,7 @@
                         <th>Matricule</th>
                         <th>Utilisateur</th>
                         <th>Nom & Prénom</th>
+                        <th>DPT</th>
                         <th class="text-center">Lot</th>
                         <th class="text-center">Date</th>
                     </tr>
@@ -278,6 +316,7 @@
                         <td class="font-mono">${escapeHtml(op.matricule)}</td>
                         <td class="font-mono">${escapeHtml(op.it)}</td>
                         <td class="font-medium">${escapeHtml(op.nom_complete)}</td>
+                        <td class="font-medium">${escapeHtml(op.departement ? op.departement.abreviation : '')}</td>
                         <td class="text-center">
                             <span class="lot-badge">${escapeHtml(op.lot || '-')}</span>
                         </td>
@@ -291,6 +330,7 @@
                         <th>Matricule</th>
                         <th>Utilisateur</th>
                         <th>Nom & Prénom</th>
+                        <th>DPT</th>
                         <th class="text-center">Lot</th>
                         <th class="text-center">Date</th>
                         <th class="text-end">Action</th>
@@ -302,6 +342,7 @@
                         <td class="font-mono">${escapeHtml(op.matricule)}</td>
                         <td class="font-mono">${escapeHtml(op.it)}</td>
                         <td class="font-medium">${escapeHtml(op.nom_complete)}</td>
+                        <td class="font-medium">${escapeHtml(op.departement ? op.departement.abreviation : '')}</td>
                         <td class="text-center">
                             <span class="lot-badge">${escapeHtml(op.lot || '-')}</span>
                         </td>

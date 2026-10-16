@@ -7,6 +7,176 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="{% static 'utilisateur/css/impo.css' %}">
+<style>
+    /* ===== Bandeau résumé import ===== */
+    .import-resume-banner {
+        background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+        border: 1px solid #bbf7d0;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    .import-resume-title {
+        font-size: 1.05rem;
+        color: #166534;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .import-resume-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1rem;
+    }
+
+    .import-resume-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.85rem;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.9rem 1rem;
+    }
+
+    .import-resume-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .import-resume-icon.icon-blue {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .import-resume-icon.icon-green {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .import-resume-icon.icon-orange {
+        background: #fed7aa;
+        color: #c2410c;
+    }
+
+    .import-resume-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .import-resume-label {
+        font-size: 0.8125rem;
+        color: #64748b;
+        font-weight: 500;
+        margin-bottom: 0.15rem;
+    }
+
+    .import-resume-value {
+        display: flex;
+        align-items: baseline;
+        gap: 0.35rem;
+        font-weight: 600;
+        line-height: 1.2;
+    }
+
+    .import-resume-value .ok {
+        color: #16a34a;
+        font-size: 1.35rem;
+    }
+
+    .import-resume-value .sep {
+        color: #94a3b8;
+        font-size: 1rem;
+    }
+
+    .import-resume-value .total {
+        color: #334155;
+        font-size: 1.05rem;
+    }
+
+    .import-resume-err {
+        margin-top: 0.35rem;
+        font-size: 0.8125rem;
+        color: #dc2626;
+        font-weight: 500;
+    }
+
+    .import-resume-sub {
+        margin-top: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+
+    .import-resume-sub .badge {
+        font-size: 0.6875rem;
+        font-weight: 600;
+        padding: 0.2rem 0.5rem;
+    }
+
+    .import-resume-warnings {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px dashed #bbf7d0;
+    }
+
+    .import-warnings-list {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        max-height: 220px;
+        overflow-y: auto;
+        font-size: 0.8125rem;
+        color: #78350f;
+    }
+
+    .import-warnings-list ul {
+        padding-left: 1.1rem;
+        margin: 0;
+    }
+
+    .import-warnings-list li {
+        margin-bottom: 0.25rem;
+        line-height: 1.4;
+    }
+
+    /* ===== Bandeau synthèse permanente ===== */
+    .synthese-permanente {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .synthese-permanente .card-header {
+        border-bottom: 1px solid #e2e8f0;
+        padding: 1rem 1.25rem;
+    }
+
+    .synthese-permanente .card-body {
+        padding: 1.25rem;
+    }
+
+    .synthese-permanente .bg-danger-subtle {
+        background-color: #fee2e2 !important;
+    }
+
+    .synthese-permanente .bg-warning-subtle {
+        background-color: #fef3c7 !important;
+    }
+
+    .synthese-permanente .bg-primary-subtle {
+        background-color: #dbeafe !important;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -19,14 +189,159 @@
                 Alimentez votre base de données en chargeant les fichiers (.xlsx, .xls, .csv).
             </p>
         </div>
-
-        {% if synthese_declarations %}
-        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
-            data-bs-target="#modalSyntheseDeclarations">
-            <i class="fas fa-clipboard-check me-2"></i>Voir la synthèse des déclarations
-        </button>
-        {% endif %}
     </div>
+
+    {# ============================================================ #}
+    {# BANDEAU RÉSUMÉ IMPORT — visible uniquement après un import #}
+    {# ============================================================ #}
+    {% if resume_import %}
+    <div class="import-resume-banner mb-4">
+
+        <div class="import-resume-title">
+            <i class="fas fa-circle-check text-success me-2"></i>
+            <strong>Importation terminée</strong>
+        </div>
+
+        <div class="import-resume-cards">
+
+            {% if resume_import.dpt %}
+            <div class="import-resume-card">
+                <div class="import-resume-icon icon-blue">
+                    <i class="fas fa-folder"></i>
+                </div>
+                <div class="import-resume-body">
+                    <div class="import-resume-label">Départements</div>
+                    <div class="import-resume-value">
+                        <span class="ok">{{ resume_import.dpt.ok }}</span>
+                        <span class="sep">/</span>
+                        <span class="total">{{ resume_import.dpt.total }}</span>
+                    </div>
+                    {% if resume_import.dpt.err %}
+                    <div class="import-resume-err">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {{ resume_import.dpt.err }} en erreur
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if resume_import.collab %}
+            <div class="import-resume-card">
+                <div class="import-resume-icon icon-green">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="import-resume-body">
+                    <div class="import-resume-label">Collaborateurs</div>
+                    <div class="import-resume-value">
+                        <span class="ok">{{ resume_import.collab.ok }}</span>
+                        <span class="sep">/</span>
+                        <span class="total">{{ resume_import.collab.total }}</span>
+                    </div>
+                    {% if resume_import.collab.err %}
+                    <div class="import-resume-err">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {{ resume_import.collab.err }} en erreur
+                    </div>
+                    {% endif %}
+                    <div class="import-resume-sub">
+                        <span class="badge bg-success-subtle text-success">{{ resume_import.collab.crees }} créés</span>
+                        <span class="badge bg-warning-subtle text-warning">{{ resume_import.collab.modif }}
+                            modifiés</span>
+                        <span class="badge bg-danger-subtle text-danger">{{ resume_import.collab.supprime }}
+                            supprimés</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if resume_import.chg %}
+            <div class="import-resume-card">
+                <div class="import-resume-icon icon-orange">
+                    <i class="fas fa-exchange-alt"></i>
+                </div>
+                <div class="import-resume-body">
+                    <div class="import-resume-label">Changements d'affectation</div>
+                    <div class="import-resume-value">
+                        <span class="ok">{{ resume_import.chg.ok }}</span>
+                        <span class="sep">/</span>
+                        <span class="total">{{ resume_import.chg.total }}</span>
+                    </div>
+                    {% if resume_import.chg.err %}
+                    <div class="import-resume-err">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {{ resume_import.chg.err }} en erreur
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+        {% if nb_erreurs_import %}
+        <div class="import-resume-warnings">
+            <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="collapse"
+                data-bs-target="#collapseWarnings" aria-expanded="false">
+                <i class="fas fa-triangle-exclamation me-1"></i>
+                Voir les {{ nb_erreurs_import }} avertissement(s)
+            </button>
+            <div class="collapse mt-2" id="collapseWarnings">
+                <div class="import-warnings-list">
+                    <ul class="mb-0">
+                        {% for err in erreurs_import %}
+                        <li>{{ err }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+    {% endif %}
+
+    {# ============================================================ #}
+    {# SYNTHÈSE PERMANENTE — 3 sections : départs / changements / ajouts #}
+    {# ============================================================ #}
+    {% if synthese_declarations %}
+    <div class="card mb-4 shadow-sm synthese-permanente">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="mb-0">
+                <i class="fas fa-clipboard-check me-2 text-primary"></i>
+                Synthèse du dernier import de collaborateurs
+            </h5>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal"
+                    data-bs-target="#modalSyntheseDeclarations">
+                    <i class="fas fa-list me-1"></i> Voir le détail
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-6 col-md-4">
+                    <div class="p-3 border rounded bg-danger-subtle h-100">
+                        <div class="small text-muted mb-1">🔴 Départs non effectués</div>
+                        <div class="fs-4 fw-bold">{{ synthese_declarations.nb_departs|default:0 }}</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4">
+                    <div class="p-3 border rounded bg-warning-subtle h-100">
+                        <div class="small text-muted mb-1">🟠 Changements non effectués</div>
+                        <div class="fs-4 fw-bold">{{ synthese_declarations.nb_changements|default:0 }}</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4">
+                    <div class="p-3 border rounded bg-primary-subtle h-100">
+                        <div class="small text-muted mb-1">🟣 Ajouts non effectués</div>
+                        <div class="fs-4 fw-bold">{{ synthese_declarations.nb_ajouts|default:0 }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Guide des formats -->
     <div class="import-guide mb-4">
@@ -94,45 +409,7 @@
             </div>
         </div>
     </div>
-{% if messages %}
-<div class="container mt-3">
 
-    {% for message in messages %}
-
-    {% if 'error' in message.tags %}
-    {% with alert_class='danger' %}
-    <div class="alert alert-{{ alert_class }} alert-dismissible fade show" role="alert">
-        <i class="fas fa-circle-exclamation me-2"></i>
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    {% endwith %}
-
-    {% elif 'warning' in message.tags %}
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        <i class="fas fa-triangle-exclamation me-2"></i>
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-
-    {% elif 'success' in message.tags %}
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="fas fa-circle-check me-2"></i>
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-
-    {% else %}
-    <div class="alert alert-info alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    {% endif %}
-
-    {% endfor %}
-
-</div>
-{% endif %}
     <!-- Zone de téléchargement -->
     <div class="import-card-form mb-4">
         <form method="post" enctype="multipart/form-data">
@@ -223,11 +500,8 @@
                         </td>
                         <td><span class="badge bg-warning-subtle text-warning fw-bold">{{ item.modif|default:0 }}</span>
                         </td>
-                        <td><span class="badge bg-danger-subtle text-danger fw-bold">{{ item.supprime|default:0}}</span>
-                        </td>
-                        <td><span
-                                class="badge bg-secondary-subtle text-secondary fw-bold">{{item.date|default:0}}</span>
-                        </td>
+                        <td><span class="badge bg-danger-subtle text-danger fw-bold">{{ item.supprime|default:0 }}</span></td>
+                        <td><span class="badge bg-secondary-subtle text-secondary fw-bold">{{ item.date|default:"-"}}</span></td>
                         <td>
                             {% if item.statut == "SUCCES" %}
                             <span
@@ -238,8 +512,8 @@
                             {% elif item.statut == "ECHEC" %}
                             <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Échec</span>
                             {% else %}
-                            <span class="badge bg-info-subtle text-info border border-info-subtle">{{
-                                item.statut}}</span>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle">{{ item.statut
+                                }}</span>
                             {% endif %}
                         </td>
                         <td class="text-center">
@@ -276,7 +550,6 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
 
-            <!-- Barre de filtre par action -->
             <div class="details-filtre-bar">
                 <label for="filtreAction{{ item.id }}" class="details-filtre-label">Filtrer par action :</label>
                 <select class="form-select form-select-sm details-filtre-select" id="filtreAction{{ item.id }}"
@@ -394,7 +667,6 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
 
-            <!-- Barre de filtre par action -->
             <div class="details-filtre-bar">
                 <label for="filtreActionGenerique" class="details-filtre-label">Filtrer par action :</label>
                 <select class="form-select form-select-sm details-filtre-select" id="filtreActionGenerique"
@@ -434,11 +706,11 @@
     </div>
 </div>
 
-<!-- Popup de synthèse des déclarations vs fichier importé -->
+<!-- Popup de synthèse des déclarations vs fichier importé — 3 onglets -->
 {% if synthese_declarations %}
 <div class="modal fade" id="modalSyntheseDeclarations" tabindex="-1" aria-labelledby="labelSyntheseDeclarations"
     aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="labelSyntheseDeclarations">
@@ -450,15 +722,15 @@
                 <ul class="list-unstyled fs-5 mb-4">
                     <li class="mb-1">
                         🔴 Départs déclarés mais non effectués :
-                        <strong>{{ synthese_declarations.nb_departs }}</strong>
+                        <strong>{{ synthese_declarations.nb_departs|default:0 }}</strong>
                     </li>
                     <li class="mb-1">
                         🟠 Changements déclarés mais non effectués :
-                        <strong>{{ synthese_declarations.nb_changements }}</strong>
+                        <strong>{{ synthese_declarations.nb_changements|default:0 }}</strong>
                     </li>
                     <li class="mb-1">
-                        🟢 Déclarations correctement effectuées :
-                        <strong>{{ synthese_declarations.nb_effectuees }}</strong>
+                        🟣 Ajouts déclarés mais rattachés à un autre RU :
+                        <strong>{{ synthese_declarations.nb_ajouts|default:0 }}</strong>
                     </li>
                 </ul>
 
@@ -466,18 +738,25 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="tab-departs-btn" data-bs-toggle="tab"
                             data-bs-target="#tab-departs" type="button" role="tab">
-                            🔴 Départs ({{ synthese_declarations.nb_departs }})
+                            🔴 Départs ({{ synthese_declarations.nb_departs|default:0 }})
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="tab-changements-btn" data-bs-toggle="tab"
                             data-bs-target="#tab-changements" type="button" role="tab">
-                            🟠 Changements ({{ synthese_declarations.nb_changements }})
+                            🟠 Changements ({{ synthese_declarations.nb_changements|default:0 }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-ajouts-btn" data-bs-toggle="tab" data-bs-target="#tab-ajouts"
+                            type="button" role="tab">
+                            🟣 Ajouts non effectués ({{ synthese_declarations.nb_ajouts|default:0 }})
                         </button>
                     </li>
                 </ul>
 
                 <div class="tab-content pt-3">
+                    <!-- Onglet Départs -->
                     <div class="tab-pane fade show active" id="tab-departs" role="tabpanel">
                         <div class="table-responsive">
                             <table class="table table-sm table-striped mb-0">
@@ -511,6 +790,7 @@
                         </div>
                     </div>
 
+                    <!-- Onglet Changements -->
                     <div class="tab-pane fade" id="tab-changements" role="tabpanel">
                         <div class="table-responsive">
                             <table class="table table-sm table-striped mb-0">
@@ -545,6 +825,43 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- Onglet Ajouts non effectués -->
+                    <div class="tab-pane fade" id="tab-ajouts" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Matricule</th>
+                                        <th>Nom complet</th>
+                                        <th>RU déclaré (A)</th>
+                                        <th>RU dans le fichier</th>
+                                        <th>Date déclaration</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for a in synthese_declarations.ajouts_non_effectues %}
+                                    <tr>
+                                        <td>{{ a.matricule|default:"-" }}</td>
+                                        <td>{{ a.nom_complete|default:"-" }}</td>
+                                        <td>{{ a.ru_declare_nom|default:"-" }}</td>
+                                        <td>{{ a.ru_fichier_nom|default:"-" }}</td>
+                                        <td>{{ a.date_declaration }}</td>
+                                        <td><span class="badge bg-primary-subtle text-primary">{{ a.statut }}</span>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-muted text-center py-3">
+                                            Aucun ajout en attente.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -562,7 +879,6 @@
 <script>
     const URL = "{% url 'import_details_json' 0 %}";
 
-    // Correspondance action -> classe CSS du badge
     const ACTION_BADGE_CLASS = {
         "CREATION": "badge-action-creation",
         "MODIFICATION": "badge-action-modification",
@@ -577,7 +893,6 @@
         "ERREUR": "Erreur",
     };
 
-    // Construit une ligne <tr> pour une entrée de détail d'import
     function ligneDetail(d) {
         const cls = ACTION_BADGE_CLASS[d.action] || "badge-action-defaut";
         const label = ACTION_LABEL[d.action] || d.action;
@@ -593,7 +908,6 @@
             </tr>`;
     }
 
-    // Filtre les lignes déjà rendues dans une modale de détails selon l'action choisie
     function filtrerActions(id) {
         const select = document.getElementById('filtreAction' + id);
         if (!select) return;
@@ -604,13 +918,12 @@
         let visibles = 0;
         tbody.querySelectorAll('tr').forEach(row => {
             const badge = row.querySelector('.badge-action');
-            if (!badge) return; // ligne "Aucun détail" / "Chargement..."
+            if (!badge) return;
             const match = !valeur || badge.dataset.action === valeur;
             row.style.display = match ? '' : 'none';
             if (match) visibles++;
         });
 
-        // Message si le filtre ne retourne rien
         let ligneVide = tbody.querySelector('.ligne-filtre-vide');
         if (visibles === 0 && tbody.querySelector('.badge-action')) {
             if (!ligneVide) {

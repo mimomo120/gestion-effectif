@@ -118,6 +118,26 @@
         font-size: 0.8125rem;
         color: var(--text-subtle, #94a3b8);
     }
+
+    /* ===== Badge "RU non déclaré" ===== */
+    .badge-ru-non-declare {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 6px;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+        cursor: help;
+    }
+
+    .badge-ru-non-declare i {
+        font-size: 0.75rem;
+        color: #d97706;
+    }
 </style>
 {% endblock %}
 
@@ -156,6 +176,16 @@
                         <option value="C"> Lot C</option>
                     </select>
                 </div>
+                {% if afficher_filtre_dpt %}
+                <div class="filter-item">
+                    <select class="input-control select-control" id="filtre-dpt">
+                        <option value="">Tous les départements</option>
+                        {% for d in departements_liste %}
+                        <option value="{{ d }}">{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
 
                 <!-- Filtre Responsable d'Unité (RU) — combobox recherchable -->
                 <div class="filter-item">
@@ -173,19 +203,18 @@
                             </div>
                             <ul class="ru-combobox-list" id="ruList" role="listbox">
                                 <li class="ru-combobox-option active" data-value="">Tous les RU</li>
-                                {% for ru_it_val, ru_nom in ru_choices %}
-                                <li class="ru-combobox-option" data-value="{{ ru_it_val }}">{{ ru_nom }}</li>
+                                {% for ru_nom in ru_choices %}
+                                <li class="ru-combobox-option" data-value="{{ ru_nom }}">{{ ru_nom }}</li>
                                 {% endfor %}
                             </ul>
                             <div class="ru-combobox-empty" id="ruEmpty" hidden>Aucun RU trouvé</div>
                         </div>
 
-                        <!-- Valeur réelle du filtre : conservée pour rester compatible
-                             avec la logique JS existante (ruSelect.value / applyFilters) -->
+                        <!-- Valeur réelle du filtre (RU par NOM) -->
                         <select id="ru" hidden>
                             <option value="">Tous les RU</option>
-                            {% for ru_it_val, ru_nom in ru_choices %}
-                            <option value="{{ ru_it_val }}">{{ ru_nom }}</option>
+                            {% for ru_nom in ru_choices %}
+                            <option value="{{ ru_nom }}">{{ ru_nom }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -266,6 +295,7 @@
         const counter = document.getElementById("counter");
         const searchInput = document.getElementById("search");
         const lotSelect = document.getElementById("choix");
+        const dptSelect = document.getElementById("filtre-dpt");   // ⚡ peut être null
         const ruSelect = document.getElementById("ru");
         const dateInput = document.getElementById("date");
         const resetBtn = document.getElementById("resetBtn");
@@ -305,7 +335,20 @@
                     </tr>`;
                 return;
             }
-            resultat.innerHTML = results.map(c => `
+            resultat.innerHTML = results.map(c => {
+                let ruCell;
+                if (c.ru_change_non_declare) {
+                    ruCell = `
+                        <span class="badge-ru-non-declare"
+                              title="RU système : ${escapeHtml(c.ru_systeme_nom || '—')}">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            ${escapeHtml(c.ru_nom || '—')}
+                        </span>`;
+                } else {
+                    ruCell = escapeHtml(c.ru_nom || '—');
+                }
+
+                return `
                 <tr class="table-row">
                     <td class="font-mono">${escapeHtml(c.matricule)}</td>
                     <td class="font-mono">${escapeHtml(c.it)}</td>
@@ -316,10 +359,11 @@
                     <td class="text-center">
                         <span class="lot-badge">${escapeHtml(c.lot || '-')}</span>
                     </td>
-                    <td>${escapeHtml(c.ru_nom || '—')}</td>
+                    <td>${ruCell}</td>
                     <td class="font-mono">${escapeHtml(c.departement || '—')}</td>
                 </tr>
-            `).join("");
+                `;
+            }).join("");
         }
 
         function renderPagination(page, numPages, hasPrev, hasNext) {
@@ -330,7 +374,6 @@
 
             let html = "";
 
-            // Précédent
             if (hasPrev) {
                 html += `<li><a class="page-link" href="#" data-page="${page - 1}"><i class="fa-solid fa-chevron-left"></i></a></li>`;
             } else {
@@ -358,7 +401,6 @@
                 html += `<li><a class="page-link" data-page="${numPages}" href="#">${numPages}</a></li>`;
             }
 
-            // Suivant
             if (hasNext) {
                 html += `<li><a class="page-link" href="#" data-page="${page + 1}"><i class="fa-solid fa-chevron-right"></i></a></li>`;
             } else {
@@ -380,6 +422,7 @@
             const params = new URLSearchParams({
                 q: searchInput.value.trim(),
                 lot: lotSelect.value,
+                dpt: dptSelect ? dptSelect.value : "",   // ⚡ NOUVEAU
                 ru: ruSelect.value,
                 date: dateInput.value || defaultDate,
                 page: currentPage,
@@ -421,9 +464,18 @@
         lotSelect.addEventListener("change", () => { currentPage = 1; applyFilters(); });
         dateInput.addEventListener("change", () => { currentPage = 1; applyFilters(); });
 
+        // ⚡ Écouteur pour le filtre département (peut ne pas exister)
+        if (dptSelect) {
+            dptSelect.addEventListener("change", () => {
+                currentPage = 1;
+                applyFilters();
+            });
+        }
+
         resetBtn.addEventListener("click", () => {
             searchInput.value = "";
             lotSelect.value = "";
+            if (dptSelect) dptSelect.value = "";   // ⚡ NOUVEAU
             dateInput.value = defaultDate;
             setRuValue("", "Tous les RU");
             currentPage = 1;

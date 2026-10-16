@@ -1,11 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* =========================================================
-   DESIGN TOKENS
-   Palette pensée pour un tableau de bord d'exploitation :
-   bleu-acier (donnée réelle), vert (donnée système),
-   ocre (maquette/plan), rouge-brique et violet (alertes RH).
-========================================================= */
 :root {
     --ink: #101828;
     --ink-soft: #475467;

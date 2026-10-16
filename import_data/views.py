@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.http import HttpResponse, JsonResponse
 import unicodedata
 
+
 # ------------------------------------------------------------------
 # FONCTIONS AUXILIAIRES
 # ------------------------------------------------------------------
@@ -24,12 +25,12 @@ def clean_val(val):
         return None
     if isinstance(val, float) and val.is_integer():
         return str(int(val))
-    # normalise les espaces et supprime caractères invisibles en tête/queue
     try:
         s = str(val).strip()
         return s
     except Exception:
         return str(val)
+
 
 def clean_int(val, default=0):
     try:
@@ -39,38 +40,61 @@ def clean_int(val, default=0):
     except (ValueError, TypeError):
         return default
 
+
 def read_uploaded_file(fichier):
     """
-    Lecture optimisée : dtype=str pour éviter conversions surprises.
+    Lit un fichier CSV ou Excel en désactivant la reconnaissance
+    automatique des NaN (pour ne pas transformer 'EL', 'NA', 'NULL',
+    'N/A', etc. en valeurs manquantes).
     """
     if fichier.name.endswith(".csv"):
-        df = pd.read_csv(fichier, dtype=str)
+        df = pd.read_csv(
+            fichier,
+            dtype=str,
+            keep_default_na=False,
+            na_values=[],
+        )
     else:
+        # ⚡ Essayer openpyxl d'abord (plus fiable pour les chaînes "EL", "EL-")
         try:
-            df = pd.read_excel(fichier, engine="calamine", dtype=str)
-        except ImportError:
-            df = pd.read_excel(fichier, dtype=str)
+            df = pd.read_excel(
+                fichier,
+                engine="openpyxl",
+                dtype=str,
+                keep_default_na=False,
+                na_values=[],
+            )
+        except Exception:
+            # Fallback sur calamine si openpyxl échoue
+            try:
+                df = pd.read_excel(
+                    fichier,
+                    engine="calamine",
+                    dtype=str,
+                    keep_default_na=False,
+                    na_values=[],
+                )
+            except ImportError:
+                df = pd.read_excel(
+                    fichier,
+                    dtype=str,
+                    keep_default_na=False,
+                    na_values=[],
+                )
+
     df.columns = df.columns.str.strip()
     return df
 
+
 def iter_rows(df):
-    """
-    to_dict("records") est plus rapide que iterrows()
-    """
     return enumerate(df.to_dict("records"))
+
 
 # ------------------------------------------------------------------
 # IMPORT DÉPARTEMENTS
 # ------------------------------------------------------------------
 
 def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
-    """
-    Retourne (lignes_ok, lignes_total, lignes_erreur) :
-      - lignes_ok    : nb de lignes effectivement créées ou mises à jour
-      - lignes_total : nb de lignes présentes dans le fichier
-      - lignes_erreur: nb de lignes complètement ignorées (abréviation
-        manquante ou exception levée pendant le traitement de la ligne)
-    """
     if collaborateurs_map is None:
         collaborateurs_map = {c.it: c for c in Collaborateur.objects.all()}
 
@@ -113,7 +137,7 @@ def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
                 HRBP=rh_obj,
                 ADMIN=admin_obj,
                 DRH=drh_obj,
-                PILOT=pilot_obj
+                PILOT=pilot_obj,
             )
 
             if abbrev in departements_existants:
@@ -144,6 +168,7 @@ def importer_departements(df_dpt, erreurs, collaborateurs_map=None):
 
 CHAMPS_SUIVIS = ["matricule", "nom_complete", "lot", "departement", "eq", "shift", "sexe"]
 
+
 def _val_affichable(v):
     if v is None:
         return ""
@@ -151,30 +176,18 @@ def _val_affichable(v):
         return v.abreviation
     return str(v)
 
+
 def _normalize_for_match(s):
     if s is None:
         return ""
     s = str(s).strip()
-    # remove multiple spaces
     s = " ".join(s.split())
-    # remove accents
     s = unicodedata.normalize("NFKD", s)
     s = "".join(ch for ch in s if not unicodedata.combining(ch))
     return s.lower()
 
 
 def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_map=None):
-    """
-    Retourne :
-      (nb_lignes_traitees_total_incl_suppressions, collaborateurs_dans_fichier,
-       lignes_ok, lignes_total, lignes_erreur)
-
-    lignes_ok     : nb de lignes du fichier effectivement créées ou mises à jour
-    lignes_total  : nb de lignes présentes dans le fichier
-    lignes_erreur : nb de lignes du fichier jamais traitées (IT manquant ou
-                    exception levée pendant le traitement de la ligne)
-    """
-    # maps existants (cache) : clé = abbreviation stripped
     departements_map = {d.abreviation.strip(): d for d in Departement.objects.all()}
     if collaborateurs_map is None:
         collaborateurs_map = {c.it: c for c in Collaborateur.objects.all()}
@@ -208,9 +221,6 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
 
             ru_mat = clean_val(row.get("RU"))
 
-            # FIX: utiliser clean_val() (qui gère correctement pd.isna) au lieu de
-            # "row.get(...) or ''" qui laissait passer le float NaN (nan est truthy)
-            # et produisait la chaîne littérale "nan" une fois passé dans str().
             nom = clean_val(row.get("Nom")) or ""
             prenom = clean_val(row.get("Prénom")) or clean_val(row.get("Prenom")) or ""
 
@@ -225,8 +235,6 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
             )
 
             matricule_val = data["matricule"]
-
-            # Crée un objet prêt pour bulk (nouveau ou mise à jour)
             obj = Collaborateur(it=utilisateur_it, **data)
 
             if utilisateur_it in collaborateurs_map:
@@ -279,7 +287,6 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
                     message_erreur=str(e),
                 ))
 
-    # suppression/diff et persistence (identique à l'existant)
     collaborateurs_a_supprimer = set(collaborateurs_map.keys()) - collaborateurs_dans_fichier
 
     if import_log is not None:
@@ -296,23 +303,6 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
     with transaction.atomic():
         tous_objets = a_creer + a_maj
 
-        # ----------------------------------------------------------------
-        # FIX (UNIQUE constraint failed: Collaborateur_collaborateur.matricule)
-        # ----------------------------------------------------------------
-        # bulk_create(update_conflicts=True, unique_fields=["it"]) ne résout
-        # les conflits QUE sur la colonne "it". La contrainte unique sur
-        # "matricule" reste vérifiée ligne par ligne par SQLite pendant
-        # l'exécution du batch (elle n'est pas différée en fin de transaction).
-        #
-        # Résultat : si un matricule change de propriétaire d'un import à
-        # l'autre (ex: A avait 100 et passe à 101, B reprend 100), SQLite peut
-        # tenter d'écrire le nouveau matricule de B avant que celui de A ait
-        # été libéré -> UNIQUE constraint failed.
-        #
-        # Solution : avant le bulk_create, on détecte tous les matricules
-        # entrants déjà attribués en base à un AUTRE "it", et on les vide
-        # (None) au préalable. Le bulk_create peut alors s'exécuter sans
-        # jamais rencontrer de doublon de matricule.
         matricules_entrants = {
             obj.matricule: obj.it for obj in tous_objets if obj.matricule
         }
@@ -339,7 +329,6 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
                 for c in a_liberer:
                     c.matricule = None
                 Collaborateur.objects.bulk_update(a_liberer, ["matricule"], batch_size=1000)
-        # ----------------------------------------------------------------
 
         if tous_objets:
             Collaborateur.objects.bulk_create(
@@ -399,14 +388,12 @@ def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_
         lignes_erreur,
     )
 
+
 # ------------------------------------------------------------------
-# IMPORT CHANGEMENTS D'AFFECTATION (inchangé sauf noms DPT)
+# IMPORT CHANGEMENTS D'AFFECTATION
 # ------------------------------------------------------------------
 
 def importer_changements(df_chg, erreurs):
-    """
-    Retourne (lignes_ok, lignes_total, lignes_erreur).
-    """
     departements_map = {d.abreviation: d for d in Departement.objects.all()}
     a_creer = []
     lignes_total = len(df_chg)
@@ -455,6 +442,7 @@ def importer_changements(df_chg, erreurs):
     lignes_ok = len(a_creer)
     return lignes_ok, lignes_total, lignes_erreur
 
+
 # ------------------------------------------------------------------
 # SUIVI DES DÉCLARATIONS VS FICHIER IMPORTÉ
 # ------------------------------------------------------------------
@@ -462,11 +450,12 @@ def importer_changements(df_chg, erreurs):
 def _snapshot_ru(collaborateurs_map):
     return {it: getattr(c, "ru_it_id", None) for it, c in collaborateurs_map.items()}
 
+
 def analyser_declarations_vs_import(ancien_ru_map, collaborateurs_dans_fichier):
     declarations = (
         DeclarationEffectif.objects
-        .filter(nature__in=["D", "C"])
-        .select_related("collaborateur_it", "nv_Ru")
+        .filter(nature__in=["D", "C", "A", "V"])
+        .select_related("collaborateur_it", "nv_Ru", "Ru")
         .order_by("collaborateur_it_id", "-date", "-id")
     )
 
@@ -481,8 +470,27 @@ def analyser_declarations_vs_import(ancien_ru_map, collaborateurs_dans_fichier):
         c.it: c for c in Collaborateur.objects.filter(it__in=its_concernes)
     }
 
+    ru_ids_affichage = set()
+    for d in dernieres.values():
+        if d.nv_Ru_id:
+            ru_ids_affichage.add(d.nv_Ru_id)
+        if d.Ru_id:
+            ru_ids_affichage.add(d.Ru_id)
+    for c in collaborateurs_apres.values():
+        if c.ru_it_id:
+            ru_ids_affichage.add(c.ru_it_id)
+    for r in ancien_ru_map.values():
+        if r:
+            ru_ids_affichage.add(r)
+
+    ru_par_id = {
+        r.it: r.nom_complete
+        for r in Collaborateur.objects.filter(it__in=ru_ids_affichage)
+    }
+
     departs_non_effectues = []
     changements_non_effectues = []
+    ajouts_non_effectues = []
     effectuees = []
 
     for cid, decl in dernieres.items():
@@ -534,14 +542,40 @@ def analyser_declarations_vs_import(ancien_ru_map, collaborateurs_dans_fichier):
                     "statut": "Changement déclaré, non effectué",
                 })
 
+        elif decl.nature in ("A", "V"):
+            ru_declare = decl.Ru_id
+            actuelle_dans_fichier = collab_actuel.ru_it_id if collab_actuel else None
+
+            if actuelle_dans_fichier == ru_declare:
+                effectuees.append({
+                    "matricule": matricule,
+                    "nom_complete": nom_complet,
+                    "type": "Ajout/Validation",
+                    "date_declaration": decl.date,
+                })
+            else:
+                ajouts_non_effectues.append({
+                    "matricule": matricule,
+                    "nom_complete": nom_complet,
+                    "ru_declare": ru_declare,
+                    "ru_declare_nom": ru_par_id.get(ru_declare, ru_declare),
+                    "ru_fichier": actuelle_dans_fichier,
+                    "ru_fichier_nom": ru_par_id.get(actuelle_dans_fichier, actuelle_dans_fichier),
+                    "date_declaration": decl.date,
+                    "statut": "Ajouté par un RU mais rattaché à un autre dans le fichier",
+                })
+
     return {
         "departs_non_effectues": departs_non_effectues,
         "changements_non_effectues": changements_non_effectues,
+        "ajouts_non_effectues": ajouts_non_effectues,
         "effectuees": effectuees,
         "nb_departs": len(departs_non_effectues),
         "nb_changements": len(changements_non_effectues),
+        "nb_ajouts": len(ajouts_non_effectues),
         "nb_effectuees": len(effectuees),
     }
+
 
 def _serialiser_synthese(synthese):
     def _conv_liste(liste):
@@ -556,23 +590,21 @@ def _serialiser_synthese(synthese):
     return {
         "departs_non_effectues": _conv_liste(synthese["departs_non_effectues"]),
         "changements_non_effectues": _conv_liste(synthese["changements_non_effectues"]),
+        "ajouts_non_effectues": _conv_liste(synthese["ajouts_non_effectues"]),
         "effectuees": _conv_liste(synthese["effectuees"]),
         "nb_departs": synthese["nb_departs"],
         "nb_changements": synthese["nb_changements"],
+        "nb_ajouts": synthese["nb_ajouts"],
         "nb_effectuees": synthese["nb_effectuees"],
     }
 
-def _derniere_synthese():
-    dernier = (
-        histo_import.objects
-        .exclude(synthese_json__isnull=True)
-        .order_by("-date")
-        .first()
-    )
-    return dernier.synthese_json if dernier else None
 
 @role_required(['SUPER', "DRH"])
 def importer_fichiers_combines(request):
+    storage = messages.get_messages(request)
+    for _ in storage:
+        pass
+
     role = request.session.get('role')
     template_de_base = {
         "SUPER": "utilisateur/navbar_N1.html",
@@ -585,17 +617,18 @@ def importer_fichiers_combines(request):
         .order_by('-date')[:10]
     )
 
-    if request.method != "POST":
-        storage = messages.get_messages(request)
-        for _ in storage:
-            pass
+    synthese_existante = _derniere_synthese()
 
+    if request.method != "POST":
         return render(request, "import_data/import.html", {
             "form": MultipleImportForm(),
             "template_de_base": template_de_base,
             "historique_imports": historique_imports,
-            "synthese_declarations": _derniere_synthese(),
-            "just_imported": False,
+            "synthese_declarations": synthese_existante,
+            "just_imported": synthese_existante is not None,
+            "resume_import": None,
+            "erreurs_import": [],
+            "nb_erreurs_import": 0,
         })
 
     form = MultipleImportForm(request.POST, request.FILES)
@@ -604,8 +637,11 @@ def importer_fichiers_combines(request):
             "form": form,
             "template_de_base": template_de_base,
             "historique_imports": historique_imports,
-            "synthese_declarations": _derniere_synthese(),
-            "just_imported": False,
+            "synthese_declarations": synthese_existante,
+            "just_imported": synthese_existante is not None,
+            "resume_import": None,
+            "erreurs_import": [],
+            "nb_erreurs_import": 0,
         })
 
     f_collab = request.FILES.get("fichier_collaborateur")
@@ -613,19 +649,20 @@ def importer_fichiers_combines(request):
     f_chg = request.FILES.get("fichier_changement")
 
     if not (f_collab or f_dpt or f_chg):
-        messages.error(request, "Veuillez fournir au moins un fichier à importer.", extra_tags="import")
         return render(request, "import_data/import.html", {
             "form": form,
             "template_de_base": template_de_base,
             "historique_imports": historique_imports,
-            "synthese_declarations": _derniere_synthese(),
-            "just_imported": False,
+            "synthese_declarations": synthese_existante,
+            "just_imported": synthese_existante is not None,
+            "resume_import": None,
+            "erreurs_import": ["Veuillez fournir au moins un fichier à importer."],
+            "nb_erreurs_import": 1,
         })
 
     erreurs = []
     crees_dpts = crees_collabs = crees_chgs = 0
 
-    # ===== Compteurs précis lignes OK / total / erreur, par fichier =====
     dpt_ok = dpt_total = dpt_err = 0
     collab_ok = collab_total = collab_err = 0
     chg_ok = chg_total = chg_err = 0
@@ -640,7 +677,7 @@ def importer_fichiers_combines(request):
         collaborateurs_map = {
             c.it: c for c in Collaborateur.objects.only(
                 "it", "matricule", "nom_complete", "lot",
-                "departement_id","eq", "shift", "sexe", "ru_it_id",
+                "departement_id", "eq", "shift", "sexe", "ru_it_id",
             )
         }
 
@@ -649,10 +686,12 @@ def importer_fichiers_combines(request):
     if f_dpt:
         try:
             df_dpt = read_uploaded_file(f_dpt)
-            dpt_ok, dpt_total, dpt_err = importer_departements(df_dpt, erreurs, collaborateurs_map=collaborateurs_map)
+            dpt_ok, dpt_total, dpt_err = importer_departements(
+                df_dpt, erreurs, collaborateurs_map=collaborateurs_map
+            )
             crees_dpts = dpt_ok
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Départements : {e}", extra_tags="import")
+            erreurs.append(f"Erreur de lecture du fichier Départements : {e}")
 
     if f_collab:
         try:
@@ -685,7 +724,7 @@ def importer_fichiers_combines(request):
             if import_log is not None:
                 import_log.statut = "ECHEC"
                 import_log.save(update_fields=["statut"])
-            messages.error(request, f"Erreur de lecture du fichier Collaborateurs : {e}", extra_tags="import")
+            erreurs.append(f"Erreur de lecture du fichier Collaborateurs : {e}")
 
     if f_chg:
         try:
@@ -693,32 +732,28 @@ def importer_fichiers_combines(request):
             chg_ok, chg_total, chg_err = importer_changements(df_chg, erreurs)
             crees_chgs = chg_ok
         except Exception as e:
-            messages.error(request, f"Erreur de lecture du fichier Changements : {e}", extra_tags="import")
+            erreurs.append(f"Erreur de lecture du fichier Changements : {e}")
 
-    # ===== Résumé : X/Y lignes importées avec succès, Z en erreur =====
-    resume = []
-    if f_dpt:
-        resume.append(
-            f"Départements : {dpt_ok}/{dpt_total} ligne(s) importée(s) avec succès"
-            + (f", {dpt_err} en erreur" if dpt_err else "")
-        )
-    if f_collab:
-        detail_msg = f"Collaborateurs : {collab_ok}/{collab_total} ligne(s) importée(s) avec succès"
-        if collab_err:
-            detail_msg += f", {collab_err} en erreur"
-        if import_log:
-            detail_msg += f" ({import_log.depar} créé(s), {import_log.modif} modifié(s), {import_log.supprime} supprimé(s))"
-        resume.append(detail_msg)
-    if f_chg:
-        resume.append(
-            f"Changements d'affectation : {chg_ok}/{chg_total} ligne(s) importée(s) avec succès"
-            + (f", {chg_err} en erreur" if chg_err else "")
-        )
-
-    messages.success(request, "Importation terminée : " + " | ".join(resume), extra_tags="import")
-
-    if erreurs:
-        messages.warning(request, f"{len(erreurs)} avertissement(s) : " + " | ".join(erreurs[:20]), extra_tags="import")
+    resume_import = {
+        "dpt": {
+            "ok": dpt_ok,
+            "total": dpt_total,
+            "err": dpt_err,
+        } if f_dpt else None,
+        "collab": {
+            "ok": collab_ok,
+            "total": collab_total,
+            "err": collab_err,
+            "crees": import_log.depar if import_log else 0,
+            "modif": import_log.modif if import_log else 0,
+            "supprime": import_log.supprime if import_log else 0,
+        } if f_collab else None,
+        "chg": {
+            "ok": chg_ok,
+            "total": chg_total,
+            "err": chg_err,
+        } if f_chg else None,
+    }
 
     fin = timezone.now()
     if import_log is not None:
@@ -731,16 +766,22 @@ def importer_fichiers_combines(request):
         .order_by('-date')[:10]
     )
 
+    synthese_finale = synthese_declarations or synthese_existante
+
     return render(request, "import_data/import.html", {
         "form": MultipleImportForm(),
         "template_de_base": template_de_base,
         "historique_imports": historique_imports,
-        "synthese_declarations": synthese_declarations,
-        "just_imported": synthese_declarations is not None,
+        "synthese_declarations": synthese_finale,
+        "just_imported": synthese_finale is not None,
+        "resume_import": resume_import,
+        "erreurs_import": erreurs[:20],
+        "nb_erreurs_import": len(erreurs),
     })
 
+
 # ============================================================
-# get_collaborateurs_reels, export_effectif_reel (adaptés)
+# get_collaborateurs_reels, export_effectif_reel
 # ============================================================
 
 def get_collaborateurs_reels(departements):
@@ -784,6 +825,7 @@ def get_collaborateurs_reels(departements):
 
     return resultats
 
+
 @role_required(["HRBP", "DRH", "ADMIN", "PILOT"])
 def export_effectif_reel(request):
     it = request.session.get("it")
@@ -815,7 +857,7 @@ def export_effectif_reel(request):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Effectif Réel"
-    headers = ["Matricule", "IT", "Nom", "Prénom", "Département", "Equipe", "Lot","RU(utilisateur)", "Nom Prénom"]
+    headers = ["Matricule", "IT", "Nom", "Prénom", "Département", "Equipe", "Lot", "RU(utilisateur)", "Nom Prénom"]
     ws.append(headers)
 
     header_fill = PatternFill(start_color="1e293b", end_color="1e293b", fill_type="solid")
@@ -829,10 +871,7 @@ def export_effectif_reel(request):
         c = r["collaborateur"]
         ru_matricule, ru_nom_prenom = ru_info_map.get(r["ru"], ("-", "-")) if r.get("ru") else ("-", "-")
 
-        parts = (c.nom_complete or "").split(None, 1)
-        nom = parts[0] if parts else "-"
-        prenom = parts[1] if len(parts) > 1 else "-"
-
+        nom, prenom = split_nom_prenom(c.nom_complete)
 
         ws.append([
             c.matricule,
@@ -859,6 +898,7 @@ def export_effectif_reel(request):
 
     return response
 
+
 @role_required(['SUPER', "DRH"])
 def import_details_json(request, import_id):
     import_log = get_object_or_404(histo_import, pk=import_id)
@@ -868,8 +908,9 @@ def import_details_json(request, import_id):
     )
     return JsonResponse({"details": list(details)})
 
+
 # ------------------------------------------------------------------
-# HISTORIQUE COMPLET DES IMPORTS (inclus helpers d'export Excel)
+# HISTORIQUE COMPLET DES IMPORTS
 # ------------------------------------------------------------------
 
 STATUT_BADGES = {
@@ -879,6 +920,7 @@ STATUT_BADGES = {
     "EN_COURS": ("En cours", "bg-info-subtle text-info border border-info-subtle"),
 }
 
+
 def _parse_date(val):
     if not val:
         return None
@@ -886,6 +928,7 @@ def _parse_date(val):
         return datetime.strptime(val, "%Y-%m-%d").date()
     except ValueError:
         return None
+
 
 @role_required(['SUPER', "DRH"])
 def historique_imports_json(request):
@@ -918,8 +961,9 @@ def historique_imports_json(request):
 
     return JsonResponse({"resultats": resultats, "total": len(resultats)})
 
+
 # ------------------------------------------------------------------
-# EXPORT EXCEL DE LA SYNTHÈSE DES DÉCLARATIONS
+# EXPORT EXCEL DE LA SYNTHÈSE
 # ------------------------------------------------------------------
 
 def _style_header_row(ws):
@@ -930,10 +974,82 @@ def _style_header_row(ws):
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center")
 
+
 def _autosize(ws):
-    for col_cells in ws.columns:
-        length = max((len(str(cell.value)) for cell in col_cells if cell.value is not None), default=0)
-        ws.column_dimensions[col_cells[0].column_letter].width = max(length + 2, 12)
+    from openpyxl.utils import get_column_letter
+
+    for col_idx in range(1, ws.max_column + 1):
+        col_letter = get_column_letter(col_idx)
+        length = 0
+        for row_idx in range(1, ws.max_row + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            if cell.value is not None:
+                length = max(length, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = max(length + 2, 12)
+
+
+def _derniere_synthese():
+    """Récupère la synthèse du dernier import de collaborateurs réussi."""
+    dernier = (
+        histo_import.objects
+        .exclude(synthese_json__isnull=True)
+        .exclude(nom_fichier__isnull=True)
+        .filter(statut__in=["SUCCES", "PARTIEL"])
+        .order_by("-date")
+        .first()
+    )
+    return dernier.synthese_json if dernier else None
+
+# Particules nobiliaires / onomastiques courantes (arabe, maghrébin, etc.)
+PARTICULES_NOM = {
+    # ─── Arabes / maghrébines ───
+    "el", "al", "ed", "ec", "es", "ez", "er", "et",
+    "ech", "ech-",
+    "ben", "bin", "bena", "beni",
+    "ould", "sidi", "moulay", "lalla",
+    "abou", "abu", "ibn",
+    "bou", "boudj", "bouz", "boua", "boum",
+
+    # ─── Berbères / marocaines ───
+    "ait", "aït", "aitt",
+    "id", "n", "u",
+    "tam", "tamz", "tan",
+    "if", "amz", "imz",
+
+    # ─── Européennes ───
+    "da", "de", "du", "des",
+    "la", "le",
+    "van", "von", "der", "den",
+
+    # ─── Variantes avec tiret ───
+    "el-", "al-", "ed-", "ec-", "es-", "ez-", "er-", "et-",
+}
+
+
+def split_nom_prenom(nom_complete):
+    if not nom_complete:
+        return ("-", "-")
+
+    s = str(nom_complete).strip()
+    s = " ".join(s.split())
+
+    mots = s.split(" ")
+    if not mots:
+        return ("-", "-")
+    premier = mots[0].lower().rstrip("-")
+    est_particule = premier in PARTICULES_NOM
+
+    if est_particule and len(mots) >= 2:
+        nom = f"{mots[0]} {mots[1]}"
+        prenom = " ".join(mots[2:]) if len(mots) > 2 else "-"
+        return (nom, prenom)
+
+    if est_particule and len(mots) == 1:
+        return (mots[0], "-")
+
+    nom = mots[0]
+    prenom = " ".join(mots[1:]) if len(mots) > 1 else "-"
+    return (nom, prenom)
 
 @role_required(['SUPER', "DRH"])
 def export_synthese_declarations(request):
@@ -948,52 +1064,85 @@ def export_synthese_declarations(request):
         return redirect("importer_fichier")
 
     wb = openpyxl.Workbook()
+    wb.remove(wb.active)
 
-    # Feuille 1 : Départs non effectués
-    ws1 = wb.active
-    ws1.title = "Departs non effectues"
-    ws1.append(["Matricule", "Nom complet", "RU", "Date déclaration", "Statut"])
-    _style_header_row(ws1)
-    for d in synthese.get("departs_non_effectues", []):
-        ws1.append([
-            d.get("matricule") or "-",
-            d.get("nom_complete") or "-",
-            d.get("ru") or "-",
-            d.get("date_declaration") or "-",
-            d.get("statut") or "-",
-        ])
-    _autosize(ws1)
+    created_any = False
 
-    # Feuille 2 : Changements non effectués
-    ws2 = wb.create_sheet("Changements non effectues")
-    ws2.append([
-        "Matricule", "Nom complet", "Ancienne affectation",
-        "Nouvelle affectation déclarée", "Affectation actuelle (fichier)", "Date déclaration",
-    ])
-    _style_header_row(ws2)
-    for c in synthese.get("changements_non_effectues", []):
+    departs = synthese.get("departs_non_effectues", [])
+    if departs:
+        ws1 = wb.create_sheet("Departs non effectues")
+        ws1.append(["Matricule", "Nom complet", "RU", "Date déclaration", "Statut"])
+        _style_header_row(ws1)
+        for d in departs:
+            ws1.append([
+                d.get("matricule") or "-",
+                d.get("nom_complete") or "-",
+                d.get("ru") or "-",
+                d.get("date_declaration") or "-",
+                d.get("statut") or "-",
+            ])
+        _autosize(ws1)
+        created_any = True
+
+    changements = synthese.get("changements_non_effectues", [])
+    if changements:
+        ws2 = wb.create_sheet("Changements non effectues")
         ws2.append([
-            c.get("matricule") or "-",
-            c.get("nom_complete") or "-",
-            c.get("ancienne_affectation") or "-",
-            c.get("nouvelle_affectation_declaree") or "-",
-            c.get("affectation_actuelle_fichier") or "-",
-            c.get("date_declaration") or "-",
+            "Matricule", "Nom complet", "Ancienne affectation",
+            "Nouvelle affectation déclarée", "Affectation actuelle (fichier)", "Date déclaration",
         ])
-    _autosize(ws2)
+        _style_header_row(ws2)
+        for c in changements:
+            ws2.append([
+                c.get("matricule") or "-",
+                c.get("nom_complete") or "-",
+                c.get("ancienne_affectation") or "-",
+                c.get("nouvelle_affectation_declaree") or "-",
+                c.get("affectation_actuelle_fichier") or "-",
+                c.get("date_declaration") or "-",
+            ])
+        _autosize(ws2)
+        created_any = True
 
-    # Feuille 3 : Déclarations effectuées
-    ws3 = wb.create_sheet("Declarations effectuees")
-    ws3.append(["Matricule", "Nom complet", "Type", "Date déclaration"])
-    _style_header_row(ws3)
-    for e in synthese.get("effectuees", []):
+    ajouts = synthese.get("ajouts_non_effectues", [])
+    if ajouts:
+        ws3 = wb.create_sheet("Ajouts non effectues")
         ws3.append([
-            e.get("matricule") or "-",
-            e.get("nom_complete") or "-",
-            e.get("type") or "-",
-            e.get("date_declaration") or "-",
+            "Matricule", "Nom complet", "RU déclaré (A/V)",
+            "RU dans le fichier", "Date déclaration", "Statut",
         ])
-    _autosize(ws3)
+        _style_header_row(ws3)
+        for a in ajouts:
+            ws3.append([
+                a.get("matricule") or "-",
+                a.get("nom_complete") or "-",
+                a.get("ru_declare_nom") or a.get("ru_declare") or "-",
+                a.get("ru_fichier_nom") or a.get("ru_fichier") or "-",
+                a.get("date_declaration") or "-",
+                a.get("statut") or "-",
+            ])
+        _autosize(ws3)
+        created_any = True
+
+    effectuees = synthese.get("effectuees", [])
+    if effectuees:
+        ws4 = wb.create_sheet("Declarations effectuees")
+        ws4.append(["Matricule", "Nom complet", "Type", "Date déclaration"])
+        _style_header_row(ws4)
+        for e in effectuees:
+            ws4.append([
+                e.get("matricule") or "-",
+                e.get("nom_complete") or "-",
+                e.get("type") or "-",
+                e.get("date_declaration") or "-",
+            ])
+        _autosize(ws4)
+        created_any = True
+
+    if not created_any:
+        ws_empty = wb.create_sheet("Aucune donnee")
+        ws_empty.append(["Aucune donnée dans la synthèse du dernier import."])
+        ws_empty.column_dimensions["A"].width = 50
 
     today_str = timezone.localdate().strftime("%Y-%m-%d")
     response = HttpResponse(
@@ -1001,5 +1150,4 @@ def export_synthese_declarations(request):
     )
     response["Content-Disposition"] = f'attachment; filename="synthese_declarations_{today_str}.xlsx"'
     wb.save(response)
-
     return response

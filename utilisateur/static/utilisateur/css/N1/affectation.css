@@ -405,3 +405,60 @@ body {
     cursor: not-allowed;
     background-color: #fafafa;
 }
+/* ============================================================
+   CARTE "TOTAL"
+   ============================================================ */
+.total-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    min-width: 220px;
+}
+
+.total-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.total-card-icon {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #ffffff;
+    border-radius: 12px;
+    font-size: 20px;
+    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.25);
+}
+
+.total-card-content {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.total-card-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+
+.total-card-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+    line-height: 1;
+}

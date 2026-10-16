@@ -11,13 +11,17 @@ from datetime import date
 from declaration_effectif.views import difference , histo_aff ,determiner_hierarchie, calculer_niveaux_hierarchie
 from Collaborateur.views import (
     rec, Ru_Rg, liste_N1_pr_N3, Rg_Dur, reelEff, SystEff,
-    get_effectif_reel_ids, get_effectif_reel_ids_multi, get_managers_its, get_maquettes_n1_map,
+    get_effectif_reel_ids, get_effectif_reel_ids_multi, get_managers_its,
+    get_maquettes_n1_map,niveau_hierarchique,
     repartir_maquette_par_lot, LOT_VERS_CHAMP_MAQUETTE,
     _dates_fin_de_mois, _regrouper_par_annee, get_maquettes_a_date,
+    get_maquettes_a_date_multi,get_hierarchie_map,
     get_managers_racines, calculer_maquette_totale_perimetre,
     get_tous_les_it_sous, get_tous_les_it_sous_reel,
-    get_tous_les_it_sous_reel_evolution,reelEff_evolution_multi
+    get_tous_les_it_sous_reel_evolution, reelEff_evolution_multi,
+    get_managers_avec_operateurs_aop,get_maquettes_multi
 )
+from django.core.cache import cache
 from django.db.models import Sum ,F , OuterRef, Subquery
 from .decorators import role_required
 from datetime import timedelta
@@ -33,7 +37,6 @@ from collections import defaultdict
 import string
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-
 from django.utils.dateparse import parse_date
 
 def login_view(request):
@@ -246,7 +249,6 @@ def tableau(request):
             
         return JsonResponse({'html': html_rows})
 
-    # ---- CALCULS HABITUELS DU TABLEAU DE BORD ----
     operateurs_systeme = SystEff(it, managers_its=managers_its)
     syste = operateurs_systeme.values('it').distinct().count()
 
@@ -336,17 +338,6 @@ def est_n1_pur(it_val):
     return True
 
 
-def lister_n1_purs():
-    _, l1, _, _, _ = calculer_niveaux_hierarchie()
-
-    return utilisateur.objects.filter(
-        it_id__in=l1,
-        role="N+1",
-        N2=0,
-        N3=0,
-        N4=0,
-    )
-
 
 def verifier(request):
     it = request.GET.get("q", "")
@@ -372,7 +363,6 @@ def deconnecter(request):
     return redirect("login")
 
 def _reel_effectif_batch(ru_ids):
-
     ru_ids = list(ru_ids)
     ru_ids_set = set(ru_ids)
     if not ru_ids:
@@ -385,6 +375,23 @@ def _reel_effectif_batch(ru_ids):
         .values_list('it', 'ru_it_id')
     ):
         membres_par_ru[c_ru_it].add(c_it)
+
+    dernieres_decl_par_collab = {}
+    for cid, nat, ru_id_decl, dt in (
+        declaration_effectif.objects
+        .filter(collaborateur_it_id__in={c for s in membres_par_ru.values() for c in s})
+        .order_by("collaborateur_it_id", "-date", "-id")
+        .values_list("collaborateur_it_id", "nature", "Ru_id", "date")
+    ):
+        if cid not in dernieres_decl_par_collab:
+            dernieres_decl_par_collab[cid] = (nat, ru_id_decl, dt)
+
+    exclus_a_autre_ru_par_ru = defaultdict(set)
+    for cid, (nat, ru_id_decl, dt) in dernieres_decl_par_collab.items():
+        if nat == "A":
+            for ru_id, membres in membres_par_ru.items():
+                if cid in membres and ru_id_decl != ru_id:
+                    exclus_a_autre_ru_par_ru[ru_id].add(cid)
 
     dernieres_dates = dict(
         declaration_effectif.objects.filter(Ru_id__in=ru_ids)
@@ -431,9 +438,11 @@ def _reel_effectif_batch(ru_ids):
     for ru_id in ru_ids:
         if ru_id in dernieres_dates:
             base = membres_par_ru.get(ru_id, set()) - exclus_par_ru.get(ru_id, set())
+            base -= exclus_a_autre_ru_par_ru.get(ru_id, set())
             operateurs = base | ajouts_valides_par_ru.get(ru_id, set())
         else:
             operateurs = set(membres_par_ru.get(ru_id, set()))
+            operateurs -= exclus_a_autre_ru_par_ru.get(ru_id, set())
         operateurs |= entrants_valides_par_ru.get(ru_id, set())
         operateurs.discard(ru_id)
         resultat[ru_id] = operateurs
@@ -677,13 +686,169 @@ def notifications(request):
         "notifications": alert.order_by("-date")[:5],
         "nb_notifications": nv,
     }
+
+
+
 @role_required('SUPER')
 def SUPER_dashboard(request):
-        it=request.session.get("it")
-        util = utilisateur.objects.all().exclude(it_id=it)
-        total=util.count()
-        departements=Departement.objects.all().distinct()
-        return render(request,"declaration_effectif/Super/dashboard.html",{"utilisateurs":util,"total":total,"departements":departements})
+    it_session = request.session.get("it")
+
+    # ---- Utilisateurs (base) ----
+    utilisateurs_qs = utilisateur.objects.all().order_by('it__nom_complete')
+    total = utilisateurs_qs.count()
+
+    # ---- PAGINATION ----
+    page_number = request.GET.get('page', 1)
+    try:
+        per_page = int(request.GET.get('per_page', 20))
+    except (TypeError, ValueError):
+        per_page = 20
+
+    paginator = Paginator(utilisateurs_qs, per_page)
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages if paginator.num_pages else 1)
+
+    # ---- Stats par rôle ----
+    stats_roles = {
+        "SUPER": utilisateurs_qs.filter(SUPER=1).count(),
+        "ADMIN": utilisateurs_qs.filter(ADMIN=1).count(),
+        "HRBP": utilisateurs_qs.filter(HRBP=1).count(),
+        "DRH": utilisateurs_qs.filter(DRH=1).count(),
+        "PILOT": utilisateurs_qs.filter(PILOT=1).count(),
+        "N1": utilisateurs_qs.filter(N1=1).count(),
+        "N2": utilisateurs_qs.filter(N2=1).count(),
+        "N3": utilisateurs_qs.filter(N3=1).count(),
+        "N4": utilisateurs_qs.filter(N4=1).count(),
+    }
+
+    # ---- Dates ----
+    today = timezone.now().date()
+    il_y_a_7_jours = timezone.now() - timedelta(days=7)
+    il_y_a_30_jours = timezone.now() - timedelta(days=30)
+
+    # ---- Stats connexion ----
+    total_logins = LoginLog.objects.filter(action="LOGIN").count()
+    total_logouts = LoginLog.objects.filter(action="LOGOUT").count()
+    total_echecs = LoginLog.objects.filter(action="FAILED").count()
+
+    logins_7j = LoginLog.objects.filter(action="LOGIN", date_heure__gte=il_y_a_7_jours).count()
+    logins_30j = LoginLog.objects.filter(action="LOGIN", date_heure__gte=il_y_a_30_jours).count()
+    echecs_7j = LoginLog.objects.filter(action="FAILED", date_heure__gte=il_y_a_7_jours).count()
+    logins_aujourdhui = LoginLog.objects.filter(action="LOGIN", date_heure__date=today).count()
+
+    # ---- Helper pour préparer un log ----
+    def _prep_log(log, with_role=True):
+        user = log.utilisateur
+        nom_complet = None
+        role = None
+        role_slug = None
+        it_val = log.utilisateur_id
+
+        if user:
+            if hasattr(user, "it") and user.it:
+                nom_complet = user.it.nom_complete
+            elif user.it_id:
+                try:
+                    col = Collaborateur.objects.filter(it=user.it_id).first()
+                    if col:
+                        nom_complet = col.nom_complete
+                except Exception:
+                    pass
+
+            if with_role:
+                role = user.role
+                role_slug = (role or "").lower().replace("+", "")
+
+        return {
+            "date_heure": log.date_heure,
+            "ip_address": log.ip_address or "—",
+            "utilisateur_id": it_val,
+            "nom_complet": nom_complet or "—",
+            "role": role,
+            "role_slug": role_slug,
+        }
+
+    # ---- Dernières connexions (30) ----
+    derniers_logins = [
+        _prep_log(log, with_role=True)
+        for log in (
+            LoginLog.objects
+            .filter(action="LOGIN")
+            .select_related("utilisateur", "utilisateur__it")
+            .order_by("-date_heure")[:30]
+        )
+    ]
+
+    # ---- Derniers échecs (10) ----
+    derniers_echecs = [
+        _prep_log(log, with_role=False)
+        for log in (
+            LoginLog.objects
+            .filter(action="FAILED")
+            .select_related("utilisateur", "utilisateur__it")
+            .order_by("-date_heure")[:10]
+        )
+    ]
+
+    # ---- Top 10 utilisateurs les plus connectés (7j) ----
+    top_users = (
+        LoginLog.objects
+        .filter(action="LOGIN", date_heure__gte=il_y_a_7_jours)
+        .values("utilisateur__it_id", "utilisateur__role")
+        .annotate(nb_connexions=Count("id"))
+        .order_by("-nb_connexions")[:10]
+    )
+
+    top_users_enrichis = []
+    for item in top_users:
+        it_val = item["utilisateur__it_id"]
+        nom = "—"
+        if it_val:
+            col = Collaborateur.objects.filter(it=it_val).first()
+            if col:
+                nom = col.nom_complete
+        role = item["utilisateur__role"] or "—"
+        top_users_enrichis.append({
+            "it": it_val,
+            "nom_complet": nom,
+            "role": role,
+            "role_slug": role.lower().replace("+", ""),
+            "nb_connexions": item["nb_connexions"],
+        })
+
+    # ---- Départements ----
+    departements = Departement.objects.all().distinct()
+
+    context = {
+        "utilisateurs": page_obj,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "is_paginated": page_obj.has_other_pages(),
+        "total": total,
+        "departements": departements,
+
+        "stats_roles": stats_roles,
+
+        "total_logins": total_logins,
+        "total_logouts": total_logouts,
+        "total_echecs": total_echecs,
+        "logins_7j": logins_7j,
+        "logins_30j": logins_30j,
+        "echecs_7j": echecs_7j,
+        "logins_aujourdhui": logins_aujourdhui,
+
+        "derniers_logins": derniers_logins,
+        "derniers_echecs": derniers_echecs,
+        "top_users": top_users_enrichis,
+
+        "today": today,
+    }
+
+    return render(request, "declaration_effectif/Super/dashboard.html", context)
 
 def generer_mot_de_passe_temporaire(longueur=12):
     alphabet = string.ascii_letters + string.digits + "!@#$%"
@@ -759,6 +924,8 @@ def supprimer_user(request, id):
 
     util.delete()
     return JsonResponse({"message": "Utilisateur supprimé avec succès."}, status=200)
+
+
 @role_required('SUPER')
 def modifier_user(request, id):
     if request.method != "POST":
@@ -843,6 +1010,7 @@ def calculer_evolution_effectif_reel(departements, jours=30):
 
     return {"labels": labels, "valeurs": valeurs}
 
+
 @role_required(["HRBP", "DRH", "ADMIN"])
 def dashboard_rh(request):
     it = request.session.get("it")
@@ -869,30 +1037,20 @@ def dashboard_rh(request):
 
     colSyst = Collaborateur.objects.filter(departement_id__in=departements).count()
 
-    declarations_activite = (
-        declaration_effectif.objects
-        .filter(collaborateur_it__departement_id__in=departements, nature__in=["D", "A"])
-        .order_by("collaborateur_it_id", "-date", "-id")
-    )
+    today = timezone.now().date()
 
-    dernier_etat_activite = {}
-    for decl in declarations_activite:
-        if decl.collaborateur_it_id not in dernier_etat_activite:
-            dernier_etat_activite[decl.collaborateur_it_id] = decl.nature
+    ids_total_r = get_effectif_reel_ids(departements, today)
+    colReel = len(ids_total_r)
 
-    liste_D = {c for c, nature in dernier_etat_activite.items() if nature == "D"}
-    
-    colReel = Collaborateur.objects.filter(
-        departement_id__in=departements
-    ).exclude(it__in=liste_D).count()
-    _, l1, l2, l3, l4 = calculer_niveaux_hierarchie()
+    niveau_par_it, l1, l2, l3, l4 = calculer_niveaux_hierarchie()
+
     ids_managers_perimetre = set(
         Collaborateur.objects.filter(
             it__in=(l1 | l2 | l3 | l4), departement_id__in=departements
         ).values_list("it", flat=True)
     )
-    maquette, maquette_map_racines, racines, somme_ap, somme_ce = calculer_maquette_totale_perimetre(
-        ids_managers_perimetre
+    maquette, maquette_map_racines, racines, somme_ap, somme_ce = (
+        calculer_maquette_totale_perimetre(ids_managers_perimetre)
     )
 
     syst_par_dept = dict(
@@ -902,13 +1060,25 @@ def dashboard_rh(request):
         .values_list("departement_id", "total")
     )
 
-    reel_par_dept = dict(
-        Collaborateur.objects.filter(departement_id__in=departements)
-        .exclude(it__in=liste_D)
-        .values("departement_id")
-        .annotate(total=Count("it"))
-        .values_list("departement_id", "total")
+    reel_par_dept = {}
+
+    for dept in departements_qs:
+        abrev = dept.abreviation
+        ids_r_dept = get_effectif_reel_ids([abrev], today)
+        reel_par_dept[abrev] = len(ids_r_dept)
+
+    # Départs par département
+    declarations_activite = (
+        declaration_effectif.objects
+        .filter(collaborateur_it__departement_id__in=departements, nature__in=["D", "A"])
+        .order_by("collaborateur_it_id", "-date", "-id")
     )
+    dernier_etat_activite = {}
+    for decl in declarations_activite:
+        if decl.collaborateur_it_id not in dernier_etat_activite:
+            dernier_etat_activite[decl.collaborateur_it_id] = decl.nature
+
+    liste_D = {c for c, nature in dernier_etat_activite.items() if nature == "D"}
 
     depart_par_dept = dict(
         Collaborateur.objects.filter(departement_id__in=departements, it__in=liste_D)
@@ -916,6 +1086,7 @@ def dashboard_rh(request):
         .annotate(total=Count("it"))
         .values_list("departement_id", "total")
     )
+
     racines_par_dept = defaultdict(set)
     if racines:
         for it_m, dept_m in Collaborateur.objects.filter(
@@ -950,26 +1121,23 @@ def dashboard_rh(request):
             "mr": reel_dept - maquette_dept,
         })
 
-    today = timezone.now().date()
     ev = _calculer_evolution_reel(departements, today)
 
-    collaborateurs_base = Collaborateur.objects.filter(departement_id__in=departements)
-    responsables_directs = set(
-        collaborateurs_base
-        .exclude(ru_it_id__isnull=True)
-        .values_list("ru_it_id", flat=True)
-        .distinct()
-    )
 
-    operateur_n1 = Collaborateur.objects.filter(
-        departement_id__in=departements, lot__in=["A", "O", "P"]
-    ).exclude(it__in=responsables_directs)
+    managers_aop = get_managers_avec_operateurs_aop()
+
+    vrais_n1_ids = set()
+    for it_candidat in (l1 & managers_aop):
+        if it_candidat in (l2 | l3 | l4):
+            continue
+        vrais_n1_ids.add(it_candidat)
 
     ru_ids = set(
-        operateur_n1
-        .exclude(ru_it_id__isnull=True)
-        .values_list("ru_it_id", flat=True)
-        .distinct()
+        Collaborateur.objects.filter(
+            it__in=vrais_n1_ids,
+            departement_id__in=departements,
+        )
+        .values_list("it", flat=True)
     )
 
     ru_declares = set(
@@ -982,6 +1150,9 @@ def dashboard_rh(request):
     ru_total = len(ru_ids)
     non_valides = len(ru_non_declares)
 
+    # ============================================================
+    # Listes départs / changements
+    # ============================================================
     date_depart = request.GET.get("date_depart")
     date_changement = request.GET.get("date_changement")
 
@@ -1012,6 +1183,9 @@ def dashboard_rh(request):
         "collaborateur_it", "collaborateur_it__departement", "Ru", "nv_Ru"
     ).order_by("-date")[:10]
 
+    # ============================================================
+    # Contexte
+    # ============================================================
     context = {
         "departements": departements,
         "colSyst": colSyst,
@@ -1034,9 +1208,9 @@ def dashboard_rh(request):
         "y_max": y_max,
         "date_depart": date_depart or "",
         "date_changement": date_changement or "",
-        "somme_ap": somme_ap, "somme_ce": somme_ce,
+        "somme_ap": somme_ap,
+        "somme_ce": somme_ce,
     }
-
     return render(request, "declaration_effectif/HRBP/dashboard.html", context)
 
 def derniers_mouvements_respo(it_respo, limite=10):
@@ -1198,32 +1372,22 @@ def _calculer_evolution_reel(departement_ids, today):
 
 
 def _evolution_maquette_par_lot(racines, dates_ref_annee, lots_suivis):
+
     evolution = {lot: [] for lot in lots_suivis}
+    racines = list(racines) if racines else []
+
+    maquettes_multi = get_maquettes_multi(racines, dates_ref_annee)
 
     for d in dates_ref_annee:
-
         lot_stats_mois = {
-            lot: {
-                "reel": 0,
-                "systeme": 0,
-                "maquette": 0
-            }
+            lot: {"reel": 0, "systeme": 0, "maquette": 0}
             for lot in lots_suivis
         }
-
-        # IMPORTANT :
-        # on utilise les racines et non ru_ids
-        maquettes_a_d = get_maquettes_a_date(racines, d)
-
-        repartir_maquette_par_lot(
-            maquettes_a_d,
-            lot_stats_mois
-        )
+        maquettes_a_d = maquettes_multi.get(d, {})
+        repartir_maquette_par_lot(maquettes_a_d, lot_stats_mois)
 
         for lot in lots_suivis:
-            evolution[lot].append(
-                lot_stats_mois[lot]["maquette"]
-            )
+            evolution[lot].append(lot_stats_mois[lot]["maquette"])
 
     return evolution
 
@@ -1235,14 +1399,14 @@ def _stats_et_evolutions_par_ru(responsables, operateur, ids_total_r, maquette_m
 
     ru_ids = [ru.it for ru in responsables]
 
-    maquettes_par_date = {
-        d: get_maquettes_a_date(ru_ids, d) for d in dates_ref_ru
-    }
+    maquettes_par_date = get_maquettes_a_date_multi(ru_ids, dates_ref_ru)
+
     toutes_dates = sorted(set(dates_ref_ru) | set(dates_jour))
     reel_evolution = reelEff_evolution_multi(ru_ids, toutes_dates)
 
     reel_actuel_par_ru = {
-        ru_id: len(collabs) for ru_id, collabs in _reel_effectif_batch(ru_ids).items()
+        ru_id: len(collabs)
+        for ru_id, collabs in _reel_effectif_batch(ru_ids).items()
     }
 
     for ru in responsables:
@@ -1252,6 +1416,7 @@ def _stats_et_evolutions_par_ru(responsables, operateur, ids_total_r, maquette_m
 
         maquette_obj = maquette_map.get(ru.it)
         maquette_ru = maquette_obj.total if maquette_obj else 0
+
         liste_ru_stats.append({
             "n1": ru, "equipe": ru.eq,
             "systeme": systeme, "ms": systeme - maquette_ru,
@@ -1264,8 +1429,11 @@ def _stats_et_evolutions_par_ru(responsables, operateur, ids_total_r, maquette_m
         reel_series = [len(ev_ru.get(d, set())) for d in dates_ref_ru]
         maquette_series = []
         for d in dates_ref_ru:
-            snap = maquettes_par_date[d].get(ru.it)
-            maquette_series.append((snap.A + snap.T + snap.P + snap.C) if snap else 0)
+            snap = maquettes_par_date.get(d, {}).get(ru.it)
+            maquette_series.append(
+                (snap.A + snap.T + snap.P + snap.C) if snap else 0
+
+            )
 
         ru_evolution[ru.it] = {
             "nom": ru.nom_complete, "labels": mois_labels_ru,
@@ -1280,8 +1448,21 @@ def _stats_et_evolutions_par_ru(responsables, operateur, ids_total_r, maquette_m
 
     return liste_ru_stats, ru_evolution, ru_evolution_jour
 
+
 def pilot_dashboard(request):
     it = request.session.get("it")
+    if not it:
+        return redirect("login")
+
+    cache_key = f"pilot_dashboard_{it}"
+    cached_context = cache.get(cache_key)
+    if cached_context is not None:
+        return render(
+            request,
+            "declaration_effectif/PILOT/dashboard.html",
+            cached_context,
+        )
+
     departement = get_object_or_404(Departement, PILOT_id=it)
     departement_ids = [departement.abreviation]
     collab = Collaborateur.objects.filter(departement_id=departement.abreviation)
@@ -1294,16 +1475,26 @@ def pilot_dashboard(request):
     operateur = Collaborateur.objects.filter(
         departement_id=departement.abreviation, lot__in=["A", "O", "P"]
     ).exclude(ru_it_id__isnull=True).exclude(ru_it_id=F('it'))
+
     _, l1, l2, l3, l4 = calculer_niveaux_hierarchie()
-    ru_ids = l1 & set(operateur.filter(ru_it__isnull=False, ru_it__departement=departement).values_list("ru_it_id", flat=True))
+
+    ru_ids = l1 & set(
+        operateur.filter(
+            ru_it__isnull=False, ru_it__departement=departement
+        ).values_list("ru_it_id", flat=True)
+    )
     ru_ids.discard(None)
+
     ids_managers_departement = set(
         Collaborateur.objects.filter(
             it__in=(l1 | l2 | l3 | l4), departement=departement
         ).values_list("it", flat=True)
     )
-    maquette_totale, maquette_map_racines, racines ,somme_ap,somme_ce= calculer_maquette_totale_perimetre(
-        ids_managers_departement, departement=departement
+
+    maquette_totale, maquette_map_racines, racines, somme_ap, somme_ce = (
+        calculer_maquette_totale_perimetre(
+            ids_managers_departement, departement=departement
+        )
     )
     MR = total_r - maquette_totale
     MS = total_syst - maquette_totale
@@ -1315,15 +1506,21 @@ def pilot_dashboard(request):
     )
     ru_non_declarer = ru_ids - ru_declarer
 
-    responsables = Collaborateur.objects.filter(it__in=ru_ids).select_related('departement', 'ru_it')
+    responsables = Collaborateur.objects.filter(it__in=ru_ids).select_related(
+        'departement', 'ru_it'
+    )
+
     n2 = l2 & set(
-        responsables.filter(ru_it__isnull=False, ru_it__departement=departement)
-        .values_list("ru_it_id", flat=True)
+        responsables.filter(
+            ru_it__isnull=False, ru_it__departement=departement
+        ).values_list("ru_it_id", flat=True)
     )
     nbr_n2 = len(n2)
+
     n3 = l3 & set(
-        Collaborateur.objects.filter(it__in=n2, ru_it__isnull=False, ru_it__departement=departement)
-        .values_list("ru_it_id", flat=True)
+        Collaborateur.objects.filter(
+            it__in=n2, ru_it__isnull=False, ru_it__departement=departement
+        ).values_list("ru_it_id", flat=True)
     )
     nbr_n3 = len(n3)
 
@@ -1333,13 +1530,16 @@ def pilot_dashboard(request):
     ev = _calculer_evolution_reel(departement_ids, today)
     annee_actuelle = str(today.year)
 
-    evolution_maquette_par_lot = _evolution_maquette_par_lot(racines, ev["dates_ref_annee"], lots_suivis)
+    evolution_maquette_par_lot = _evolution_maquette_par_lot(
+        racines, ev["dates_ref_annee"], lots_suivis
+    )
 
-    annees_ru, mois_cles_ru, mois_labels_ru, dates_ref_ru = _dates_fin_de_mois(nb_annees=1)
+    annees_ru, mois_cles_ru, mois_labels_ru, dates_ref_ru = _dates_fin_de_mois(
+        nb_annees=1
+    )
     dates_ref_ru = [min(d, today) for d in dates_ref_ru]
     dates_jour = [today - timedelta(days=i) for i in range(29, -1, -1)]
     jours_labels = [d.strftime("%d/%m") for d in dates_jour]
-
     liste_ru_stats, ru_evolution, ru_evolution_jour = _stats_et_evolutions_par_ru(
         responsables, operateur, ids_total_r, maquette_map,
         dates_ref_ru, mois_labels_ru, dates_jour, jours_labels,
@@ -1358,10 +1558,14 @@ def pilot_dashboard(request):
         lots_distincts.append("A/O")
     lots_distincts.sort()
 
-    lot_stats = {lot: {"systeme": 0, "reel": 0, "maquette": 0} for lot in lots_distincts}
+    lot_stats = {
+        lot: {"systeme": 0, "reel": 0, "maquette": 0}
+        for lot in lots_distincts
+    }
 
     for lot_val, total in (
-        collab.values('lot').annotate(total=Count('it')).values_list('lot', 'total')
+        collab.values('lot').annotate(total=Count('it'))
+        .values_list('lot', 'total')
     ):
         cle = cle_lot(lot_val)
         if cle in lot_stats:
@@ -1369,12 +1573,12 @@ def pilot_dashboard(request):
 
     for lot_val, total in (
         Collaborateur.objects.filter(it__in=ids_total_r)
-        .values('lot').annotate(total=Count('it')).values_list('lot', 'total')
+        .values('lot').annotate(total=Count('it'))
+        .values_list('lot', 'total')
     ):
         cle = cle_lot(lot_val)
         if cle in lot_stats:
             lot_stats[cle]["reel"] += total
-
 
     repartir_maquette_par_lot(maquette_map_racines, lot_stats)
 
@@ -1386,7 +1590,7 @@ def pilot_dashboard(request):
     dc_data = _get_departs_et_changements(departement)
 
     context = {
-        "maint": timezone.now().date(),
+        "maint": today,
         "total_syst": total_syst,
         "total_r": total_r,
         "maquette_totale": maquette_totale,
@@ -1402,8 +1606,12 @@ def pilot_dashboard(request):
         "evolution_reel_data_annee_json": json.dumps(ev["evolution_annee"]),
         "annee_actuelle": annee_actuelle,
 
-        "evolution_reel_labels_mois_courant_json": json.dumps(ev["jours_labels_mois_courant"]),
-        "evolution_reel_data_mois_courant_json": json.dumps(ev["evolution_mois_courant"]),
+        "evolution_reel_labels_mois_courant_json": json.dumps(
+            ev["jours_labels_mois_courant"]
+        ),
+        "evolution_reel_data_mois_courant_json": json.dumps(
+            ev["evolution_mois_courant"]
+        ),
 
         "evolution_maquette_lot_labels_json": json.dumps(ev["mois_labels_annee"]),
         "evolution_maquette_par_lot_json": json.dumps(evolution_maquette_par_lot),
@@ -1416,14 +1624,27 @@ def pilot_dashboard(request):
         "lot_systeme_json": json.dumps(lot_systeme_totaux),
         "lot_maquette_json": json.dumps(lot_maquette_totaux),
 
-        "nbr_n2": nbr_n2, "nbr_n3": nbr_n3,"n2":Collaborateur.objects.filter(it__in=n2),"n3":Collaborateur.objects.filter(it__in=n3),
+        "nbr_n2": nbr_n2,
+        "nbr_n3": nbr_n3,
+        "n2": Collaborateur.objects.filter(it__in=n2),
+        "n3": Collaborateur.objects.filter(it__in=n3),
 
         "liste_departs": dc_data["liste_departs"],
         "nbr_departs": dc_data["nbr_departs"],
         "liste_changements_non_faits": dc_data["liste_changements_non_faits"],
-        "nbr_changements_non_faits": dc_data["nbr_changements_non_faits"],"somme_ap":somme_ap,"somme_ce":somme_ce,
+        "nbr_changements_non_faits": dc_data["nbr_changements_non_faits"],
+        "somme_ap": somme_ap,
+        "somme_ce": somme_ce,
     }
-    return render(request, "declaration_effectif/PILOT/dashboard.html", context)
+    cache.set(cache_key, context, 120)
+
+    return render(
+        request,
+        "declaration_effectif/PILOT/dashboard.html",
+        context,
+    )
+
+
 
 def declaration(request):
 
