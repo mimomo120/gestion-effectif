@@ -8,7 +8,6 @@ urlpatterns = [
     path('',views.login_view,name="login"),
     path('register/',views.register_view,name="register"),
     path('dashboard/',views.tableau,name='dashboard_N1'),
-    path("verifier/",views.verifier,name="verifier"),
     path("deconnecter/",views.deconnecter,name="deconnecter"),
     path("Dashboard/N2/",views.dashboard_N2,name="dashboard_N2"),
     path('changer-role/<str:nouveau_role>/', views.changer_role, name='changer_role'),

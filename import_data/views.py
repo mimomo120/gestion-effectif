@@ -177,16 +177,6 @@ def _val_affichable(v):
     return str(v)
 
 
-def _normalize_for_match(s):
-    if s is None:
-        return ""
-    s = str(s).strip()
-    s = " ".join(s.split())
-    s = unicodedata.normalize("NFKD", s)
-    s = "".join(ch for ch in s if not unicodedata.combining(ch))
-    return s.lower()
-
-
 def importer_collaborateurs(df_collab, erreurs, import_log=None, collaborateurs_map=None):
     departements_map = {d.abreviation.strip(): d for d in Departement.objects.all()}
     if collaborateurs_map is None:

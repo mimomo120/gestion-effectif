@@ -6,9 +6,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const roleSelect = document.getElementById("filtre-role");
     const resetBtn = document.getElementById("resetBtn");
     const pagination = document.getElementById("pagination");
-
-    // Filtres additionnels génériques : tout select/input avec [data-filter-param]
-    // ex: <select id="ru_it_filter" data-filter-param="ru_it">
     const extraFilters = Array.from(document.querySelectorAll("[data-filter-param]"));
 
     let currentPage = 1;
@@ -87,11 +84,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const data = await response.json();
             const results = data.results || [];
-
-            // FIX : on ne remplace plus tout le contenu du compteur,
-            // on ne met à jour que le nombre pour garder le libellé
-            // "Total : " affiché par le rendu serveur initial et
-            // rester cohérent entre premier chargement et filtrage AJAX.
             if (counter) counter.textContent = `Total : ${data.count ?? results.length}`;
 
             if (results.length > 0) {

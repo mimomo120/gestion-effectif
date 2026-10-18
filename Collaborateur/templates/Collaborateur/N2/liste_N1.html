@@ -1,7 +1,7 @@
 {% extends "utilisateur/navbar_N1.html" %}
 {% load static %}
 
-{% block title %}Responsables{% endblock %}
+{% block title %}Collaborateurs{% endblock %}
 
 {% block css %}
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -48,6 +48,7 @@
                         <th>Utilisateur</th>
                         <th>Nom & Prénom</th>
                         <th>Lot</th>
+                        <th>Responsable</th>
                     </tr>
                 </thead>
                 <tbody id="result">
@@ -63,11 +64,12 @@
                             </div>
                         </td>
                         <td><span class="badge-lot" data-lot="{{ c.lot }}">{{ c.lot|default:"-" }}</span></td>
+                        <td class="text-muted">{{ c.ru_it.nom_complete|default:"-" }}</td>
                     </tr>
                     {% empty %}
                     <tr>
                         <td colspan="5" class="text-center py-4 text-muted">
-                            <i class="fas fa-inbox me-2"></i> Aucun responsable trouvé
+                            <i class="fas fa-inbox me-2"></i> Aucun collaborateur trouvé
                         </td>
                     </tr>
                     {% endfor %}
@@ -75,11 +77,12 @@
             </table>
         </div>
 
-        {% if operateurs.has_other_pages %}
-        <div class="table-footer">
-            <ul class="pagination">
+        <!-- ✅ Pagination dynamique (remplie par JS) -->
+        <div class="table-footer" id="pagination-container">
+            {% if operateurs.has_other_pages %}
+            <ul class="pagination" id="pagination">
                 {% if operateurs.has_previous %}
-                <li><a class="page-link" href="?page_ru={{ operateurs.previous_page_number }}"><i
+                <li><a class="page-link" href="#" data-page="{{ operateurs.previous_page_number }}"><i
                             class="fas fa-chevron-left"></i></a></li>
                 {% else %}
                 <li><span class="page-link disabled"><i class="fas fa-chevron-left"></i></span></li>
@@ -89,37 +92,20 @@
                 {% if num == operateurs.number %}
                 <li><span class="page-link active">{{ num }}</span></li>
                 {% else %}
-                <li><a class="page-link" href="?page_ru={{ num }}">{{ num }}</a></li>
+                <li><a class="page-link" href="#" data-page="{{ num }}">{{ num }}</a></li>
                 {% endif %}
                 {% endfor %}
 
                 {% if operateurs.has_next %}
-                <li><a class="page-link" href="?page_ru={{ operateurs.next_page_number }}"><i
+                <li><a class="page-link" href="#" data-page="{{ operateurs.next_page_number }}"><i
                             class="fas fa-chevron-right"></i></a></li>
                 {% else %}
                 <li><span class="page-link disabled"><i class="fas fa-chevron-right"></i></span></li>
                 {% endif %}
             </ul>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
-
-</div>
-
-<!-- Modal Popup -->
-<div class="popup-collab-overlay" id="popup-overlay"></div>
-<div class="popup-collab" id="popup-collab">
-    <div class="popup-collab-header">
-        <div class="d-flex align-items-center gap-2">
-            <i class="fas fa-users text-primary"></i>
-            <span id="popup-ru-nom"></span>
-            <span class="popup-collab-count" id="popup-ru-count"></span>
-        </div>
-        <button type="button" class="popup-collab-close" id="popup-close">
-            <i class="fas fa-times"></i>
-        </button>
-    </div>
-    <div class="popup-collab-body" id="popup-body"></div>
 </div>
 {% endblock %}
 
@@ -127,115 +113,158 @@
 {{ block.super }}
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+
+        /* ============ RÉFÉRENCES ============ */
         const search = document.getElementById("search");
         const lotFilter = document.getElementById("choix");
         const resetBtn = document.getElementById("resetBtn");
-        const panel = document.getElementById("panel-ru");
+        const tbody = document.getElementById("result");
+        const paginCont = document.getElementById("pagination-container");
 
-        function appliquerFiltres() {
-            if (!panel) return;
-            const rows = panel.querySelectorAll("tbody tr[data-search]");
-            const q = (search.value || "").toLowerCase().trim();
+        let currentPage = 1;
+        let totalPages = 1;
+        let debounceTimer;
+
+        /* ============ APPEL AJAX ============ */
+        function chargerDonnees(page = 1) {
+            const q = (search.value || "").trim();
             const lot = lotFilter.value;
 
-            rows.forEach(function (row) {
-                const matchSearch = !q || row.dataset.search.includes(q);
-                const matchLot = !lot || row.dataset.lot === lot;
-                row.style.display = (matchSearch && matchLot) ? "" : "none";
+            const params = new URLSearchParams({
+                q: q,
+                choix: lot,
+                page: page
             });
-        }
-
-        if (search) search.addEventListener("input", appliquerFiltres);
-        if (lotFilter) lotFilter.addEventListener("change", appliquerFiltres);
-        if (resetBtn) {
-            resetBtn.addEventListener("click", function () {
-                search.value = "";
-                lotFilter.value = "";
-                appliquerFiltres();
-            });
-        }
-
-        // Gestion Modal
-        const popup = document.getElementById("popup-collab");
-        const overlay = document.getElementById("popup-overlay");
-        const popupNom = document.getElementById("popup-ru-nom");
-        const popupCount = document.getElementById("popup-ru-count");
-        const popupBody = document.getElementById("popup-body");
-        const popupClose = document.getElementById("popup-close");
-        const resultBody = document.getElementById("result");
-
-        if (popup) document.body.appendChild(popup);
-        if (overlay) document.body.appendChild(overlay);
-
-        function fermerPopup() {
-            if (popup) popup.classList.remove("active");
-            if (overlay) overlay.classList.remove("active");
-        }
-
-        function ouvrirPopup(btn) {
-            const it = btn.dataset.it;
-            const nom = btn.dataset.nom || "-";
-
-            if (popupNom) popupNom.textContent = nom;
-            if (popupCount) popupCount.textContent = "";
-            if (popupBody) popupBody.innerHTML = '<div class="popup-collab-loading"><i class="fas fa-spinner fa-spin me-2"></i>Chargement...</div>';
-
-            if (popup) popup.classList.add("active");
-            if (overlay) overlay.classList.add("active");
-
-            fetch(`/collaborateurs-ru/${encodeURIComponent(it)}/`)
+            fetch(`/rechercher-N1-par-N2?${params.toString()}`, {
+                headers: { "X-Requested-With": "XMLHttpRequest" }
+            })
                 .then(res => {
                     if (!res.ok) throw new Error("HTTP " + res.status);
                     return res.json();
                 })
                 .then(data => {
-                    const liste = data.collaborateurs || [];
-                    if (popupCount) popupCount.textContent = liste.length ? `(${liste.length})` : "";
-
-                    if (liste.length === 0) {
-                        if (popupBody) popupBody.innerHTML = '<div class="popup-collab-empty">Aucun collaborateur trouvé.</div>';
-                        return;
-                    }
-
-                    let html = `
-                    <div class="popup-collab-table-head">
-                        <span>Matricule</span>
-                        <span>Utilisateur</span>
-                        <span>Nom & Prénom</span>
-                        <span class="text-end">Lot</span>
-                    </div>`;
-
-                    liste.forEach(c => {
-                        html += `
-                        <div class="popup-collab-row">
-                            <span class="col-matricule">${c.matricule ?? "-"}</span>
-                            <span class="col-it">${c.it ?? "-"}</span>
-                            <span class="col-nom">${c.nom_complete ?? "-"}</span>
-                            <span class="text-end">
-                                <span class="badge-lot" data-lot="${c.lot}">${c.lot ?? "-"}</span>
-                            </span>
-                        </div>`;
-                    });
-
-                    if (popupBody) popupBody.innerHTML = html;
+                    currentPage = data.page;
+                    totalPages = data.num_pages;
+                    afficherLignes(data.results);
+                    afficherPagination(data);
                 })
-                .catch(() => {
-                    if (popupBody) popupBody.innerHTML = '<div class="popup-collab-empty">Erreur lors du chargement des données.</div>';
+                .catch(err => {
+                    console.error(err);
+                    tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center py-4 text-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erreur lors du chargement des données.
+                    </td>
+                </tr>`;
                 });
         }
 
-        if (resultBody) {
-            resultBody.addEventListener("click", function (e) {
-                const btn = e.target.closest(".btn-voir-collab");
-                if (!btn) return;
-                e.stopPropagation();
-                ouvrirPopup(btn);
+        /* ============ AFFICHER LES LIGNES ============ */
+        function afficherLignes(results) {
+            if (!results || results.length === 0) {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center py-4 text-muted">
+                        <i class="fas fa-inbox me-2"></i> Aucun collaborateur trouvé
+                    </td>
+                </tr>`;
+                return;
+            }
+
+            let html = "";
+            results.forEach(c => {
+                html += `
+            <tr>
+                <td class="fw-semibold text-secondary">${c.matricule ?? "-"}</td>
+                <td>${c.it ?? "-"}</td>
+                <td>
+                    <div class="user-cell">
+                        <div class="user-avatar">${(c.nom_complete || "?")[0]}</div>
+                        <span class="fw-medium">${c.nom_complete ?? "-"}</span>
+                    </div>
+                </td>
+                <td><span class="badge-lot" data-lot="${c.lot}">${c.lot ?? "-"}</span></td>
+                <td class="text-muted">${c.ru_nom ?? "-"}</td>
+            </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        /* ============ AFFICHER LA PAGINATION ============ */
+        function afficherPagination(data) {
+            if (data.num_pages <= 1) {
+                paginCont.innerHTML = "";
+                return;
+            }
+
+            let html = '<ul class="pagination" id="pagination">';
+
+            // Précédent
+            if (data.has_previous) {
+                html += `<li><a class="page-link" href="#" data-page="${data.previous_page}"><i class="fas fa-chevron-left"></i></a></li>`;
+            } else {
+                html += `<li><span class="page-link disabled"><i class="fas fa-chevron-left"></i></span></li>`;
+            }
+
+            // Pages
+            for (let i = 1; i <= data.num_pages; i++) {
+                if (i === data.page) {
+                    html += `<li><span class="page-link active">${i}</span></li>`;
+                } else {
+                    html += `<li><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
+                }
+            }
+
+            // Suivant
+            if (data.has_next) {
+                html += `<li><a class="page-link" href="#" data-page="${data.next_page}"><i class="fas fa-chevron-right"></i></a></li>`;
+            } else {
+                html += `<li><span class="page-link disabled"><i class="fas fa-chevron-right"></i></span></li>`;
+            }
+
+            html += '</ul>';
+            paginCont.innerHTML = html;
+        }
+
+        /* ============ ÉCOUTEURS ============ */
+
+        // Recherche (avec debounce)
+        if (search) {
+            search.addEventListener("input", function () {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => chargerDonnees(1), 300);
             });
         }
 
-        if (popupClose) popupClose.addEventListener("click", fermerPopup);
-        if (overlay) overlay.addEventListener("click", fermerPopup);
-        document.addEventListener("keydown", e => { if (e.key === "Escape") fermerPopup(); });
+        // Filtre lot
+        if (lotFilter) {
+            lotFilter.addEventListener("change", function () {
+                chargerDonnees(1);
+            });
+        }
+
+        // Reset
+        if (resetBtn) {
+            resetBtn.addEventListener("click", function () {
+                search.value = "";
+                lotFilter.value = "";
+                chargerDonnees(1);
+            });
+        }
+
+        // Pagination (délégation d'événement)
+        if (paginCont) {
+            paginCont.addEventListener("click", function (e) {
+                const link = e.target.closest("a.page-link[data-page]");
+                if (!link) return;
+                e.preventDefault();
+                const page = parseInt(link.dataset.page, 10);
+                if (!isNaN(page) && page !== currentPage) {
+                    chargerDonnees(page);
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

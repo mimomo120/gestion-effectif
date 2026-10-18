@@ -1,202 +1,183 @@
-# Gestion Effectif
+# 📊 Gestion des Effectifs
 
-Application web Django de **gestion des effectifs RH** : import des données de structure, déclaration quotidienne des effectifs par les responsables d'unité (RU), validation en cascade selon une hiérarchie à 4 niveaux (N+1 → N+4), tableaux de bord par rôle, et export Excel.
+> Application web Django de gestion et de suivi des effectifs en temps réel, avec hiérarchie multi-niveaux (N+1 à N+4), déclarations journalières, maquettes et tableaux de bord par rôle.
 
-> Dépôt : [github.com/mimomo120/gestion-effectif](https://github.com/mimomo120/gestion-effectif)
-
----
-
-## Sommaire
-
-1. [Contexte métier](#1-contexte-métier)
-2. [Rôles et hiérarchie](#2-rôles-et-hiérarchie)
-3. [Fonctionnalités](#3-fonctionnalités)
-4. [Stack technique](#4-stack-technique)
-5. [Structure du projet](#5-structure-du-projet)
-6. [Modèle de données (résumé)](#6-modèle-de-données-résumé)
-7. [Installation locale](#7-installation-locale)
-8. [Démarrage](#8-démarrage)
-9. [Routes principales](#9-routes-principales)
-10. [Commandes utiles](#10-commandes-utiles)
-11. [État actuel du projet / points d'attention](#11-état-actuel-du-projet--points-dattention)
-12. [Pistes d'amélioration](#12-pistes-damélioration)
-13. [Licence](#13-licence)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
+![Django](https://img.shields.io/badge/Django-5.x-092E20?logo=django)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-5.x-7952B3?logo=bootstrap)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Status](https://img.shields.io/badge/Status-En%20d%C3%A9veloppement-orange)
 
 ---
 
-## 1. Contexte métier
+## 📖 Table des matières
 
-Dans une organisation où le nombre de collaborateurs déclaré par le **système RH** (SIRH) ne correspond pas toujours au nombre **réellement présent** sur le terrain (départs non enregistrés, transferts en cours, ajouts non validés...), ce projet sert d'outil de **réconciliation** :
+- [Présentation](#-présentation)
+- [Principe métier](#-principe-métier)
+- [Fonctionnalités](#-fonctionnalités)
+- [Rôles utilisateurs](#-rôles-utilisateurs)
+- [Technologies utilisées](#-technologies-utilisées)
+- [Installation](#-installation)
+- [Configuration](#-configuration)
+- [Utilisation](#-utilisation)
+- [Structure du projet](#-structure-du-projet)
+- [Modèle de données](#-modèle-de-données)
+- [Captures d'écran](#-captures-décran)
+- [Optimisations](#-optimisations)
+- [Contribution](#-contribution)
+- [Licence](#-licence)
+- [Contact](#-contact)
+- [Annexes](#-annexes) _(fichiers complémentaires)_
 
-- chaque **responsable d'unité (N+1)** déclare quotidiennement qui est réellement présent dans son équipe (validation, ajout, départ, changement de responsable) ;
-- ces déclarations remontent et se consolident à chaque niveau hiérarchique (N+2, N+3, N+4) ;
-- les écarts entre **effectif système**, **effectif réel** (déclaré) et **effectif cible** (la « maquette », c'est-à-dire l'effectif théorique attribué à chaque responsable) sont visualisés sur des tableaux de bord dédiés ;
-- les équipes RH (HRBP / DRH / ADMIN / PILOT) disposent d'une vue consolidée par département, avec export Excel.
+---
 
-## 2. Rôles et hiérarchie
+## 🎯 Présentation
 
-L'application repose sur une authentification par session propre (pas le système `auth` de Django) : un `Collaborateur` peut avoir un compte `utilisateur` avec un ou plusieurs rôles activables.
+**Gestion des Effectifs** est une application Django conçue pour permettre aux organisations de :
 
-| Rôle | Portée | Ce qu'il voit / peut faire |
-|---|---|---|
-| **N+1** | Son équipe directe (opérateurs) | Déclare l'effectif réel du jour (valider / ajouter / départ / changement de RU), consulte son tableau de bord et son historique |
-| **N+2** | Les N+1 sous sa responsabilité | Supervise la validation des N+1, consulte les stats consolidées de son périmètre |
-| **N+3** | Les N+2 / N+1 sous sa responsabilité | Vue consolidée plus large, suivi des non-validés |
-| **N+4** | Toute la branche hiérarchique | Vue la plus large, groupée par N+3 → N+2 → N+1 |
-| **PILOT** | Un département entier | Gère la **maquette** (effectif cible) de chaque N+1/N+2/N+3/N+4 du département, synchronise les lignes de maquette, consulte le tableau de bord département |
-| **HRBP / DRH / ADMIN** | Un ou plusieurs départements | Vue RH consolidée, export Excel de l'effectif réel, suivi des affectations |
-| **SUPER** | Toute l'application | Gestion des comptes utilisateurs (création, modification, suppression, rôle) |
+- Suivre **en temps réel** l'effectif réel et système de chaque unité
+- Permettre aux **N+1 (Responsables d'Unité)** de déclarer quotidiennement leurs mouvements d'effectif
+- Offrir aux **managers supérieurs (N+2, N+3, N+4)** et aux **fonctions support (HRBP, DRH, ADMIN, PILOT, SUPER)** une vue consolidée et des outils de supervision
+- Comparer les effectifs avec les **maquettes** (effectifs cibles)
+- Importer des données depuis Excel/CSV et exporter les synthèses
 
-Un même collaborateur peut cumuler plusieurs rôles (ex. N+1 *et* N+3) ; il choisit son rôle actif via `changer-role/<role>/` après connexion.
+L'application repose sur une **hiérarchie multi-niveaux** (N+1 → N+4) et sur un principe de **déclaration journalière par les N+1**.
 
-## 3. Fonctionnalités
+---
 
-### Authentification (`utilisateur`)
-- Connexion par identifiant `it` + mot de passe (haché avec les hashers Django) ;
-- redirection automatique vers le tableau de bord du rôle actif ;
-- changement de rôle actif si le compte en cumule plusieurs ;
-- journal des connexions (`LoginLog` : connexion / déconnexion / échec).
+## 🔑 Principe métier
 
-### Import de données (`import_data`)
-- Import combiné de fichiers Excel/CSV : départements, collaborateurs, changements de responsable ;
-- détection des écarts entre l'import et les déclarations en cours (`analyser_declarations_vs_import`) ;
-- historique détaillé de chaque import (créations, modifications, suppressions, erreurs) consultable en JSON ;
-- export Excel de l'effectif réel (filtré par département) et de la synthèse des déclarations.
+> **⚡ Seuls les N+1 valident les déclarations d'effectif.**
+> Les autres rôles (N+2, N+3, N+4, HRBP, DRH, ADMIN, PILOT, SUPER) **consultent**, **supervisent**, **alertent** et **exportent** les données, mais **ne déclarent pas** à la place des N+1.
 
-### Déclaration d'effectif (`declaration_effectif`)
-- Déclaration quotidienne par un N+1 : validation, ajout, départ, changement de responsable ;
-- remontée en cascade des validations jusqu'au N+4 ;
-- historique des affectations et des décisions (validé / refusé / non démarré) ;
-- système d'alertes entre collaborateurs (ex. rappel de déclaration).
+### Cycle de déclaration
 
-### Gestion des collaborateurs et de la maquette (`Collaborateur`)
-- Listes hiérarchiques (N+1 par N+2, N+2 par N+3, N+3 par N+4) avec recherche et pagination ;
-- gestion de la **maquette N+1** (effectif cible par catégorie : Anapec/CDI, Pro, Tam, Cadre) avec historique complet des modifications ;
-- synchronisation automatique des lignes de maquette pour tous les niveaux de management d'un département.
+1. **N+1** ouvre son dashboard → déclare les mouvements de son équipe :
+   - **A** : Ajout d'un collaborateur
+   - **D** : Départ d'un collaborateur
+   - **C** : Changement d'affectation (transfert vers un autre RU)
+   - **V** : Validation de l'effectif tel quel
+2. **N+2** consulte la liste des N+1 n'ayant pas déclaré → peut envoyer des **alertes**
+3. **N+3** consulte une vue consolidée → suit les écarts réel/maquette
+4. **N+4** dispose d'une vue globale → peut exporter les synthèses
+5. **HRBP / DRH / ADMIN** suivent par **département** → comparer effectif réel/système/maquette
+6. **PILOT** gère les **maquettes** et synchronise les données
+7. **SUPER** administre les utilisateurs, les rôles et les logs
 
-### Tableaux de bord
-- Une vue dédiée par rôle (N1, N2, N3, N4, HRBP, PILOT, Super) ;
-- comparaison **effectif système vs effectif réel vs maquette** ;
-- graphiques Chart.js : évolution sur plusieurs jours/mois, comparatif par RU, répartition par lot (catégorie de contrat) ;
-- listes de départs déclarés et changements non encore appliqués.
+---
 
-## 4. Stack technique
+## ✨ Fonctionnalités
 
-| Composant | Techno |
-|---|---|
-| Framework web | Django 6.0.7 |
-| Langage | Python (testé avec 3.14 ; compatible 3.10+) |
-| Base de données | SQLite (`db.sqlite3`, configuration actuelle — voir [§11](#11-état-actuel-du-projet--points-dattention)) |
-| Frontend | Templates Django (HTML/CSS/JS), AJAX (fetch/jQuery selon les pages), [Chart.js](https://www.chartjs.org/) |
-| Import/Export | Pandas 2.2.3, OpenPyXL 3.1.5 |
-| Autres | `python-dotenv` (présent dans `requirements.txt`, non câblé dans `settings.py` actuellement) |
+### 🔐 Authentification et gestion des rôles
+- Authentification personnalisée (**IT + mot de passe**)
+- **Multi-rôles** par utilisateur : changement de rôle actif sans reconnexion
+- Journalisation des connexions (`LoginLog`)
+- Détection automatique du rôle selon la hiérarchie
 
-## 5. Structure du projet
+### 📋 Déclarations journalières (N+1 uniquement)
+- Interface dédiée pour la **déclaration du jour**
+- Gestion des **ajouts**, **départs**, **changements**, **validations**
+- Historique complet des mouvements
+- Suppression / modification d'une déclaration du jour
 
-```
-gestion-effectif/
-├── config/                  # Configuration Django (settings, urls, wsgi, asgi)
-├── utilisateur/              # Authentification, rôles, comptes, dashboards N+1/HRBP/PILOT/SUPER
-├── Collaborateur/            # Collaborateurs, départements, hiérarchie, maquette N+1
-├── declaration_effectif/     # Déclarations, validations, historique, alertes, dashboards N3/N4
-├── import_data/               # Import Excel/CSV, historique d'import, exports Excel
-├── static/                   # Assets statiques globaux (images, etc.)
-├── manage.py                  # Point d'entrée Django
-├── requirements.txt           # Dépendances Python
-└── db.sqlite3                 # Base de données locale (voir §11 — ne devrait pas être versionnée)
-```
+### 📊 Tableaux de bord par rôle
 
-Chaque app Django suit la structure standard : `models.py`, `views.py`, `urls.py`, `admin.py`, `templates/<app>/...`.
+| Rôle | Périmètre | Déclaration ? | Supervision |
+|------|-----------|:-------------:|:-----------:|
+| **N+1** | Son équipe directe | ✅ **Oui** | — |
+| **N+2** | Ses N+1 et leurs équipes | ❌ Non | ✅ Alertes, validation |
+| **N+3** | Ses N+2, N+1 et équipes | ❌ Non | ✅ Suivi consolidé |
+| **N+4** | Périmètre global | ❌ Non | ✅ Export global |
+| **HRBP / DRH / ADMIN** | Leurs départements | ❌ Non | ✅ Suivi par DPT |
+| **PILOT** | Son département | ❌ Non | ✅ Gestion maquettes |
+| **SUPER** | Tous les utilisateurs | ❌ Non | ✅ Administration |
 
-## 6. Modèle de données (résumé)
+### 📈 Maquettes et comparaisons
+- Définition des maquettes par N+1 (**A**, **T**, **P**, **C**)
+- Calcul automatique :
+  - **MR** = Réel − Maquette
+  - **MS** = Système − Maquette
+- Historique des modifications (`HistoriqueMaquetteN1`)
+- Répartition par lot : **A/O**, **P**, **E**, **C**
 
-```
-Departement ──< Collaborateur >── (auto-FK ru_it) : hiérarchie manager/subordonné
-     │                  │
-     │                  ├──< MaquetteN1 (effectif cible par catégorie A/T/P/C)
-     │                  │        └──< HistoriqueMaquetteN1 (traçabilité des modifications)
-     │                  │
-     │                  ├──< declaration_effectif (nature : V/D/C/A, par jour)
-     │                  ├──< Alert (notifications entre collaborateurs)
-     │                  └──< utilisateur (1‑1, compte de connexion + rôles + LoginLog)
-     │
-     └──< historique (suivi des changements d'affectation inter-départements)
-```
+### 📥 Import / Export
+- **Import Excel/CSV** :
+  - Départements
+  - Collaborateurs
+  - Changements d'affectation
+- **Analyse des écarts** entre déclarations et fichier importé
+- **Export Excel** :
+  - Effectif réel
+  - Synthèse des déclarations (départs, changements, ajouts)
+  - Historique des imports
 
-- **Collaborateur** : identifié par `it` (clé primaire), catégorisé par `lot` (Anapec, CDI, Pro, Tam, Cadre) et rattaché à un responsable (`ru_it`, auto-référence) et un département.
-- **declaration_effectif** : une ligne par déclaration (`V` valider, `D` départ, `C` changement de RU, `A` ajout), datée automatiquement.
-- **MaquetteN1** : une ligne active par manager (N+1 à N+4), avec un historique complet des modifications (`HistoriqueMaquetteN1`) et une propriété `total` calculée.
-- **utilisateur** : compte de connexion séparé du modèle `Collaborateur`, avec un rôle actif et des indicateurs booléens pour chaque rôle possédé (N1, N2, N3, N4, HRBP, ADMIN, SUPER, DRH, PILOT).
+### 🔔 Alertes et notifications
+- Envoi d'alertes aux N+1 n'ayant pas déclaré
+- Système de notifications par utilisateur
 
-## 7. Installation locale
+---
 
-**Prérequis** : Python 3.10+ et `pip`.
+## 👥 Rôles utilisateurs
+
+| Rôle | Description | Peut déclarer ? |
+|------|-------------|:---------------:|
+| **SUPER** | Administrateur système — gère tous les utilisateurs | ❌ |
+| **ADMIN** | Administrateur fonctionnel — gère son périmètre | ❌ |
+| **DRH** | Directeur des Ressources Humaines | ❌ |
+| **HRBP** | HR Business Partner | ❌ |
+| **PILOT** | Responsable de la maquette du département | ❌ |
+| **N+1** | **Manager d'équipe — seul à déclarer** | ✅ **OUI** |
+| **N+2** | Manager de N+1 | ❌ |
+| **N+3** | Manager de N+2 | ❌ |
+| **N+4** | Manager de N+3 | ❌ |
+
+---
+
+## 🛠️ Technologies utilisées
+
+- **Backend** : Python 3.10+, Django 5.x
+- **Base de données** : SQLite (dev) / PostgreSQL (prod)
+- **Frontend** : HTML5, CSS3, Bootstrap 5, JavaScript (Vanilla)
+- **Bibliothèques Python** :
+  - `pandas` — Import Excel/CSV
+  - `openpyxl` — Export Excel
+  - `django-redis` — Cache (optionnel)
+  - `django-debug-toolbar` — Debug (dev)
+
+---
+
+## 🚀 Installation
+
+### Prérequis
+- Python 3.10 ou supérieur
+- pip
+- virtualenv (recommandé)
+- Git
+
+### Étapes
 
 ```bash
+# 1. Cloner le dépôt
 git clone https://github.com/mimomo120/gestion-effectif.git
 cd gestion-effectif
 
+# 2. Créer et activer un environnement virtuel
 python -m venv venv
-source venv/bin/activate      # Windows : venv\Scripts\activate
 
+# Windows
+venv\Scripts\activate
+
+# Linux / macOS
+source venv/bin/activate
+
+# 3. Installer les dépendances
 pip install -r requirements.txt
-```
 
-Aucune variable d'environnement n'est requise pour démarrer en local : la base SQLite fournie (`db.sqlite3`) est utilisée telle quelle.
-
-## 8. Démarrage
-
-```bash
+# 4. Appliquer les migrations
 python manage.py migrate
+
+# 5. Créer un superutilisateur (optionnel)
+python manage.py createsuperuser
+
+# 6. Lancer le serveur
 python manage.py runserver
-```
-
-Puis ouvrir [http://127.0.0.1:8000/](http://127.0.0.1:8000/).
-
-Pour créer un premier compte utilisateur applicatif, un `Collaborateur` correspondant doit déjà exister en base (via `python manage.py shell`, l'admin Django `/admin/`, ou un import), puis s'inscrire via `/register/`.
-
-## 9. Routes principales
-
-| Préfixe / app | Exemples de routes | Rôle(s) typique(s) |
-|---|---|---|
-| `utilisateur` | `/`, `/register/`, `/dashboard/`, `/Dashboard/N2/`, `/PILOT/`, `/Dashboard/` | N+1, N+2, PILOT, HRBP/DRH/ADMIN |
-| `declaration_effectif` | `/validation/`, `/valider_operateurs/`, `/Dashboard_N3/`, `/Dashboard_N4/`, `/historique/` | N+1 à N+4, HRBP |
-| `Collaborateur` | `/rechercher/`, `/liste_N1_par_N2/`, `/maquette`, `/maquette-n1/synchroniser/` | N+1, N+2, PILOT |
-| `import_data` | `/import_data/import/`, `/import_data/export-effectif-reel/` | équipes RH / PILOT |
-| Admin Django | `/admin/` | superutilisateur Django |
-
-*(liste non exhaustive — voir les fichiers `urls.py` de chaque app pour le détail complet)*
-
-## 10. Commandes utiles
-
-```bash
-python manage.py makemigrations   # créer les migrations après modification des modèles
-python manage.py migrate          # appliquer les migrations
-python manage.py shell            # shell interactif Django
-python manage.py check            # vérifier le projet
-python manage.py createsuperuser  # créer un compte pour l'admin Django (/admin/)
-```
-
-## 11. État actuel du projet / points d'attention
-
-Cette section décrit l'état **réel** du dépôt tel qu'il a été inspecté, pour éviter les mauvaises surprises :
-
-- ⚠️ **`SECRET_KEY` et `DEBUG=True` sont codés en dur** dans `config/settings.py` — aucune bascule par variable d'environnement n'est en place pour l'instant. À ne surtout pas déployer tel quel en production.
-- ⚠️ **Seul SQLite est configuré** dans `DATABASES` — il n'y a pas (encore) de bascule automatique vers PostgreSQL.
-- ⚠️ **`db.sqlite3` est actuellement suivi par Git** (fichier volumineux contenant des données) — il n'y a pas de `.gitignore` à la racine du dépôt.
-- ⚠️ **`python-dotenv` est listé dans `requirements.txt`** mais n'est pas encore utilisé dans `settings.py` (aucun `load_dotenv()` ni lecture de variables d'environnement).
-- Il n'y a pas de fichier `LICENSE` à la racine.
-- Il n'y a pas de suite de tests automatisés remplie (les fichiers `tests.py` de chaque app sont vides).
-- Le projet cible un usage **interne à une organisation** avec des rôles hiérarchiques métier spécifiques (pas un produit générique).
-
-## 12. Pistes d'amélioration
-
-- Externaliser `SECRET_KEY`, `DEBUG` et `ALLOWED_HOSTS` via variables d'environnement (`python-dotenv` déjà présent en dépendance) et préparer une bascule PostgreSQL pour la production.
-- Ajouter un `.gitignore` (`db.sqlite3`, `__pycache__/`, `*.pyc`, `/staticfiles/`, `.env`) et retirer `db.sqlite3` du suivi Git (`git rm --cached db.sqlite3`).
-- Ajouter une suite de tests (au minimum sur la logique de hiérarchie et les calculs d'effectifs, qui sont la partie la plus sensible du projet).
-- Ajouter un fichier `LICENSE`.
-- Documenter le format attendu des fichiers Excel/CSV d'import (colonnes, types) dans `import_data/`.
-
-## 13. Licence
-
-Aucune licence n'est actuellement définie pour ce dépôt. Projet à usage interne — contacter le mainteneur pour toute question de réutilisation.

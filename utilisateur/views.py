@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect , get_object_or_404
 from utilisateur.models import utilisateur , LoginLog
-from Collaborateur.models import  Departement , Collaborateur ,Equipe, MaquetteN1
+from Collaborateur.models import  Departement , Collaborateur , MaquetteN1
 from django.contrib.auth.hashers import make_password , check_password
 from django.db.models import Q ,Count ,Max , F
 from django.contrib import messages
@@ -14,7 +14,7 @@ from Collaborateur.views import (
     get_effectif_reel_ids, get_effectif_reel_ids_multi, get_managers_its,
     get_maquettes_n1_map,niveau_hierarchique,
     repartir_maquette_par_lot, LOT_VERS_CHAMP_MAQUETTE,
-    _dates_fin_de_mois, _regrouper_par_annee, get_maquettes_a_date,
+    _dates_fin_de_mois,
     get_maquettes_a_date_multi,get_hierarchie_map,
     get_managers_racines, calculer_maquette_totale_perimetre,
     get_tous_les_it_sous, get_tous_les_it_sous_reel,
@@ -321,30 +321,10 @@ def tableau(request):
     }
     return render(request, "declaration_effectif/N1/dashboard_N1.html", context)
 
-def est_n1_pur(it_val):
-    role_calcule, n1, n2, n3, n4 = determiner_hierarchie(it_val)
-    if role_calcule != "N+1":
-        return False
-
-    util = utilisateur.objects.filter(it_id=it_val).first()
-    if not util:
-        return False
-
-    if util.role != "N+1":
-        return False
-    if util.N2 or util.N3 or util.N4:
-        return False
-
-    return True
 
 
 
-def verifier(request):
-    it = request.GET.get("q", "")
-    if it:
-        nbr = est_n1_pur(it)
-        return JsonResponse({"valide": nbr})
-    return JsonResponse({"valide": False})
+
 
 
 def deconnecter(request):
@@ -967,48 +947,7 @@ def modifier_user(request, id):
     }, status=200)
 
 
-def calculer_evolution_effectif_reel(departements, jours=30):
-    collaborateurs = Collaborateur.objects.filter(departement_id__in=departements)
-    liste_collab_ids = list(collaborateurs.values_list("it", flat=True))
-    total_collab = len(liste_collab_ids)
 
-    today = timezone.now().date()
-    date_debut = today - timedelta(days=jours)
-
-    declarations = declaration_effectif.objects.filter(
-        collaborateur_it__in=liste_collab_ids,
-        date__lte=today
-    ).order_by("collaborateur_it_id", "date").values(
-        "collaborateur_it_id", "date", "nature"
-    )
-
-    declarations_par_collab = defaultdict(list)
-    for d in declarations:
-        declarations_par_collab[d["collaborateur_it_id"]].append(
-            (d["date"], d["nature"])
-        )
-
-    dates_par_collab = {
-        collab_id: [d for d, _ in decls]
-        for collab_id, decls in declarations_par_collab.items()
-    }
-
-    labels = []
-    valeurs = []
-    date_courante = date_debut
-    while date_courante <= today:
-        nb_depart = 0
-        for collab_id, decls in declarations_par_collab.items():
-            dates_list = dates_par_collab[collab_id]
-            pos = bisect.bisect_right(dates_list, date_courante) - 1
-            if pos >= 0 and decls[pos][1] == "D":
-                nb_depart += 1
-
-        labels.append(date_courante.strftime("%d/%m"))
-        valeurs.append(total_collab - nb_depart)
-        date_courante += timedelta(days=1)
-
-    return {"labels": labels, "valeurs": valeurs}
 
 
 @role_required(["HRBP", "DRH", "ADMIN"])
@@ -1326,15 +1265,6 @@ def _get_departs_et_changements(departement):
         "nbr_changements_non_faits": len(liste_changements_non_faits),
     }
 
-
-def pilot_departs_changements(request):
-    it = request.session.get("it")
-    departement = get_object_or_404(Departement, PILOT_id=it)
-    context = {
-        "departement": departement,
-        **_get_departs_et_changements(departement),
-    }
-    return render(request, "declaration_effectif/PILOT/departs_changements.html", context)
 
 
 def _calculer_evolution_reel(departement_ids, today):

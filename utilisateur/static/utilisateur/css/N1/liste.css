@@ -438,3 +438,134 @@ body {
     background-color: #e0f2fe;
     color: #0369a1;
 }
+        /* ===== Combobox recherchable pour le filtre RU ===== */
+        .ru-combobox {
+            position: relative;
+        }
+    
+        .ru-combobox-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            cursor: pointer;
+            min-width: 220px;
+            text-align: left;
+        }
+    
+        .ru-combobox-trigger span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    
+        .ru-combobox-caret {
+            flex-shrink: 0;
+            font-size: 0.75rem;
+            color: var(--text-subtle, #94a3b8);
+            transition: transform 0.15s ease;
+        }
+    
+        .ru-combobox.open .ru-combobox-trigger {
+            border-color: var(--primary, #2563eb);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+    
+        .ru-combobox.open .ru-combobox-caret {
+            transform: rotate(180deg);
+        }
+    
+        .ru-combobox-panel {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            width: 280px;
+            max-width: 90vw;
+            background: var(--bg-surface, #ffffff);
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: var(--radius-md, 8px);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+            z-index: 40;
+            overflow: hidden;
+        }
+    
+        .ru-combobox-search {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid var(--border-light, #f1f5f9);
+        }
+    
+        .ru-combobox-search i {
+            color: var(--text-subtle, #94a3b8);
+            font-size: 0.8rem;
+        }
+    
+        .ru-combobox-search input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 0.875rem;
+            color: var(--text-main, #0f172a);
+            background: transparent;
+        }
+    
+        .ru-combobox-list {
+            list-style: none;
+            margin: 0;
+            padding: 0.35rem 0;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+    
+        .ru-combobox-option {
+            padding: 0.55rem 0.9rem;
+            font-size: 0.875rem;
+            color: var(--text-main, #0f172a);
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    
+        .ru-combobox-option:hover {
+            background-color: var(--bg-subtle, #f1f5f9);
+        }
+    
+        .ru-combobox-option.active {
+            background-color: var(--primary-light, #eff6ff);
+            color: var(--primary, #2563eb);
+            font-weight: 600;
+        }
+    
+        .ru-combobox-option.hidden-option {
+            display: none;
+        }
+    
+        .ru-combobox-empty {
+            padding: 0.85rem;
+            text-align: center;
+            font-size: 0.8125rem;
+            color: var(--text-subtle, #94a3b8);
+        }
+    
+        /* ===== Badge "RU non déclaré" ===== */
+        .badge-ru-non-declare {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 6px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+            cursor: help;
+        }
+    
+        .badge-ru-non-declare i {
+            font-size: 0.75rem;
+            color: #d97706;
+        }

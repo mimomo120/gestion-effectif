@@ -46,24 +46,7 @@ class Departement(models.Model):
 
     def __str__(self):
         return self.nom_departement
-
-class Equipe(models.Model):
-    nom = models.CharField(max_length=50)
-    abreviation = models.CharField(max_length=20, unique=True)
-    maquette = models.IntegerField(default=0, validators=[MinValueValidator(0)])
-    A = models.IntegerField(default=0, validators=[MinValueValidator(0)])  # A + O
-    P = models.IntegerField(default=0, validators=[MinValueValidator(0)])
-    C = models.IntegerField(default=0, validators=[MinValueValidator(0)])
-    T = models.IntegerField(default=0, validators=[MinValueValidator(0)])
-
-    class Meta:
-        verbose_name = "Équipe"
-        verbose_name_plural = "Équipes"
-
-    def __str__(self):
-        return self.nom
-
-
+    
 class Collaborateur(models.Model):
     SEXE_CHOICES = [
         (0, "Femme"),

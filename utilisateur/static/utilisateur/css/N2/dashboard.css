@@ -882,12 +882,6 @@ body {
     background-color: #f8fafc;
 }
 
-/* Tableau — variante "table table-sm table-hover align-middle"
-   utilisée par les popups Départs et Changements (#modalDepart et
-   #modalChangement). Avant ce correctif ces deux tables n'héritaient
-   d'aucun style custom-modal et gardaient le rendu Bootstrap brut,
-   ce qui les faisait trancher visuellement avec les popups N+2/N+3.
-   On applique ici le même habillage, sans devoir toucher au HTML. */
 .custom-modal .modal-body .table-responsive {
     margin: 0;
 }
@@ -1206,3 +1200,46 @@ body {
 .modal-footer .btn-secondary:hover {
     background-color: #475569;
 }
+        .ru-search-select {
+            position: relative;
+        }
+    
+        .ru-search-input {
+            width: 100%;
+        }
+    
+        .ru-search-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            z-index: 20;
+            max-height: 220px;
+            overflow-y: auto;
+            margin: 0;
+            padding: 4px 0;
+            list-style: none;
+            background: #fff;
+            border: 1px solid #d0d5dd;
+            border-radius: 6px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+        }
+    
+        .ru-search-dropdown.open {
+            display: block;
+        }
+    
+        .ru-search-option {
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+    
+        .ru-search-option:hover {
+            background: #f1f5f9;
+        }
+    
+        .ru-search-dropdown.no-results .ru-search-option {
+            display: none !important;
+        }

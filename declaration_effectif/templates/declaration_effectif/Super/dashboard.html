@@ -876,7 +876,6 @@
                     const result = await response.json();
                     if (response.ok) {
                         if (modalSupprimer) modalSupprimer.hide();
-                        // ⚡ Recharge via AJAX
                         fetchUsers(currentPage);
                     } else {
                         alertSuppr.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur.'}</div>`;
@@ -931,7 +930,6 @@
                     const result = await response.json();
                     if (response.ok) {
                         if (modalModifier) modalModifier.hide();
-                        // ⚡ Recharge via AJAX
                         fetchUsers(currentPage);
                     } else {
                         alertModif.innerHTML = `<div class="alert alert-danger py-2 mb-0 mt-2">${result.error || 'Erreur.'}</div>`;

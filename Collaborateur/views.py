@@ -596,33 +596,7 @@ def Ru_Rg(it):
     return Collaborateur.objects.filter(it__in=n1_ids)
 
 
-#-------------------------------------------------------#
-# Page : liste des collaborateurs directs + RU du N2
-#-------------------------------------------------------#
 
-@role_required('N+2')
-def liste_N1_par_N2(request):
-    it = request.session.get("it")
-    tous_les_it_reel = get_tous_les_it_sous_reel(it)
-    col_qs = Collaborateur.objects.filter(it__in=tous_les_it_reel).exclude(it=it)
-    PER_PAGE = 10
-    
-    paginator_ru = Paginator(col_qs, PER_PAGE)
-    page_ru = request.GET.get("page_ru", 1)
-    try:
-        ru_page_obj = paginator_ru.page(page_ru)
-    except PageNotAnInteger:
-        ru_page_obj = paginator_ru.page(1)
-    except EmptyPage:
-        ru_page_obj = paginator_ru.page(paginator_ru.num_pages)
-    return render(
-        request,
-        "Collaborateur/N2/liste_N1.html",
-        {
-            "operateurs": ru_page_obj,
-            "ru_count": paginator_ru.count,
-        },
-    )
 
 
 #-------------------------------------------------------#
@@ -656,42 +630,100 @@ def collaborateurs_par_ru(request, ru_it):
         "collaborateurs": data,
     })
 
-def rechercher_N1_par_N2(request):
-
+@role_required('N+2')
+def liste_N1_par_N2(request):
     it = request.session.get("it")
-    q = request.GET.get("q", "").strip()
-    lot = request.GET.get("choix", "").strip()
-    page_number = request.GET.get("page", 1)
+    tous_les_it_reel = get_tous_les_it_sous_reel(it)
 
-    resultat = Ru_Rg(it)
+    col_qs = (
+        Collaborateur.objects
+        .filter(it__in=tous_les_it_reel)
+        .exclude(it=it)
+        .select_related("ru_it")
+        .order_by("matricule")
+    )
+
+    PER_PAGE = 10
+    paginator_ru = Paginator(col_qs, PER_PAGE)
+    page_ru = request.GET.get("page_ru", 1)
+    try:
+        ru_page_obj = paginator_ru.page(page_ru)
+    except PageNotAnInteger:
+        ru_page_obj = paginator_ru.page(1)
+    except EmptyPage:
+        ru_page_obj = paginator_ru.page(paginator_ru.num_pages)
+
+    return render(
+        request,
+        "Collaborateur/N2/liste_N1.html",
+        {
+            "operateurs": ru_page_obj,
+            "ru_count":   paginator_ru.count,
+        },
+    )
+
+
+def rechercher_N1_par_N2(request):
+    """
+    Endpoint AJAX : recherche + filtre lot + pagination serveur
+    sur TOUS les collaborateurs sous le N+2.
+    """
+    it = request.session.get("it")
+    if not it:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+
+    q            = request.GET.get("q", "").strip()
+    lot          = request.GET.get("choix", "").strip()
+    page_number  = request.GET.get("page", 1)
+
+    tous_les_it_reel = get_tous_les_it_sous_reel(it)
+
+    resultat = (
+        Collaborateur.objects
+        .filter(it__in=tous_les_it_reel)
+        .exclude(it=it)
+        .select_related("ru_it")
+        .order_by("matricule")
+    )
 
     if q:
         resultat = resultat.filter(
-            Q(matricule__icontains=q) | Q(nom_complete__icontains=q)
+            Q(matricule__icontains=q) |
+            Q(it__icontains=q) |
+            Q(nom_complete__icontains=q)
         )
+
     if lot:
         resultat = resultat.filter(lot=lot)
 
-    paginator = Paginator(resultat, 15)
-    page_obj = paginator.get_page(page_number)
+    paginator = Paginator(resultat, 10)
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages if paginator.num_pages else 1)
 
     results = [
         {
-            "matricule": op.matricule,
-            "it": op.it,
-            "nom_complete": op.nom_complete,
-            "lot": op.lot,
+            "matricule":      op.matricule,
+            "it":             op.it,
+            "nom_complete":   op.nom_complete,
+            "lot":            op.lot,
+            "ru_nom":         op.ru_it.nom_complete if op.ru_it else "-",
         }
         for op in page_obj
     ]
 
     return JsonResponse({
-        "results": results,
-        "count": paginator.count,
-        "page": page_obj.number,
-        "num_pages": paginator.num_pages,
+        "results":      results,
+        "count":        paginator.count,
+        "page":         page_obj.number,
+        "num_pages":    paginator.num_pages,
         "has_previous": page_obj.has_previous(),
-        "has_next": page_obj.has_next(),
+        "has_next":     page_obj.has_next(),
+        "previous_page": page_obj.previous_page_number() if page_obj.has_previous() else None,
+        "next_page":     page_obj.next_page_number() if page_obj.has_next() else None,
     })
 #-------------------------------------------------------#
 #Cette fct return la liste des N+2 d'un N+3
@@ -926,7 +958,6 @@ def get_dernieres_declarations():
 
 
 def get_ru_reel_et_departs():
-
     cached = cache.get("ru_reel_et_departs")
     if cached is not None:
         return cached
@@ -940,6 +971,8 @@ def get_ru_reel_et_departs():
             departs.add(it_collab)
         elif decl.nature == "C" and decl.nv_Ru_id:
             ru_reel[it_collab] = decl.nv_Ru_id
+        elif decl.nature == "A" and decl.Ru_id:
+            ru_reel[it_collab] = decl.Ru_id       
         elif decl.Ru_id:
             ru_reel[it_collab] = decl.Ru_id
 
@@ -953,7 +986,7 @@ def get_tous_les_it_sous_reel(it):
 
     enfants_par_ru = {}
     for c in Collaborateur.objects.exclude(it__in=departs):
-        ru_effectif = ru_reel.get(c.it, c.ru_it_id)
+        ru_effectif = ru_reel.get(c.it) or c.ru_it_id
         if ru_effectif:
             enfants_par_ru.setdefault(ru_effectif, []).append(c.it)
 
@@ -1193,7 +1226,6 @@ def verifier(request):
     ).exists()
     if not est_ru:
         return JsonResponse({"valide": False, "erreur": "Cet identifiant n'est pas un RU."})
-
     return JsonResponse({"valide": True})
 
 def get_effectif_reel_ids(departement_ids, at_date, ru_id=None):
@@ -1603,21 +1635,6 @@ def collaborateur_api(request):
         "next_page": page_obj.next_page_number() if page_obj.has_next() else None,
     })
 
-def get_n1_reels(departement):
-    collaborateurs = Collaborateur.objects.filter(
-        departement_id=departement.abreviation,
-        lot__in=LOTS_OPERATEUR_N1,
-    ).exclude(
-        ru_it_id__isnull=True
-    ).exclude(
-        ru_it_id=F('it')
-    )
-
-    ru_ids = set(collaborateurs.values_list('ru_it_id', flat=True))
-
-    ru_ids.discard(None)
-    return ru_ids
-
 
 
 @transaction.atomic
@@ -1850,42 +1867,11 @@ def _dates_fin_de_mois(nb_annees=3):
     return annees, mois_cles, mois_labels, dates_ref
 
 
-def _regrouper_par_annee(mois_cles, valeurs):
-    labels_par_annee, data_par_annee = {}, {}
-    for (annee, mois), v in zip(mois_cles, valeurs):
-        labels_par_annee.setdefault(annee, []).append(f"{mois:02d}")
-        data_par_annee.setdefault(annee, []).append(v)
-    return labels_par_annee, data_par_annee
-
-
 class _MaquetteSnapshot:
     __slots__ = ("A", "T", "P", "C")
     def __init__(self, A=0, T=0, P=0, C=0):
         self.A, self.T, self.P, self.C = A, T, P, C
 
-
-def get_maquettes_a_date(ru_ids, at_date):
-
-    ru_ids = list(ru_ids)
-    if not ru_ids:
-        return {}
-
-    entrees = (
-        HistoriqueMaquetteN1.objects
-        .filter(n1_id__in=ru_ids, date__date__lte=at_date)
-        .order_by("n1_id", "-date", "-id")
-    )
-    resultat = {}
-    vus = set()
-    for h in entrees:
-        if h.n1_id in vus:
-            continue
-        vus.add(h.n1_id)
-        resultat[h.n1_id] = _MaquetteSnapshot(
-            A=h.nouveau_A or 0, T=h.nouveau_T or 0,
-            P=h.nouveau_P or 0, C=h.nouveau_C or 0,
-        )
-    return resultat
 
 def get_maquettes_a_date_multi(ru_ids, dates):
 
@@ -2069,62 +2055,6 @@ def get_hierarchie_complete():
     return result
 
 
-def get_vrais_n1_purs():
-    cache_key = "vrais_n1_purs_v1"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    h = get_hierarchie_complete()
-    vrais = set()
-    for it in (h["l1"] & h["managers_aop"]):
-        if it in (h["l2"] | h["l3"] | h["l4"]):
-            continue
-        vrais.add(it)
-
-    cache.set(cache_key, vrais, CACHE_TTL_MEDIUM)
-    return vrais
-
-
-def invalider_tout_cache():
-    cache.delete_many([
-        "hierarchie_complete_v1",
-        "vrais_n1_purs_v1",
-        "managers_its",
-        "managers_avec_aop",
-        "hierarchie_map",
-        "niveaux_hierarchie_v1",
-        "ru_reel_et_departs",
-    ])
-    try:
-        cache.delete_pattern("reel_batch_*")
-        cache.delete_pattern("tous_n1_*")
-        cache.delete_pattern("maquettes_multi_*")
-    except AttributeError:
-        # delete_pattern n'existe que sur Redis/django-redis
-        cache.clear()
-
-
-# ============================================================
-# 2. CACHE EFFECTIFS PAR RU
-# ============================================================
-
-def get_effectif_batch(ru_ids):
-    ru_ids = tuple(sorted(set(ru_ids)))
-    if not ru_ids:
-        return {}
-
-    cache_key = f"reel_batch_{hash(ru_ids)}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    from declaration_effectif.views import _reel_effectif_batch
-    resultat = _reel_effectif_batch(list(ru_ids))
-
-    cache.set(cache_key, resultat, CACHE_TTL_SHORT)
-    return resultat
-
 
 # ============================================================
 # 3. CACHE MAQUETTES MULTI-DATES
@@ -2148,24 +2078,6 @@ def get_maquettes_multi(ru_ids, dates):
     return resultat
 
 
-# ============================================================
-# 4. CACHE "TOUS LES N+1 SOUS UN IT"
-# ============================================================
-
-def get_tous_les_n1_cached(it):
-    if not it:
-        return set()
-
-    cache_key = f"tous_n1_{it}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    from Collaborateur.views import get_tous_les_n1
-    resultat = get_tous_les_n1(it)
-
-    cache.set(cache_key, resultat, CACHE_TTL_MEDIUM)
-    return resultat
 
 
 # ============================================================

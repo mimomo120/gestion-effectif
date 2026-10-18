@@ -22,7 +22,6 @@ class utilisateur(models.Model):
     SUPER=models.IntegerField(choices=[("1",True),("0",False)])
     DRH=models.IntegerField(choices=[("1",True),("0",False)])
     PILOT=models.IntegerField(choices=[("1",True),("0",False)])
-    doit_changer_mdp = models.BooleanField(default=False)
     def set_password(self, raw_password):
         """Hasher le password avant stockage"""
         self.password = make_password(raw_password)
